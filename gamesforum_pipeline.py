@@ -603,7 +603,11 @@ Work through these in order and actually change the text:
    back to the last genuinely interesting line.
 7. TELLS. Remove "בואו נצלול", mutual compliments, three consecutive
    agreements, consecutive turns opening on the same word.
-8. LENGTH. Cut to under 1100 words. Cut whole exchanges, not adjectives.
+8. LENGTH. The result must land between 900 and 1100 words. If the draft is
+   already in that band, do NOT shorten it: fix the problems above in place.
+   Only if it exceeds 1100 do you cut, and then cut whole exchanges rather
+   than trimming everywhere. Returning a much shorter script is a failure,
+   not a tighter edit.
 9. HEBREW. Anything that reads like translated English gets rewritten the way
    someone would actually say it out loud.
 
@@ -884,6 +888,17 @@ def write_script(digest: str, budget: str = "") -> str:
     log("  pass 3/3: polish")
     polished = gemini_text(build_polish_prompt(script, digest))
 
+    # Run #2 shipped a 68-second episode. The polish pass, told to cut, cut
+    # most of the script away, and the guard let it through because the draft
+    # was already flagged "thin" so no NEW problem class appeared. Length is
+    # therefore checked on its own terms, before anything else.
+    draft_words = sum(len(t.split()) for _, t in parse_turns(script))
+    polished_words = sum(len(t.split()) for _, t in parse_turns(polished))
+    if draft_words and polished_words < draft_words * 0.75:
+        log(f"    polish cut {draft_words} words to {polished_words} "
+            f"({polished_words / draft_words:.0%}); keeping draft")
+        return script
+
     after = lint_script(polished)
 
     # Accept the edit only if it is genuinely not worse. Comparing issue
@@ -905,6 +920,31 @@ def write_script(digest: str, budget: str = "") -> str:
     for w in after:
         log(f"    final: {w}")
     return polished
+
+
+MIN_EPISODE_WORDS = 650          # roughly four minutes spoken
+
+
+def write_script_checked(digest: str, budget: str = "") -> str:
+    """write_script, with a hard floor on length.
+
+    A too-short episode is not a stylistic problem, it is a broken deliverable.
+    One retry, then ship the longest attempt rather than nothing, but say so
+    loudly in the log.
+    """
+    best = ""
+    best_words = 0
+    for attempt in (1, 2):
+        script = write_script(digest, budget)
+        words = sum(len(t.split()) for _, t in parse_turns(script))
+        log(f"  script attempt {attempt}: {words} words")
+        if words > best_words:
+            best, best_words = script, words
+        if words >= MIN_EPISODE_WORDS:
+            return script
+        log(f"  TOO SHORT (floor {MIN_EPISODE_WORDS}); regenerating")
+    log(f"  WARNING: shipping {best_words} words, under the floor")
+    return best
 
 
 # ---------------------------------------------------------------- audio
@@ -1082,7 +1122,7 @@ def main() -> int:
     )
 
     log("writing podcast script")
-    script = write_script(digest, budget)
+    script = write_script_checked(digest, budget)
     for w in verify_script(script, digest):
         log(f"  ! {w}")
     (DIGESTS / f"{today}-script.md").write_text(script, encoding="utf-8")

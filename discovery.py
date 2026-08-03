@@ -343,6 +343,99 @@ def write_ledger(date: str, rows: list[dict], profile: dict) -> pathlib.Path:
 # ------------------------------------------------------------ main
 
 
+STOPWORDS = {
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "as", "by", "from", "is", "are", "was", "were", "be",
+    "its", "it", "this", "that", "how", "why", "what", "new", "more",
+    "says", "said", "after", "over", "into", "out", "up", "down", "his",
+    "her", "their", "not", "can", "will", "has", "have", "had",
+}
+
+
+# Words that say "mobile games article" and nothing about WHICH story.
+# Without this list every pair looks related.
+GENERIC = {
+    "gaming", "games", "game", "mobile", "studio", "studios", "player",
+    "players", "market", "revenue", "app", "apps", "store", "industry",
+    "company", "companies", "data", "report", "million", "billion",
+    "growth", "launch", "users", "user", "based", "case", "against",
+    "showing", "shows", "using", "expand", "target", "results", "quarter",
+    "business", "platform", "advertising", "spend", "acquisition",
+    "acquires", "financial", "detailed", "insights", "strategy",
+}
+
+
+def _is_name(tok: str) -> bool:
+    """Would this token identify WHICH story, if shared?
+
+    Bare integers and years fail: two unrelated pieces both mentioning 2026
+    are not the same story. A figure like 719m does identify one.
+    """
+    if tok in GENERIC:
+        return False
+    if tok.isdigit():
+        return False                       # includes years
+    if tok[0].isdigit() and len(tok) < 3:
+        return False
+    return len(tok) >= 3
+
+
+def _fingerprint(art: dict) -> set[str]:
+    """Distinctive tokens from title plus the model's one-line summary.
+
+    Two outlets covering one event rarely share a headline, but they always
+    share the names: Papaya, Skillz, 719m.
+    """
+    text = f"{art.get('title', '')} {art.get('_why', '')}".lower()
+    tokens = re.findall(r"[a-z][a-z0-9'.-]{2,}|\d[\d.,]*[a-z]*", text)
+    return {t.strip(".,'") for t in tokens if t not in STOPWORDS} - {""}
+
+
+def dedupe_stories(chosen: list[dict], min_shared: int = 3,
+                   min_overlap: float = 0.18) -> list[dict]:
+    """Drop a second telling of a story already in the episode.
+
+    URL de-duplication only catches literal repeats. Two outlets covering the
+    same court ruling produce two different URLs, two different headlines and,
+    as seen in run #2, two conflicting dollar figures for one event.
+
+    Detection is by shared NAMES, not overall word overlap. A weekly roundup
+    covering five stories shares little vocabulary with a single-story piece
+    even when one contains the other, so plain Jaccard scores it as unrelated.
+    But "skillz" and "papaya" appearing in both is close to conclusive.
+
+    Two conditions, both required, to keep false merges rare:
+      * at least `min_shared` distinctive names in common
+      * overlap of at least `min_overlap` against the smaller item
+    """
+    kept: list[dict] = []
+    for art in chosen:                      # already sorted best first
+        fp = _fingerprint(art)
+        clash = None
+        for other in kept:
+            ofp = _fingerprint(other)
+            if not fp or not ofp:
+                continue
+            shared = fp & ofp
+            distinctive = {t for t in shared if _is_name(t)}
+            overlap = len(shared) / min(len(fp), len(ofp))
+            if len(distinctive) >= min_shared and overlap >= min_overlap:
+                log(f"    shared names: {sorted(distinctive)[:5]}")
+                clash = other
+                break
+        if clash:
+            art["_reject"] = f"אותו סיפור כמו \"{clash['title'][:40]}\""
+            log(f"  duplicate story dropped: {art['title'][:56]}")
+            # Keep the link, so the show notes still credit both outlets.
+            clash.setdefault("_also", []).append(
+                {"title": art["title"], "url": art["url"],
+                 "source": art.get("source", "")}
+            )
+            continue
+        kept.append(art)
+    return kept
+
+
 def apply_caps(scored: list[dict], sources: list[dict], thr: dict) -> list[dict]:
     """Rank globally, then enforce a per-source ceiling.
 
@@ -517,7 +610,11 @@ def select(dry_run: bool = False) -> list[dict]:
         if notes:
             art["_why"] += " · " + " · ".join(notes)
 
-    chosen = apply_caps(survivors, sources, thr)
+    # Over-select, drop repeat tellings, then trim to the real limit, so a
+    # duplicate costs the episode nothing.
+    wanted = thr["max_articles"]
+    thr_wide = {**thr, "max_articles": wanted + 3}
+    chosen = dedupe_stories(apply_caps(survivors, sources, thr_wide))[:wanted]
     assign_airtime(chosen, profile)
     chosen_urls = {a["url"] for a in chosen}
 

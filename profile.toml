@@ -51,6 +51,16 @@ link_pattern = '/(?:features|news)/[a-z0-9][a-z0-9\-.]{8,}'
 weight = 1.0
 max_per_episode = 2
 
+# Gamesforum מפרסמים סיכומים שבועיים בדיוק כמו PocketGamer. הם נקראים
+# כדי לחלץ מהם לינקים ולתת בוסט לכתבות שהובלטו, אבל לא נכנסים כתוכן.
+# בלי זה סיכום ששכב על סיפור אחד נכנס לפרק לצד הכתבה המקורית עליו,
+# ואז אותו סיפור נשמע פעמיים עם שני מספרים סותרים.
+roundup_patterns = [
+  "the gaming dispatch", "the roundup", "the weekly round-up",
+  "weekly roundup", "this week's biggest stories", "week in views",
+]
+roundup_boost = 1.6
+
 [[sources]]
 name = "PocketGamer.biz"
 kind = "rss"
