@@ -1,0 +1,121 @@
+# מי אתה ומאיפה קוראים. זה הקובץ היחיד שתערוך.
+# אחרי כל ריצה תקבל ledger שמראה מה נכנס, מה נזרק ולמה. תכוון לפי זה.
+
+[identity]
+who = """
+בעלים של חברת משחקי מובייל. מנהל בפועל UA, מונטיזציה (IAP, מודעות,
+היברידי), LiveOps ומוצר. איש מקצוע ותיק, לא צריך הסברי יסוד.
+"""
+
+# ---------------------------------------------------------------- מקורות
+#
+# weight          מכפיל על ציון הרלוונטיות. מקור חלש יותר לא נחסם, רק צריך
+#                 להיות טוב יותר כדי להיכנס.
+# max_per_episode תקרה קשיחה לכל מקור. זה הדבר שמונע ממקור בעל נפח גבוה
+#                 להשתלט על הפרק רק כי הוא מפרסם הרבה. חשוב.
+# block           דפוסי כותרת שנפסלים לפני הורדה, בנוסף לרשימה הגלובלית.
+
+[[sources]]
+name = "Gamesforum"
+kind = "html"
+urls = [
+  "https://www.globalgamesforum.com/features",
+  "https://www.globalgamesforum.com/news",
+]
+link_pattern = '/(?:features|news)/[a-z0-9][a-z0-9\-.]{8,}'
+weight = 1.0
+max_per_episode = 2
+
+[[sources]]
+name = "PocketGamer.biz"
+kind = "rss"
+urls = ["https://www.pocketgamer.biz/index.rss"]
+weight = 1.0
+max_per_episode = 3
+
+# הסיכומים השבועיים שלהם. הם לא נכנסים לפרק כתוכן — אם נסכם סיכום
+# נאבד את המספרים ונקבל דחיסה כפולה. במקום זה הם נקראים כדי לחלץ מהם
+# את הלינקים, וכל כתבה שהעורכים שלהם בחרו להבליט מקבלת בוסט.
+# זה השימוש הנכון בהם: אות עריכתי, לא חומר גלם.
+roundup_patterns = ["hot five", "week in views", "week in mobile games"]
+roundup_boost = 1.6
+
+# פורמטים חוזרים שמייצרים ערך גבוה באופן עקבי.
+boost = [
+  "in the hot seat",       # ראיונות עומק עם מפעילים
+  "charticle",             # ניתוח מבוסס נתונים
+  "mobile mavens",         # פאנל אנליסטים
+  "q[1-4] results", "revenue up", "revenue rises", "net bookings",
+  "earnings", "benchmark",
+]
+
+block = [
+  "pgc\\b", "pg connects", "pocket gamer connects", "speaker lineup",
+  "who's coming", "summit shanghai",
+  "jobs? news", "movers and shakers", "appoints", "steps? down",
+  "joins .* as", "hiring", "game jam", "student ambassador",
+  "in association with", "sponsored", "esports nations",
+]
+
+# אזהרה: pocketgamer.com הוא אתר צרכני, לא B2B. רוב התוכן שם ביקורות,
+# מדריכים ורשימות "המשחקים הכי טובים", שלא רלוונטיים לך כמפעיל.
+# השארתי אותו בפנים במשקל נמוך ועם חסימות אגרסיביות. אם ה-ledger מראה
+# שהוא לא מייצר ערך אחרי כמה שבועות, פשוט תמחק את הבלוק הזה.
+[[sources]]
+name = "PocketGamer.com"
+kind = "rss"
+urls = ["https://www.pocketgamer.com/index.rss"]
+weight = 0.55
+max_per_episode = 1
+block = [
+  "review", "hands-on", "preview", "best .* games", "tier list",
+  "guide", "how to", "codes", "cheats", "walkthrough", "tips and tricks",
+  "everything we know", "release date", "beginner", "characters ranked",
+  "update .* patch notes", "giveaway",
+]
+
+# ---------------------------------------------------------------- טעם
+
+[interests]
+core = [
+  "מונטיזציה: IAP, מודעות, היברידי, תמחור, מבנה חנות",
+  "UA: CPI, ROAS, אטריביוציה, יצירתיבים, ערוצים, תקופות החזר",
+  "LTV, retention, churn, סגמנטציה של שחקנים",
+  "LiveOps: אירועים, battle pass, עיצוב כלכלה, לוחות תוכן",
+  "בנצ'מרקים ונתונים קשים על ביצועי ז'אנרים",
+  "מהלכי שוק שמשנים את מרחב האפשרויות שלי: רכישות, מדיניות חנויות, עמלות, רגולציה",
+  "DTC ומכירה ישירה, עקיפת עמלות הפלטפורמה",
+]
+
+deprioritize = [
+  "חדשות קונסולות או PC בלבד, בלי זווית מובייל",
+  "מאמרי דעה כלליים על AI בלי נתונים או מקרה בוחן",
+  "הכרזות מימון של סטודיו קטן בלי מספרים או תובנה תפעולית",
+  "סיכומי כנסים גנריים",
+  "ביקורות משחקים ותוכן שמכוון לשחקנים ולא למפעילים",
+]
+
+# נחסם בכל המקורות.
+[hard_block]
+title_patterns = [
+  "meet the speakers", "register now", "book your", "tickets",
+  "save €", "save $", "early bird", "agenda", "join us",
+  "why .* has become", "why .* is emerging",
+  "last chance", "days remaining", "sponsor",
+]
+
+[thresholds]
+min_score = 6          # ציון רלוונטיות מינימלי אחרי המשקל
+max_articles = 5       # סה"כ כתבות בפרק
+min_words = 250        # מתחת לזה זה קצרמר
+max_age_days = 10      # מתעלם מארכיון, מונע הצפה בריצה ראשונה
+
+# ---------------------------------------------------------------- זמן אוויר
+#
+# איך הציון מתורגם לזמן דיבור בפרק. הכתבה החזקה מקבלת סיפור, החלשה
+# מקבלת משפט. בלי זה כל פריט מקבל אותו נפח וזה נשמע כמו רשימה.
+
+[airtime]
+lead_share = 0.40      # הסיפור המוביל מקבל 40% מהפרק
+second_share = 0.25
+remainder_share = 0.35 # מתחלק בין השאר
