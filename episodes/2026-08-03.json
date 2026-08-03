@@ -1,37 +1,37 @@
 {
   "title": "Gamesforum Digest 2026-08-03",
-  "summary": " פסק דין של 719 מיליון דולר בתביעת Skillz נגד Papaya Gaming",
-  "notes": "<p> פסק דין של 719 מיליון דולר בתביעת Skillz נגד Papaya Gaming</p><p><strong>מקורות הפרק (5):</strong></p><ol><li><a href=\"https://www.globalgamesforum.com/news/the-gaming-dispatch-skill-gaming-lawsuit-epic-in-japan-leadership-transitions-subway-surfers-movie-vietnams-scale\">The Gaming Dispatch: Skill-Gaming Lawsuit, Epic in Japan, Leadership Transitions, Subway Surfers Movie &amp; Vietnam’s Scale</a> <em>(Gamesforum)</em></li><li><a href=\"https://www.pocketgamer.biz/court-orders-papaya-gaming-to-pay-skillz-719m-in-false-advertising-case/\">Court orders Papaya Gaming to pay Skillz $719m in false advertising case</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.globalgamesforum.com/features/why-your-pricing-is-killing-your-ltv-and-how-to-fix-it-with-app-growth-consultant-sven-juergens\">Why Your Pricing Is Killing Your LTV (And How to Fix It) With App Growth Consultant Sven Jürgens</a> <em>(Gamesforum)</em></li><li><a href=\"https://www.pocketgamer.biz/apple-pushes-back-against-proposed-uk-app-store-rules/\">Apple pushes back against proposed UK App Store rules</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/burny-games-ceo-anatolii-henis-on-building-a-repeatable-mobile-games-business/\">Burny Games CEO Anatolii Henis on building a repeatable mobile games business </a> <em>(PocketGamer.biz)</em></li></ol><p>נבחרו אוטומטית מתוך מקורות שהוגדרו ב-profile.toml. פירוט מלא של מה נבחר ומה נזרק: ledger/2026-08-03.md</p>",
-  "duration": 68,
+  "summary": " איזון קושי במשחקי פאזל היברידיים לפי SayGames",
+  "notes": "<p> איזון קושי במשחקי פאזל היברידיים לפי SayGames</p><p><strong>מקורות הפרק (5):</strong></p><ol><li><a href=\"https://www.pocketgamer.biz/how-saygames-uses-game-analytics-to-balance-difficulty-in-hybrid-puzzle-games/\">How SayGames uses game analytics to balance difficulty in hybrid puzzle games</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/mobile-gaming-iap-dipped-2-as-ad-spend-climbed-in-h1-2026/\">Mobile IAP revenue dipped 2% while ad spend climbed in H1 2026</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/in-the-hot-seat-the-ex-riot-producer-betting-mini-games-will-be-chinas-next-big-export/\">In the Hot Seat: The ex-Riot producer betting mini-games will be China's next big export</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.globalgamesforum.com/features/cheat-code-for-ltv-growth-why-rewarding-existing-players-may-be-mobile-gamings-next-growth-lever\">Cheat Code for LTV Growth: Why Rewarding Existing Players May Be Mobile Gaming’s Next Growth Lever</a> <em>(Gamesforum)</em></li><li><a href=\"https://www.globalgamesforum.com/features/mobile-gamings-spend-to-grow-model-is-evolving\">Mobile Gaming’s Spend-to-Grow Model Is Evolving</a> <em>(Gamesforum)</em></li></ol><p>נבחרו אוטומטית מתוך מקורות שהוגדרו ב-profile.toml. פירוט מלא של מה נבחר ומה נזרק: ledger/2026-08-03.md</p>",
+  "duration": 54,
   "sources": [
     {
-      "title": "The Gaming Dispatch: Skill-Gaming Lawsuit, Epic in Japan, Leadership Transitions, Subway Surfers Movie & Vietnam’s Scale",
-      "url": "https://www.globalgamesforum.com/news/the-gaming-dispatch-skill-gaming-lawsuit-epic-in-japan-leadership-transitions-subway-surfers-movie-vietnams-scale",
-      "source": "Gamesforum",
+      "title": "How SayGames uses game analytics to balance difficulty in hybrid puzzle games",
+      "url": "https://www.pocketgamer.biz/how-saygames-uses-game-analytics-to-balance-difficulty-in-hybrid-puzzle-games/",
+      "source": "PocketGamer.biz",
       "airtime": 0.4
     },
     {
-      "title": "Court orders Papaya Gaming to pay Skillz $719m in false advertising case",
-      "url": "https://www.pocketgamer.biz/court-orders-papaya-gaming-to-pay-skillz-719m-in-false-advertising-case/",
+      "title": "Mobile IAP revenue dipped 2% while ad spend climbed in H1 2026",
+      "url": "https://www.pocketgamer.biz/mobile-gaming-iap-dipped-2-as-ad-spend-climbed-in-h1-2026/",
       "source": "PocketGamer.biz",
       "airtime": 0.25
     },
     {
-      "title": "Why Your Pricing Is Killing Your LTV (And How to Fix It) With App Growth Consultant Sven Jürgens",
-      "url": "https://www.globalgamesforum.com/features/why-your-pricing-is-killing-your-ltv-and-how-to-fix-it-with-app-growth-consultant-sven-juergens",
+      "title": "In the Hot Seat: The ex-Riot producer betting mini-games will be China's next big export",
+      "url": "https://www.pocketgamer.biz/in-the-hot-seat-the-ex-riot-producer-betting-mini-games-will-be-chinas-next-big-export/",
+      "source": "PocketGamer.biz",
+      "airtime": 0.117
+    },
+    {
+      "title": "Cheat Code for LTV Growth: Why Rewarding Existing Players May Be Mobile Gaming’s Next Growth Lever",
+      "url": "https://www.globalgamesforum.com/features/cheat-code-for-ltv-growth-why-rewarding-existing-players-may-be-mobile-gamings-next-growth-lever",
       "source": "Gamesforum",
       "airtime": 0.117
     },
     {
-      "title": "Apple pushes back against proposed UK App Store rules",
-      "url": "https://www.pocketgamer.biz/apple-pushes-back-against-proposed-uk-app-store-rules/",
-      "source": "PocketGamer.biz",
-      "airtime": 0.117
-    },
-    {
-      "title": "Burny Games CEO Anatolii Henis on building a repeatable mobile games business ",
-      "url": "https://www.pocketgamer.biz/burny-games-ceo-anatolii-henis-on-building-a-repeatable-mobile-games-business/",
-      "source": "PocketGamer.biz",
+      "title": "Mobile Gaming’s Spend-to-Grow Model Is Evolving",
+      "url": "https://www.globalgamesforum.com/features/mobile-gamings-spend-to-grow-model-is-evolving",
+      "source": "Gamesforum",
       "airtime": 0.117
     }
   ]
