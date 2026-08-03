@@ -1,0 +1,38 @@
+{
+  "title": "Gamesforum Digest 2026-08-03",
+  "summary": " השפעת הרגולציה והגינות דיגיטלית על משחקי מובייל",
+  "notes": "<p> השפעת הרגולציה והגינות דיגיטלית על משחקי מובייל</p><p><strong>מקורות הפרק (5):</strong></p><ol><li><a href=\"https://www.globalgamesforum.com/features/francisco-chilaeo-rocha-why-digital-fairness-is-reshaping-mobile-gaming\">Francisco Chilão Rocha: Why Digital Fairness Is Reshaping Mobile Gaming</a> <em>(Gamesforum)</em></li><li><a href=\"https://www.globalgamesforum.com/features/the-rise-of-dtc-channels-with-berkley-egenes\">The Rise of Direct-to-Consumer Gaming: Xsolla's Berkley Egenes on DTC Strategies and Web Shops</a> <em>(Gamesforum)</em></li><li><a href=\"https://www.pocketgamer.biz/garena-is-developing-palworld-online-launching-this-year/\">Garena is developing Palworld Online, launching this year</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/roblox-revenue-rises-36-yy-but-young-north-americans-see-falling-per-hour-monetisation/\">Roblox revenue rises 36% Y/Y, but young North Americans see falling per-hour monetisation</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/reforged-labs-shuts-down-as-ceo-says-ai-is-closing-its-market-opportunity/\">Reforged Labs shuts down as CEO says AI is closing its market opportunity</a> <em>(PocketGamer.biz)</em></li></ol><p>נבחרו אוטומטית מתוך מקורות שהוגדרו ב-profile.toml. פירוט מלא של מה נבחר ומה נזרק: ledger/2026-08-03.md</p>",
+  "duration": 68,
+  "sources": [
+    {
+      "title": "Francisco Chilão Rocha: Why Digital Fairness Is Reshaping Mobile Gaming",
+      "url": "https://www.globalgamesforum.com/features/francisco-chilaeo-rocha-why-digital-fairness-is-reshaping-mobile-gaming",
+      "source": "Gamesforum",
+      "airtime": 0.4
+    },
+    {
+      "title": "The Rise of Direct-to-Consumer Gaming: Xsolla's Berkley Egenes on DTC Strategies and Web Shops",
+      "url": "https://www.globalgamesforum.com/features/the-rise-of-dtc-channels-with-berkley-egenes",
+      "source": "Gamesforum",
+      "airtime": 0.25
+    },
+    {
+      "title": "Garena is developing Palworld Online, launching this year",
+      "url": "https://www.pocketgamer.biz/garena-is-developing-palworld-online-launching-this-year/",
+      "source": "PocketGamer.biz",
+      "airtime": 0.117
+    },
+    {
+      "title": "Roblox revenue rises 36% Y/Y, but young North Americans see falling per-hour monetisation",
+      "url": "https://www.pocketgamer.biz/roblox-revenue-rises-36-yy-but-young-north-americans-see-falling-per-hour-monetisation/",
+      "source": "PocketGamer.biz",
+      "airtime": 0.117
+    },
+    {
+      "title": "Reforged Labs shuts down as CEO says AI is closing its market opportunity",
+      "url": "https://www.pocketgamer.biz/reforged-labs-shuts-down-as-ceo-says-ai-is-closing-its-market-opportunity/",
+      "source": "PocketGamer.biz",
+      "airtime": 0.117
+    }
+  ]
+}
