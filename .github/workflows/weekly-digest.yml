@@ -1,0 +1,47 @@
+name: Gamesforum weekly digest
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Run pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
+          DIGEST_LANG: he
+          TTS_MODEL: gemini-2.5-flash-preview-tts
+        run: python gamesforum_pipeline.py
+
+      - name: Commit episode
+        run: |
+          git config user.name  "gamesforum-bot"
+          git config user.email "bot@users.noreply.github.com"
+          rm -rf __pycache__
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nothing new this week"
+          else
+            git commit -m "digest: $(date -u +%Y-%m-%d)"
+            git push
+          fi
