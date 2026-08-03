@@ -44,7 +44,7 @@ except ModuleNotFoundError:           # 3.10 and older
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from gamesforum_pipeline import (          # noqa: E402
-    fetch_article, gemini_text, log,
+    fetch_article, gemini_json, log,
 )
 from sources import collect                # noqa: E402
 
@@ -130,76 +130,161 @@ def substance_note(sig: dict) -> str:
 
 def build_scoring_prompt(profile: dict, candidates: list[dict]) -> str:
     ident = profile["identity"]["who"].strip()
+    wants = profile["identity"].get("wants", "").strip()
     core = "\n".join(f"- {x}" for x in profile["interests"]["core"])
     deprio = "\n".join(f"- {x}" for x in profile["interests"]["deprioritize"])
 
     items = []
-    for i, c in enumerate(candidates):
-        excerpt = " ".join(c["text"].split()[:220])
+    for c in candidates:
+        excerpt = " ".join(c["text"].split()[:180])
+        # "ID n" rather than "[n]": bracket notation in the prompt invites the
+        # model to answer in that same notation instead of JSON.
         items.append(
-            f"[{i}] TITLE: {c['title']}\n"
-            f"    SIGNALS: {substance_note(c['signals'])}\n"
-            f"    EXCERPT: {excerpt}"
+            f"ID {c['_idx']}\n"
+            f"TITLE: {c['title']}\n"
+            f"SIGNALS: {substance_note(c['signals'])}\n"
+            f"EXCERPT: {excerpt}"
         )
-    blob = "\n\n".join(items)
+    blob = "\n\n---\n\n".join(items)
 
-    return f"""Rate how much each article below is worth this person's time.
+    return f"""You are this person's research analyst. Decide what earns a
+place in his weekly briefing.
 
 THE READER:
 {ident}
 
-MOVES THE NEEDLE FOR HIM:
+WHAT HE WANTS OUT OF AN EPISODE:
+{wants}
+
+SUBJECTS THAT CONCERN HIM:
 {core}
 
-USUALLY NOT WORTH HIS AIRTIME:
+RARELY WORTH HIS TIME:
 {deprio}
 
-SCORING, 0 to 10:
-  9-10  hard data or a market move that could change a decision he makes
-  7-8   substantive, named sources or real numbers, clearly in his domain
-  5-6   relevant topic but thin, or mostly restates what he already knows
-  3-4   tangential, or an opinion piece with no evidence
-  0-2   promotion, conference marketing, vendor PR with no data
+HOW TO THINK ABOUT EACH ARTICLE
 
-Judge the CONTENT, not the headline's confidence. An article promising
-"the future of monetization" that contains no figures is a 3, not an 8.
-An unglamorous piece with a real benchmark table is an 8.
+Do not pattern-match on topic. "Mentions monetization" is not relevance.
+Reason about this specific operator, running these specific genres, and ask
+which of these four things the article actually delivers:
 
-Return ONLY a JSON array, one object per article, no prose and no code fence:
-[{{"i": 0, "score": 7, "why": "ten-word reason", "topic": "3-word tag"}}]
+  DECISION    could plausibly change something he does: pricing, channel mix,
+              a LiveOps choice, a build-vs-buy call, a compliance exposure
+  TACTIC      a concrete method another studio used, described in enough
+              detail that he could try a version of it
+  COMPETITIVE what studios in casual, puzzle, hybrid-casual or real-money
+              skill gaming are actually doing, and what happened as a result
+  MARKET      worth knowing because the industry is talking about it, even
+              with no immediate action. He values this on its own.
 
-"why" must be specific. "relevant to mobile gaming" is useless. Say what is
-actually in it: "ZBD survey, 195 execs, retention budget data".
+An article needs to be strong on ONE of these, not all four.
+
+WEIGH THESE HEAVILY
+- Real-money skill gaming is his most exposed and least covered genre.
+  Anything on skill-versus-chance rulings, state or territory legality,
+  payments, withdrawals, KYC, collusion, bots, or Apple and Google policy on
+  real-money apps matters to him far more than the headline suggests.
+  Score these high even when the article is thin, because the alternative is
+  he does not hear about it at all.
+- Named studios in his genres, with outcomes attached.
+- Actual figures. A benchmark he can measure himself against.
+
+BE SCEPTICAL OF
+- Confident headlines with no evidence underneath. "The future of X" with no
+  data is a 3, not an 8.
+- Vendor bylines that are really product marketing. If a named company's
+  employee wrote it and the conclusion is "use a tool like ours", drop it a
+  few points, unless the data in it stands on its own.
+- Funding announcements with no operational lesson.
+
+SCALE
+  9-10  he would be worse off not knowing this
+  7-8   solid, clearly earns its airtime
+  5-6   worth a mention, thin or partly familiar
+  3-4   tangential, or assertion with no evidence
+  0-2   promotion or PR with nothing underneath
+
+Judge the excerpt you were given, not the headline's confidence.
+
+For each article, first write your reasoning, then the axis it delivers on,
+then the score. Reason before you score, not after.
+
+"why" must be concrete and specific to the article. "Relevant to mobile
+gaming" is a useless answer. "ZBD survey, 195 execs, retention budget data"
+is a useful one.
+
+Score every article listed, using the ID given for each.
 
 ARTICLES:
 {blob}
 """
 
 
-def parse_scores(raw: str, n: int) -> dict[int, dict]:
-    """Models wrap JSON in fences and prose no matter how firmly you ask."""
-    m = re.search(r"\[.*\]", raw, re.S)
-    if not m:
-        log("  scoring returned no JSON array; treating all as unscored")
-        return {}
-    try:
-        data = json.loads(m.group(0))
-    except json.JSONDecodeError as e:
-        log(f"  malformed scoring JSON ({e}); treating all as unscored")
-        return {}
+# propertyOrdering matters: the model generates fields in this order, so
+# putting reasoning before score means it actually thinks first and commits
+# to a number second. Reversed, the number comes out of nowhere and the
+# reasoning becomes a justification written after the fact.
+SCORE_SCHEMA = {
+    "type": "ARRAY",
+    "items": {
+        "type": "OBJECT",
+        "properties": {
+            "id": {"type": "INTEGER"},
+            "reasoning": {
+                "type": "STRING",
+                "description": "What this article actually contains and what "
+                               "it would mean for this specific operator. "
+                               "Two or three sentences.",
+            },
+            "axis": {
+                "type": "STRING",
+                "enum": ["DECISION", "TACTIC", "COMPETITIVE", "MARKET", "NONE"],
+            },
+            "score": {"type": "INTEGER"},
+            "why": {
+                "type": "STRING",
+                "description": "One concrete line naming what is in it.",
+            },
+            "topic": {"type": "STRING"},
+        },
+        "propertyOrdering": ["id", "reasoning", "axis", "score", "why", "topic"],
+        "required": ["id", "reasoning", "axis", "score", "why"],
+    },
+}
 
+# Batch size for scoring. Seventy-plus articles in one call is where the
+# first run fell over: the response drifted out of JSON entirely.
+SCORE_BATCH = 20
+
+
+def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
+    """Score in batches, with the response shape enforced by the API."""
     out: dict[int, dict] = {}
-    for row in data:
+    for start in range(0, len(candidates), SCORE_BATCH):
+        batch = candidates[start:start + SCORE_BATCH]
         try:
-            i = int(row["i"])
-            if 0 <= i < n:
-                out[i] = {
-                    "score": max(0, min(10, int(row.get("score", 0)))),
-                    "why": str(row.get("why", "")).strip(),
-                    "topic": str(row.get("topic", "")).strip(),
-                }
-        except (KeyError, TypeError, ValueError):
+            rows = gemini_json(build_scoring_prompt(profile, batch),
+                               SCORE_SCHEMA)
+        except Exception as e:                          # noqa: BLE001
+            log(f"  batch {start // SCORE_BATCH + 1} failed ({e})")
             continue
+        valid = {c["_idx"] for c in batch}
+        for row in rows if isinstance(rows, list) else []:
+            try:
+                i = int(row["id"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if i not in valid:
+                continue
+            out[i] = {
+                "score": max(0, min(10, int(row.get("score", 0)))),
+                "why": str(row.get("why", "")).strip(),
+                "topic": str(row.get("topic", "")).strip(),
+                "axis": str(row.get("axis", "")).strip(),
+                "reasoning": str(row.get("reasoning", "")).strip(),
+            }
+        log(f"  batch {start // SCORE_BATCH + 1}: "
+            f"{len(batch)} sent, {len(out)} scored so far")
     return out
 
 
@@ -382,11 +467,12 @@ def select(dry_run: bool = False) -> list[dict]:
         return []
 
     log("stage 4: relevance scoring")
-    scores: dict[int, dict] = {}
-    if survivors:
-        raw = gemini_text(build_scoring_prompt(profile, survivors))
-        scores = parse_scores(raw, len(survivors))
-        log(f"  scored {len(scores)}/{len(survivors)}")
+    for i, art in enumerate(survivors):
+        art["_idx"] = i
+    scores = score_all(profile, survivors) if survivors else {}
+    log(f"  scored {len(scores)}/{len(survivors)}")
+    if survivors and not scores:
+        log("  WARNING: nothing scored, falling back to substance signals")
 
     for i, art in enumerate(survivors):
         s = scores.get(i)
@@ -394,15 +480,25 @@ def select(dry_run: bool = False) -> list[dict]:
         weight = src.get("weight", 1.0)
 
         if s is None:
-            # Unscored is the model's failure, not the article's. Let it
-            # through at the threshold so a human sees it in the ledger
-            # rather than losing it silently.
-            art["_score"], art["_why"] = thr["min_score"], "לא דורג, הוכנס כברירת מחדל"
+            # Scoring failed for this one. Do NOT hand out a flat pass mark:
+            # that makes selection arbitrary and hides the failure behind a
+            # plausible-looking number. Fall back to the deterministic
+            # substance signal instead, and label it clearly in the ledger.
+            art["_score"] = round(
+                min(3.0 + art["signals"]["figures_per_100w"] * 1.5, 7.0), 1
+            )
+            art["_why"] = (
+                f"לא דורג · דירוג חלופי לפי צפיפות נתונים "
+                f"({art['signals']['figures_per_100w']} מספרים ל-100 מילים)"
+            )
             continue
 
         raw = s["score"]
         art["_why"] = s["why"] or "-"
+        art["_reasoning"] = s.get("reasoning", "")
         notes = []
+        if s.get("axis") and s["axis"] != "NONE":
+            notes.append(f"**{s['axis']}**")
 
         # Editorial signal: their own newsroom picked this out of the week.
         if art["url"].rstrip("/") in highlighted:

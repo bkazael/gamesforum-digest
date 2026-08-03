@@ -159,6 +159,33 @@ def fetch_article(url: str) -> dict | None:
 # ---------------------------------------------------------------- gemini
 
 
+def gemini_json(prompt: str, schema: dict) -> list | dict:
+    """Ask for JSON and have the API enforce the shape.
+
+    Free-text prompting for JSON fails in the field: the model will happily
+    answer in prose, or echo whatever bracket notation appears in the prompt.
+    responseSchema makes malformed output an API-level impossibility rather
+    than something to regex around afterwards.
+    """
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{TEXT_MODEL}:generateContent"
+    )
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 8192,
+            "responseMimeType": "application/json",
+            "responseSchema": schema,
+        },
+    }
+    data = _post_json(url, payload)
+    parts = data["candidates"][0]["content"]["parts"]
+    raw = "".join(p.get("text", "") for p in parts).strip()
+    return json.loads(raw)
+
+
 def gemini_text(prompt: str) -> str:
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
