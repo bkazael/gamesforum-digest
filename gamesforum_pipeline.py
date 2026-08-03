@@ -59,10 +59,36 @@ EPISODES = ROOT / "episodes"
 DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 
-# Gemini TTS caps at 2 speakers. 30 voices available; these two read well
-# as an informative/warm podcast pair.
-SPEAKER_A, VOICE_A = "Dana", "Charon"      # informative
-SPEAKER_B, VOICE_B = "Yoni", "Sulafat"     # warm
+# Voices and delivery live in profile.toml so the tone can be tuned without
+# editing code. Gemini TTS caps at 2 speakers.
+def _load_voice() -> dict:
+    cfg = {
+        "speaker_a": "Dana", "voice_a": "Charon",
+        "speaker_b": "Yoni", "voice_b": "Umbriel",
+        "direction": "Two industry colleagues talking. Measured, unhurried, "
+                     "genuinely interested. Not broadcast energy.",
+    }
+    path = pathlib.Path(__file__).resolve().parent / "profile.toml"
+    if path.exists():
+        try:
+            import tomllib
+        except ModuleNotFoundError:
+            try:
+                import tomli as tomllib      # type: ignore[no-redef]
+            except ModuleNotFoundError:
+                return cfg
+        try:
+            with path.open("rb") as f:
+                cfg.update(tomllib.load(f).get("voice", {}))
+        except Exception:                    # noqa: BLE001
+            pass
+    return cfg
+
+
+_VOICE = _load_voice()
+SPEAKER_A, VOICE_A = _VOICE["speaker_a"], _VOICE["voice_a"]
+SPEAKER_B, VOICE_B = _VOICE["speaker_b"], _VOICE["voice_b"]
+DIRECTION = _VOICE["direction"].strip()
 
 # Docs warn quality drifts past a few minutes -> synthesize in chunks.
 # ~1200 chars lands around 60-90s of speech.
@@ -208,15 +234,41 @@ def gemini_tts_chunk(script_chunk: str) -> bytes:
       * vague prompts causing the model to READ THE DIRECTIONS ALOUD,
         so we use an explicit preamble + a hard TRANSCRIPT marker.
     """
-    prompt = (
-        "Synthesize the following podcast conversation as speech. "
-        "Do not read these instructions aloud. "
-        f"Two hosts, {SPEAKER_A} and {SPEAKER_B}, recording a concise "
-        "mobile-gaming industry briefing for an experienced operator. "
-        "Delivery: professional, conversational, brisk but not rushed. "
-        "Read only the lines after the TRANSCRIPT marker.\n\n"
-        "TRANSCRIPT:\n" + script_chunk
-    )
+    # Structured the way Google's own prompting guide recommends: audio
+    # profile, scene, director's notes, then a hard transcript marker. A
+    # single vague line like "professional and conversational" is what
+    # produces either flat recitation or unearned excitement.
+    prompt = f"""Synthesize the following conversation as speech.
+Do not read any of these instructions aloud.
+
+# AUDIO PROFILE
+{SPEAKER_A}: carries the material. She has read the sources and reports what
+they say. Steady, unshowy, the authority of someone with nothing to prove.
+{SPEAKER_B}: the one who asks. He questions, restates, pushes back. Curious
+rather than impressed.
+
+# THE SCENE
+Two colleagues in the mobile games industry, mid-conversation about the
+week's news. No microphone in the room, no audience being performed for.
+
+# DIRECTOR'S NOTES
+{DIRECTION}
+
+Delivery specifics:
+- Statements land on a falling tone. Do not lift the end of every sentence.
+- Interest is conveyed by attention, not by volume or pitch.
+- Surprise is earned, not decorative. At most one genuine moment of it in
+  the whole piece, and only where the text clearly warrants it.
+- Do not stress every figure. Most numbers are said plainly, in passing.
+- Natural breaths. A brief pause before a significant point is welcome.
+- Avoid the bright "vocal smile" of morning radio entirely.
+- Equally, avoid flat monotone recitation. The register sits between those
+  two: engaged, level, human.
+
+Read only the lines after the TRANSCRIPT marker.
+
+TRANSCRIPT:
+{script_chunk}"""
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{TTS_MODEL}:generateContent"
@@ -464,11 +516,26 @@ costumes. If any exchange would survive being reassigned to the other
 speaker, it is not really dialogue.
 
 CRAFT:
-- Every number gets a reaction before it gets an explanation. A figure stated
-  flatly is a figure the listener forgets.
+- VARY THE RESPONSE. This is the single most important note. A conversation
+  where every figure is met with astonishment is exhausting and fake. Rotate
+  deliberately through:
+    * plain acknowledgement, then move on ("כן, זה בערך מה שציפיתי")
+    * a follow-up question about method ("על איזה מדגם זה מבוסס?")
+    * scepticism ("זה נשמע גבוה. הם מודדים את זה איך?")
+    * a connection to something earlier
+    * simply continuing, with no reaction at all
+    * and rarely, genuine surprise
+  Most numbers should pass without ceremony. Surprise once per episode, at
+  the single most striking fact, and never twice.
+- No more than two question marks in any three consecutive turns. Real
+  colleagues make statements too.
 - Restate the hard parts. After a dense claim, {SPEAKER_B} says it back in
   simpler words. This is the main comprehension device in audio, where the
-  listener cannot re-read.
+  listener cannot re-read. Restating is not the same as reacting.
+- Give them a stake. They can find something interesting, tedious, or
+  overdue without asserting any new fact. "זה כבר שנתיים חוזר על עצמו" is
+  attitude, not a claim. That attitude is what separates two people talking
+  from a text-to-speech engine reading a list.
 - Vary the rhythm hard. A three-word line after a long one is what makes
   speech sound alive. If every turn is a similar length, it sounds generated.
 - Concrete beats abstract. Name the company, the number, the mechanism.
@@ -495,8 +562,9 @@ FORMAT:
   than over.
 - Numbers spelled out as words. No digits, no percent signs, no currency
   symbols, they read badly.
-- English audio tags, used maybe four times in the whole script:
-  [thoughtful], [emphatic], [dry], [surprised]. Overuse sounds theatrical.
+- English audio tags: at most THREE in the entire script, and prefer none.
+  Allowed: [thoughtful], [dry], [flat]. Do NOT use [surprised], [amazed],
+  [excited], [gasp] - those are what make it sound theatrical and strange.
 - Dialogue lines only. No headings, no stage directions.
 
 PLAN:
@@ -515,6 +583,11 @@ same "Speaker: line" format, nothing else.
 
 Work through these in order and actually change the text:
 
+0. MANUFACTURED SURPRISE. Go through every reaction to a number or claim.
+   If more than one is astonishment, rewrite the rest: plain acknowledgement,
+   a method question, mild scepticism, or no reaction at all. Delete
+   exclamation marks. Remove [surprised] and [excited] tags entirely.
+   This is the first pass because it is the most damaging habit.
 1. TURN LENGTH. Find the longest turn. If it is over about forty words, break
    it with a real interruption from the other host, not a filler nod.
 2. RHYTHM. Are turns all similar length? Insert short reactions. Merge choppy
@@ -637,6 +710,28 @@ BANNED_PHRASES = [
 ]
 
 
+INTERROGATIVE = (
+    "איך", "למה", "מדוע", "מה ", "מהו", "מי ", "כמה", "האם", "מתי", "איפה",
+    "על איזה", "איזה", "באיזה", "ומה", "ואיך", "ולמה", "אז מה", "לפי מה",
+    "how", "why", "what", "which", "who", "when", "where", "does", "did",
+    "is that", "are they", "based on",
+)
+
+
+def _is_probe(text: str) -> bool:
+    """Does this turn interrogate the material?
+
+    A question mark is sufficient but not necessary. Spoken Hebrew regularly
+    drops it, and scepticism often arrives as a flat statement.
+    """
+    if "?" in text:
+        return True
+    low = text.lower().lstrip("[]abcdefghijklmnopqrstuvwxyz ").strip()
+    stripped = re.sub(r"^\[[^\]]*\]\s*", "", text).strip()
+    return any(stripped.startswith(w) or f" {w}" in f" {low}"
+               for w in INTERROGATIVE)
+
+
 def parse_turns(script: str) -> list[tuple[str, str]]:
     turns = []
     for line in script.splitlines():
@@ -697,13 +792,16 @@ def lint_script(script: str) -> list[str]:
             "become an audience"
         )
 
-    # The listener-proxy must actually question things.
+    # The listener-proxy must actually interrogate the material. Counting "?"
+    # alone undercounts badly: spoken Hebrew often drops the question mark, so
+    # "על איזה מדגם זה מבוסס" reads as a statement to a naive check while
+    # doing exactly the probing work we want.
     b_turns = [t for s, t in turns if s == SPEAKER_B]
-    questions = sum(1 for t in b_turns if "?" in t)
-    if b_turns and questions < 3:
+    probes = sum(1 for t in b_turns if _is_probe(t))
+    if b_turns and probes < 3:
         issues.append(
-            f"{SPEAKER_B} asks only {questions} question(s); he is the "
-            "listener's proxy and should be probing"
+            f"{SPEAKER_B} probes only {probes} time(s); he is the "
+            "listener's proxy and should be interrogating the material"
         )
 
     low = script.lower()
@@ -722,9 +820,36 @@ def lint_script(script: str) -> list[str]:
     if re.search(r"\d", script):
         issues.append("digits present; spell numbers out or the voice stumbles")
 
-    tags = len(re.findall(r"\[[a-z ]+\]", script))
-    if tags > 8:
-        issues.append(f"{tags} audio tags, theatrical; four or so is plenty")
+    tags = re.findall(r"\[([a-z ]+)\]", script)
+    if len(tags) > 3:
+        issues.append(f"{len(tags)} audio tags, theatrical; three is the cap")
+    banned_tags = {"surprised", "amazed", "excited", "gasp", "shouting",
+                   "panicked", "trembling"}
+    hit = banned_tags & {t.strip() for t in tags}
+    if hit:
+        issues.append(f"excitable audio tags {sorted(hit)}; these are what "
+                      "make it sound artificial")
+
+    # The tell he actually complained about: everything met with astonishment.
+    excl = script.count("!")
+    if excl > 2:
+        issues.append(f"{excl} exclamation marks; the delivery will sound "
+                      "permanently startled")
+    short_reactions = sum(
+        1 for _, t in turns
+        if len(t.split()) <= 4 and ("?" in t or "!" in t)
+    )
+    if short_reactions > len(turns) * 0.25:
+        issues.append(
+            f"{short_reactions}/{len(turns)} turns are clipped exclamations "
+            "or one-line questions; vary the responses"
+        )
+    q_total = sum(1 for _, t in turns if "?" in t)
+    if turns and q_total >= len(turns) * 0.45:
+        issues.append(
+            f"{q_total}/{len(turns)} turns contain a question; colleagues "
+            "make statements too"
+        )
 
     return issues
 
@@ -732,7 +857,9 @@ def lint_script(script: str) -> list[str]:
 def _issue_kind(msg: str) -> str:
     """Bucket a lint message so two runs can be compared by problem class."""
     for key in ("thin", "will overrun", "monologue", "uniform", "audience",
-                "question", "banned", "both open", "digits", "audio tags"):
+                "listener's proxy", "banned", "both open", "digits",
+                "audio tags", "excitable", "exclamation", "clipped",
+                "contain a question"):
         if key in msg:
             return key
     return "other"
