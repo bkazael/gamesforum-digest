@@ -411,7 +411,11 @@ FIDELITY RULES (non-negotiable):
 {opinion_block}
 FORMAT:
 - Markdown. One "##" section per included item, titled with the topic.
-- Bullets over paragraphs. Under 800 words before the sources list.
+- Bullets over paragraphs. Under 950 words before the sources list. Do not
+  pad to reach that ceiling; a thin week is allowed to produce a short digest.
+  This is raw material for a spoken episode downstream, so include enough
+  detail per item (the specific numbers, who said what, the mechanism) that a
+  script can be built from it without inventing anything.
 
 SOURCE ARTICLES:
 {corpus}
@@ -464,7 +468,11 @@ Output a compact plan:
 AIRTIME BUDGET. This was decided upstream by relevance scoring. Respect it.
 The lead story gets a narrative; a 10% item gets two or three exchanges and
 then you move on. Equal time for every item is what makes an episode sound
-like a list read aloud.
+like a list read aloud. The finished episode is spoken dialogue of roughly
+1000 words total (900-1100), so translate each percentage below into a real
+word count for that segment, e.g. 40% is roughly 400 words of actual back
+and forth, not two sentences. A segment given real airtime that gets two
+lines is a budgeting failure downstream.
 {budget or "(not supplied; weight by importance)"}
 
 3. SEGMENTS: 3 or 4 only. Ruthless. For each:
@@ -558,8 +566,15 @@ BANNED, these are the tells:
 FORMAT:
 - Exactly two speakers, labelled "{SPEAKER_A}:" and "{SPEAKER_B}:".
   Never a third.
-- 900 to 1100 words, which is 5 to 6 minutes spoken. Under is better
-  than over.
+- 900 to 1100 words, which is 5 to 6 minutes spoken. 900 is a FLOOR, not
+  a target you approach cautiously from below. A script that comes in at
+  600 or 700 words is a failed draft, not an appropriately tight one.
+  If you are unsure whether you have enough: you do not. Add another
+  restatement in plainer words, another follow-up question about method,
+  another concrete detail already sitting in the digest, or give the close
+  one more beat. Every one of the 3-4 segments in the plan should get real
+  space, not two lines each. Do not invent new facts to reach length; extend
+  the CRAFT around the facts you already have.
 - Numbers spelled out as words. No digits, no percent signs, no currency
   symbols, they read badly.
 - English audio tags: at most THREE in the entire script, and prefer none.
@@ -922,19 +937,25 @@ def write_script(digest: str, budget: str = "") -> str:
     return polished
 
 
-MIN_EPISODE_WORDS = 650          # roughly four minutes spoken
+MIN_EPISODE_WORDS = 820          # ~5 minutes spoken; target band is 900-1100
 
 
 def write_script_checked(digest: str, budget: str = "") -> str:
     """write_script, with a hard floor on length.
 
     A too-short episode is not a stylistic problem, it is a broken deliverable.
-    One retry, then ship the longest attempt rather than nothing, but say so
-    loudly in the log.
+    Run #2 shipped 68 seconds; the cause was the polish pass gutting the
+    draft (fixed separately, in write_script). But raising that guard was not
+    enough on its own: the draft pass itself was undershooting, because the
+    script prompt used to say "under is better than over", which reads as
+    permission to stop early. That line is gone now, and the floor here is
+    raised closer to the real target band so a short draft gets caught and
+    retried rather than shipped with a warning. Three attempts, then ship the
+    longest rather than nothing.
     """
     best = ""
     best_words = 0
-    for attempt in (1, 2):
+    for attempt in (1, 2, 3):
         script = write_script(digest, budget)
         words = sum(len(t.split()) for _, t in parse_turns(script))
         log(f"  script attempt {attempt}: {words} words")
