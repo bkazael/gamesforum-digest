@@ -318,9 +318,29 @@ TRANSCRIPT:
     raise RuntimeError("TTS returned no audio payload after 4 attempts")
 
 
-def _post_json(url: str, payload: dict, tries: int = 3) -> dict:
+# Free-tier Gemini quota is a per-minute request count, typically 10-15 RPM
+# depending on model. A run makes many calls back to back (scoring batches,
+# digest, three script passes, each possibly retried) with no natural
+# spacing between them, so it can burst past that ceiling in well under a
+# minute even though the total for the whole run is modest. Two separate
+# guards: pace every call so we do not burst, and on an actual 429 wait a
+# full quota window rather than a short exponential backoff.
+_MIN_CALL_INTERVAL = float(os.environ.get("MIN_CALL_INTERVAL_SEC", "4.5"))
+_last_call_at = [0.0]
+
+
+def _pace() -> None:
+    now = time.monotonic()
+    wait = _MIN_CALL_INTERVAL - (now - _last_call_at[0])
+    if wait > 0:
+        time.sleep(wait)
+    _last_call_at[0] = time.monotonic()
+
+
+def _post_json(url: str, payload: dict, tries: int = 5) -> dict:
     body = json.dumps(payload).encode()
     for attempt in range(tries):
+        _pace()
         req = urllib.request.Request(
             url,
             data=body,
@@ -338,7 +358,10 @@ def _post_json(url: str, payload: dict, tries: int = 3) -> dict:
             log(f"API {e.code} (attempt {attempt + 1}/{tries}): {detail}")
             if not retryable or attempt == tries - 1:
                 raise
-            time.sleep(min(60, 4 * 2 ** attempt))
+            # A 429 on the free tier means the per-minute bucket is empty,
+            # not that anything is wrong. A ~65s wait crosses a full window;
+            # a 500/502/503 gets the usual short exponential backoff.
+            time.sleep(65 if e.code == 429 else min(30, 4 * 2 ** attempt))
         except Exception as e:  # noqa: BLE001
             log(f"API error (attempt {attempt + 1}/{tries}): {e}")
             if attempt == tries - 1:
