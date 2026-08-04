@@ -49,7 +49,19 @@ LANG = os.environ.get("DIGEST_LANG", "he")
 # Set to "1" to append a clearly fenced machine-commentary section.
 INCLUDE_OPINION = os.environ.get("INCLUDE_OPINION", "0") == "1"
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
+# gemini-3.5-flash sat on a much stingier free-tier daily quota than its
+# generation number suggests - the 429 kept recurring even with pacing
+# applied, which only makes sense as a daily cap, not a burst problem.
+#
+# Split by task instead of dropping the newer model everywhere: relevance
+# scoring is mechanical (schema-enforced JSON, a rubric, a number) and the
+# bulk of the call volume, so it runs on gemini-2.5-flash, which has real
+# free-tier daily headroom. The digest and the podcast script are where
+# nuance actually shows up in the output - phrasing, natural dialogue,
+# metaphor quality - so those stay on the newer model, at a fraction of the
+# call count (roughly 2-11 calls a run vs. the 5+ scoring batches).
 TEXT_MODEL = os.environ.get("TEXT_MODEL", "gemini-3.5-flash")
+SCORE_MODEL = os.environ.get("SCORE_MODEL", "gemini-2.5-flash")
 
 SITE = "https://www.globalgamesforum.com"
 LISTINGS = [f"{SITE}/features", f"{SITE}/news"]
@@ -185,17 +197,21 @@ def fetch_article(url: str) -> dict | None:
 # ---------------------------------------------------------------- gemini
 
 
-def gemini_json(prompt: str, schema: dict) -> list | dict:
+def gemini_json(prompt: str, schema: dict, model: str | None = None) -> list | dict:
     """Ask for JSON and have the API enforce the shape.
 
     Free-text prompting for JSON fails in the field: the model will happily
     answer in prose, or echo whatever bracket notation appears in the prompt.
     responseSchema makes malformed output an API-level impossibility rather
     than something to regex around afterwards.
+
+    model defaults to TEXT_MODEL but callers doing high-volume mechanical
+    work (relevance scoring) pass SCORE_MODEL instead, to keep that call
+    volume off the model whose free-tier quota actually matters for quality.
     """
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{TEXT_MODEL}:generateContent"
+        f"{model or TEXT_MODEL}:generateContent"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],

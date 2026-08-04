@@ -44,7 +44,7 @@ except ModuleNotFoundError:           # 3.10 and older
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from gamesforum_pipeline import (          # noqa: E402
-    fetch_article, gemini_json, log,
+    fetch_article, gemini_json, log, SCORE_MODEL,
 )
 from sources import collect                # noqa: E402
 
@@ -263,8 +263,11 @@ def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
     for start in range(0, len(candidates), SCORE_BATCH):
         batch = candidates[start:start + SCORE_BATCH]
         try:
+            # Mechanical, high-volume, schema-enforced: this is the bulk of
+            # the run's call count, so it goes to the free-tier-safe model
+            # rather than the one reserved for the digest and script.
             rows = gemini_json(build_scoring_prompt(profile, batch),
-                               SCORE_SCHEMA)
+                               SCORE_SCHEMA, model=SCORE_MODEL)
         except Exception as e:                          # noqa: BLE001
             log(f"  batch {start // SCORE_BATCH + 1} failed ({e})")
             continue
