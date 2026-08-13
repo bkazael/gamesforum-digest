@@ -2,7 +2,7 @@ name: Gamesforum weekly digest
 
 on:
   schedule:
-    # Monday 06:00 Israel time
+    # Monday 06:00 Israel time (03:00 UTC summer / 04:00 UTC winter)
     - cron: "0 3 * * 1"
   workflow_dispatch: {}   # Trigger manually from Actions tab
 
