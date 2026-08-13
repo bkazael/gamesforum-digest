@@ -2,11 +2,13 @@ name: Gamesforum weekly digest
 
 on:
   schedule:
+    # Monday 06:00 Israel time (03:00 UTC summer / 04:00 UTC winter).
+    # GitHub cron is UTC only, so this runs 06:00 IDT / 05:00 IST.
     - cron: "0 3 * * 1"
-  workflow_dispatch: {}
+  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
 
 permissions:
-  contents: write
+  contents: write         # needed to commit the new episode
 
 concurrency:
   group: digest
@@ -15,6 +17,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # GitHub's default job timeout is six hours. Run #7 sat for an hour on a
+    # single hung API call and would have kept going. Nothing here legitimately
+    # takes more than about fifteen minutes, so this is the backstop that turns
+    # a hang into a failed run you can see.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +44,8 @@ jobs:
         run: |
           git config user.name  "gamesforum-bot"
           git config user.email "bot@users.noreply.github.com"
+          # Named paths would fail on a week that produces no episode, since
+          # git add errors on a pathspec that matches nothing.
           rm -rf __pycache__
           git add -A
           if git diff --cached --quiet; then
