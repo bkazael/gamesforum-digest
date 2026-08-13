@@ -7,7 +7,7 @@ Flow:
   2. Single-pass LLM Call (Claude API) with forced JSON Schema (Tool Use)
      -> Produces structured digest + full dialogue script (HostA & HostB)
   3. Quality Gates (Schema validity, word count floor >= 500, audio file size)
-  4. TTS Synthesis (Gemini Multi-Speaker TTS with Batched Chunking)
+  4. TTS Synthesis (Gemini Multi-Speaker TTS with Batched Chunking & Retries)
   5. RSS & Feed update
 """
 
@@ -238,11 +238,11 @@ SOURCE ARTICLES:
         
     return data
 
-# ---------------------------------------------------------------- Gemini TTS
+# ---------------------------------------------------------------- Gemini TTS (with Retry Loop)
 
 PCM_BYTES_PER_SEC = 24000 * 2
 
-def gemini_tts_chunk(script_chunk_text: str) -> bytes:
+def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
         
@@ -276,26 +276,39 @@ TRANSCRIPT:
     }
     
     body = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        url, data=body,
-        headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
-    )
     
-    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
-        data = json.loads(r.read())
+    for attempt in range(tries):
+        _check_deadline()
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+                data = json.loads(r.read())
+                
+            cand = (data.get("candidates") or [{}])[0]
+            for part in (cand.get("content") or {}).get("parts", []):
+                inline = part.get("inlineData") or part.get("inline_data")
+                if inline and inline.get("data"):
+                    return base64.b64decode(inline["data"])
+                    
+            log(f"    TTS chunk returned no audio data (attempt {attempt + 1}/{tries}); retrying...")
+        except urllib.error.HTTPError as e:
+            log(f"    TTS HTTP {e.code} (attempt {attempt + 1}/{tries})")
+            if e.code not in (429, 500, 502, 503, 504) or attempt == tries - 1:
+                raise
+        except Exception as e:
+            log(f"    TTS error (attempt {attempt + 1}/{tries}): {e}")
+            if attempt == tries - 1:
+                raise
+        time.sleep(5 * (attempt + 1))
         
-    cand = (data.get("candidates") or [{}])[0]
-    for part in (cand.get("content") or {}).get("parts", []):
-        inline = part.get("inlineData") or part.get("inline_data")
-        if inline and inline.get("data"):
-            return base64.b64decode(inline["data"])
-            
-    raise RuntimeError("Gemini TTS returned no audio payload.")
+    raise RuntimeError("Gemini TTS returned no audio payload after retries.")
 
 def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path: pathlib.Path):
     lines = [f"{turn['speaker']}: {turn['text']}" for turn in script_turns]
     
-    # Bundle into large chunks (~1500 chars each) to keep Gemini API calls to ~2-3 total
     chunks, current_chunk, current_len = [], [], 0
     for line in lines:
         if current_len + len(line) > 1500 and current_chunk:
@@ -314,7 +327,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
         audio_bytes = gemini_tts_chunk(chunk_text)
         pcm += audio_bytes
-        time.sleep(1)
+        time.sleep(2)
         
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
