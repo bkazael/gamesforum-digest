@@ -281,7 +281,10 @@ def claude_json(prompt: str, schema: dict, max_tokens: int = 8192) -> dict:
     payload = {
         "model": ANTHROPIC_MODEL,
         "max_tokens": max_tokens,
-        "temperature": 0.2,
+        # No temperature: run #10 confirmed with a live 400 that claude-
+        # sonnet-5 rejects it outright ("temperature is deprecated for this
+        # model") rather than silently ignoring it. Sampling isn't exposed
+        # as a knob on this model; leave it out entirely.
         "tools": [{
             "name": "submit",
             "description": "Submit the answer in the required structure.",
@@ -299,8 +302,7 @@ def claude_json(prompt: str, schema: dict, max_tokens: int = 8192) -> dict:
     raise RuntimeError(f"no tool_use block in response: {str(data)[:300]}")
 
 
-def claude_text(prompt: str, max_tokens: int = 8192,
-                temperature: float = 0.4) -> str:
+def claude_text(prompt: str, max_tokens: int = 8192) -> str:
     """Generate text, and refuse to return a silently truncated answer.
 
     The Gemini version of this function existed because a MAX_TOKENS
@@ -312,7 +314,9 @@ def claude_text(prompt: str, max_tokens: int = 8192,
     payload = {
         "model": ANTHROPIC_MODEL,
         "max_tokens": max_tokens,
-        "temperature": temperature,
+        # No temperature - see the identical note in claude_json. Confirmed
+        # live: claude-sonnet-5 400s on this parameter, it does not just
+        # ignore it.
         "messages": [{"role": "user", "content": prompt}],
     }
     log(f"    -> {ANTHROPIC_MODEL}, {len(prompt)} char prompt, "
