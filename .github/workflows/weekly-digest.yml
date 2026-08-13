@@ -2,13 +2,12 @@ name: Gamesforum weekly digest
 
 on:
   schedule:
-    # Monday 06:00 Israel time (03:00 UTC summer / 04:00 UTC winter).
-    # GitHub cron is UTC only, so this runs 06:00 IDT / 05:00 IST.
+    # Monday 06:00 Israel time
     - cron: "0 3 * * 1"
-  workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
+  workflow_dispatch: {}   # Trigger manually from Actions tab
 
 permissions:
-  contents: write         # needed to commit the new episode
+  contents: write         # Needed to commit the new episode
 
 concurrency:
   group: digest
@@ -17,11 +16,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # GitHub's default job timeout is six hours. Run #7 sat for an hour on a
-    # single hung API call and would have kept going. Nothing here legitimately
-    # takes more than about fifteen minutes, so this is the backstop that turns
-    # a hang into a failed run you can see.
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -34,14 +29,7 @@ jobs:
 
       - name: Run pipeline
         env:
-          # Text generation - scoring, digest, script - runs on Claude now.
-          # Gemini's free tier turned out to cap at roughly 20 requests per
-          # PROJECT per day, not per model, which a scheduled unattended
-          # pipeline burns through in one run. See the module docstring in
-          # gamesforum_pipeline.py for how that was confirmed.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Gemini stays, but ONLY for TTS - a separate quota bucket this
-          # pipeline never got close to.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
           DIGEST_LANG: he
@@ -52,8 +40,6 @@ jobs:
         run: |
           git config user.name  "gamesforum-bot"
           git config user.email "bot@users.noreply.github.com"
-          # Named paths would fail on a week that produces no episode, since
-          # git add errors on a pathspec that matches nothing.
           rm -rf __pycache__
           git add -A
           if git diff --cached --quiet; then
