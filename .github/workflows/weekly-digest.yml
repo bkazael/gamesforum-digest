@@ -34,6 +34,14 @@ jobs:
 
       - name: Run pipeline
         env:
+          # Text generation - scoring, digest, script - runs on Claude now.
+          # Gemini's free tier turned out to cap at roughly 20 requests per
+          # PROJECT per day, not per model, which a scheduled unattended
+          # pipeline burns through in one run. See the module docstring in
+          # gamesforum_pipeline.py for how that was confirmed.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Gemini stays, but ONLY for TTS - a separate quota bucket this
+          # pipeline never got close to.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
           DIGEST_LANG: he
