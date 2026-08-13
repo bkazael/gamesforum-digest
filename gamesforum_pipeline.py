@@ -197,6 +197,10 @@ def fetch_article(url: str) -> dict | None:
 # ---------------------------------------------------------------- gemini
 
 
+class Truncated(RuntimeError):
+    """The model ran out of output budget mid-answer."""
+
+
 def gemini_json(prompt: str, schema: dict, model: str | None = None) -> list | dict:
     """Ask for JSON and have the API enforce the shape.
 
@@ -217,29 +221,92 @@ def gemini_json(prompt: str, schema: dict, model: str | None = None) -> list | d
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 8192,
+            # A truncated JSON array is a parse error rather than a silent
+            # short answer, but it still costs the whole batch, so give it
+            # room and cap thinking the same way gemini_text does.
+            "maxOutputTokens": 16384,
+            "thinkingConfig": {"thinkingBudget": 1024},
             "responseMimeType": "application/json",
             "responseSchema": schema,
         },
     }
     data = _post_json(url, payload)
-    parts = data["candidates"][0]["content"]["parts"]
+    cand = (data.get("candidates") or [{}])[0]
+    parts = (cand.get("content") or {}).get("parts", [])
     raw = "".join(p.get("text", "") for p in parts).strip()
+    if cand.get("finishReason") == "MAX_TOKENS":
+        raise Truncated("scoring batch hit the token ceiling")
     return json.loads(raw)
 
 
-def gemini_text(prompt: str) -> str:
+def gemini_text(prompt: str, max_tokens: int = 16384,
+                thinking: int = 2048, temperature: float = 0.4) -> str:
+    """Generate text, and refuse to return a silently truncated answer.
+
+    This function used to just concatenate the text parts and return. That is
+    how a 57-second episode shipped: three separate things can shorten the
+    output with no error raised anywhere.
+
+      * finishReason MAX_TOKENS. The answer stops mid-sentence and looks like
+        a complete-but-short script to every downstream check.
+      * Thinking tokens. On 2.5-and-later Flash the model reasons before it
+        answers, and that reasoning is billed against the SAME
+        maxOutputTokens ceiling. Hebrew costs roughly two to three tokens a
+        word, so an unbounded thinking budget against the old 8192 ceiling
+        could leave almost nothing for the transcript. Capping thinking
+        explicitly is what reserves room for the actual answer.
+      * An empty candidate. Returns "" and every caller treats it as a very
+        short script rather than a failure.
+
+    Raises Truncated on the first two so the caller can retry with more room,
+    rather than passing a fragment down the pipeline.
+    """
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{TEXT_MODEL}:generateContent"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 8192},
+        "generationConfig": {
+            "temperature": temperature,
+            "maxOutputTokens": max_tokens,
+            "thinkingConfig": {"thinkingBudget": thinking},
+        },
     }
     data = _post_json(url, payload)
-    parts = data["candidates"][0]["content"]["parts"]
-    return "".join(p.get("text", "") for p in parts).strip()
+    cand = (data.get("candidates") or [{}])[0]
+    parts = (cand.get("content") or {}).get("parts", [])
+    text = "".join(p.get("text", "") for p in parts).strip()
+
+    usage = data.get("usageMetadata", {})
+    thought = usage.get("thoughtsTokenCount", 0)
+    out = usage.get("candidatesTokenCount", 0)
+    reason = cand.get("finishReason", "")
+    log(f"    [{out} output tokens, {thought} thinking, finish={reason or '?'}]")
+
+    if reason == "MAX_TOKENS":
+        raise Truncated(
+            f"hit the {max_tokens}-token ceiling "
+            f"({thought} of it spent thinking); answer is a fragment"
+        )
+    if not text:
+        raise Truncated(f"empty response (finishReason={reason or '?'})")
+    return text
+
+
+def gemini_text_retry(prompt: str, label: str = "") -> str:
+    """gemini_text with escalating room, because truncation is recoverable.
+
+    A fragment is worthless, but the same prompt with a bigger ceiling and a
+    smaller thinking allowance usually completes. Only after both attempts
+    fail does this give up, and then it says so rather than returning junk.
+    """
+    for max_tokens, thinking in ((16384, 2048), (32768, 512)):
+        try:
+            return gemini_text(prompt, max_tokens=max_tokens, thinking=thinking)
+        except Truncated as e:
+            log(f"  {label} truncated ({e}); retrying with more room")
+    raise Truncated(f"{label}: could not get a complete answer")
 
 
 def gemini_tts_chunk(script_chunk: str) -> bytes:
@@ -484,73 +551,20 @@ If a metaphor would survive deletion of the underlying fact, it is smuggling
 an argument. Cut it."""
 
 
-def build_outline_prompt(digest: str, budget: str = "") -> str:
-    """Plan the arc before writing a word. Scripts written straight from a
-    digest inherit the digest's shape, which is a list. Lists read aloud are
-    the single biggest reason AI podcasts sound like AI podcasts."""
-    return f"""You are the producer of a mobile-gaming industry podcast.
-Plan one episode from the digest below. Do not write dialogue yet.
-
-Output a compact plan:
-
-1. THROUGH-LINE: one sentence naming the tension that connects these items.
-   Not a topic ("retention"), a tension ("the industry is spending more to
-   acquire users it already knows it will lose"). If the items genuinely do
-   not connect, say so and order them by importance instead. Do not invent a
-   connection that is not really there.
-
-2. COLD OPEN: the single most arresting concrete detail in the whole digest.
-   A number, a reversal, a specific company doing a specific thing. This is
-   the first fifteen seconds. It is never a greeting and never a summary of
-   what is coming.
-
-AIRTIME BUDGET. This was decided upstream by relevance scoring. Respect it.
-The lead story gets a narrative; a 10% item gets two or three exchanges and
-then you move on. Equal time for every item is what makes an episode sound
-like a list read aloud. The finished episode is spoken dialogue of roughly
-1000 words total (900-1100), so translate each percentage below into a real
-word count for that segment, e.g. 40% is roughly 400 words of actual back
-and forth, not two sentences. A segment given real airtime that gets two
-lines is a budgeting failure downstream.
-{budget or "(not supplied; weight by importance)"}
-
-3. SEGMENTS: 3 or 4 only. Ruthless. For each:
-   - the claim in one sentence
-   - the hard numbers that carry it
-   - whose claim it is
-   - ONE concrete image or analogy that makes it land, drawn strictly from
-     the mechanism already described. Write "none" if nothing honest fits.
-     A forced metaphor is worse than none.
-   - the obvious objection a smart listener would raise
-
-4. HANDOFFS: how each segment connects to the next. "Second thing" is not a
-   handoff, it is a bullet point spoken aloud.
-
-5. CLOSE: the one line worth remembering. A restatement of the sharpest fact,
-   not a lesson and not advice.
-
-{_FIDELITY}
-
-DIGEST:
-{digest}
-"""
-
-
-def build_script_prompt(digest: str, outline: str) -> str:
-    lang_line = (
-        """Write the dialogue in natural spoken Hebrew, the way two Israeli
+_LANG_LINE = (
+    """Write the dialogue in natural spoken Hebrew, the way two Israeli
 industry people actually talk. Not literary Hebrew, not translated English.
 Keep English industry terms in English, because that is how the conversation
 really sounds: retention, LiveOps, churn, UA, hybrid monetization. Do not
 transliterate them into Hebrew letters."""
-        if LANG == "he"
-        else "Write the dialogue in natural spoken English."
-    )
-    return f"""Write the episode from the plan below.
+    if LANG == "he"
+    else "Write the dialogue in natural spoken English."
+)
 
-{lang_line}
 
-THE TWO HOSTS ARE NOT SYMMETRIC. This is the most important craft note.
+def _hosts() -> str:
+    return f"""THE TWO HOSTS ARE NOT SYMMETRIC. This is the most important
+craft note.
 - {SPEAKER_A} carries the material. She has read the sources and lays out
   what they say.
 - {SPEAKER_B} is the listener's proxy. He interrupts, asks the obvious
@@ -560,122 +574,318 @@ THE TWO HOSTS ARE NOT SYMMETRIC. This is the most important craft note.
 
 Two people alternating facts is not a conversation. It is a list with
 costumes. If any exchange would survive being reassigned to the other
-speaker, it is not really dialogue.
+speaker, it is not really dialogue."""
 
-CRAFT:
-- VARY THE RESPONSE. This is the single most important note. A conversation
-  where every figure is met with astonishment is exhausting and fake. Rotate
-  deliberately through:
+
+def _craft() -> str:
+    return f"""CRAFT:
+- VARY THE RESPONSE. A conversation where every figure is met with
+  astonishment is exhausting and fake. Rotate deliberately through:
     * plain acknowledgement, then move on ("כן, זה בערך מה שציפיתי")
     * a follow-up question about method ("על איזה מדגם זה מבוסס?")
     * scepticism ("זה נשמע גבוה. הם מודדים את זה איך?")
     * a connection to something earlier
     * simply continuing, with no reaction at all
     * and rarely, genuine surprise
-  Most numbers should pass without ceremony. Surprise once per episode, at
-  the single most striking fact, and never twice.
-- No more than two question marks in any three consecutive turns. Real
-  colleagues make statements too.
+  Most numbers should pass without ceremony.
+- No more than two question marks in any three consecutive turns.
 - Restate the hard parts. After a dense claim, {SPEAKER_B} says it back in
   simpler words. This is the main comprehension device in audio, where the
   listener cannot re-read. Restating is not the same as reacting.
 - Give them a stake. They can find something interesting, tedious, or
   overdue without asserting any new fact. "זה כבר שנתיים חוזר על עצמו" is
-  attitude, not a claim. That attitude is what separates two people talking
-  from a text-to-speech engine reading a list.
+  attitude, not a claim.
 - Vary the rhythm hard. A three-word line after a long one is what makes
   speech sound alive. If every turn is a similar length, it sounds generated.
 - Concrete beats abstract. Name the company, the number, the mechanism.
-- Signpost transitions, because there is nothing on screen to orient anyone.
-- One callback to something said earlier in the episode. Only one.
-- Let them disagree once about emphasis, then move on. Never manufacture a
-  disagreement about facts.
 - Light spoken texture only: "תראה", "רגע", "כן, אבל". A little goes far.
 
 BANNED, these are the tells:
-- Greetings, welcomes, intros, sign-offs, "בפרק היום נדבר על"
 - "בואו נצלול", "נשמע מרתק", "זו נקודה מצוינת"
 - Any host complimenting the other's question
-- Summarising at the end what was just said
 - Both hosts agreeing three times in a row
 - Starting consecutive turns with the same word
 
+FORMAT:
+- Exactly two speakers, labelled "{SPEAKER_A}:" and "{SPEAKER_B}:" at the
+  start of each line. Never a third speaker. Never bold or markdown on the
+  label, just the bare name and a colon.
+- Numbers spelled out as words. No digits, no percent signs, no currency
+  symbols, they read badly aloud.
+- Dialogue lines only. No headings, no stage directions, no commentary
+  before or after. Do not restate these instructions."""
+
+
+# The whole episode, in words. Everything downstream is derived from this,
+# so an episode's length is now arithmetic rather than something we ask for
+# politely and hope to receive.
+TARGET_WORDS = 1000
+COLD_OPEN_WORDS = 80
+CLOSE_WORDS = 55
+
+
+PLAN_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "through_line": {
+            "type": "STRING",
+            "description": "One sentence naming the tension connecting these "
+                           "items. Not a topic but a tension. If they truly "
+                           "do not connect, say so plainly.",
+        },
+        "orientation": {
+            "type": "STRING",
+            "description": "One short sentence naming what this week's "
+                           "episode covers, so a listener knows where they "
+                           "are. Plain and factual, not a sales pitch.",
+        },
+        "cold_open": {
+            "type": "STRING",
+            "description": "The single most arresting concrete detail in the "
+                           "digest: a number, a reversal, a named company "
+                           "doing a specific thing.",
+        },
+        "segments": {
+            "type": "ARRAY",
+            "description": "One per story, in the order given, same count.",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "title": {"type": "STRING"},
+                    "claim": {"type": "STRING",
+                              "description": "The claim in one sentence."},
+                    "figures": {"type": "STRING",
+                                "description": "The hard numbers that carry "
+                                               "it, exactly as in the digest."},
+                    "attribution": {"type": "STRING",
+                                    "description": "Whose claim it is."},
+                    "image": {"type": "STRING",
+                              "description": "ONE concrete image drawn strictly "
+                                             "from the mechanism described. "
+                                             "'none' if nothing honest fits."},
+                    "objection": {"type": "STRING",
+                                  "description": "The obvious objection a "
+                                                 "smart listener would raise."},
+                    "handoff": {"type": "STRING",
+                                "description": "How this connects to the next "
+                                               "story. 'Second thing' is not a "
+                                               "handoff."},
+                },
+                "propertyOrdering": ["title", "claim", "figures",
+                                     "attribution", "image", "objection",
+                                     "handoff"],
+                "required": ["title", "claim", "figures", "attribution",
+                             "objection"],
+            },
+        },
+        "close": {
+            "type": "STRING",
+            "description": "The one line worth remembering. A restatement of "
+                           "the sharpest fact, not a lesson and not advice.",
+        },
+    },
+    "propertyOrdering": ["through_line", "orientation", "cold_open",
+                         "segments", "close"],
+    "required": ["through_line", "orientation", "cold_open", "segments",
+                 "close"],
+}
+
+
+def build_plan_prompt(digest: str, budget: str) -> str:
+    """Plan the arc before writing a word.
+
+    Returned as schema-enforced JSON rather than prose, because the plan is
+    now consumed by code: each segment drives its own generation call with
+    its own word budget. A free-text outline cannot be split up reliably.
+    """
+    return f"""You are the producer of a mobile-gaming industry podcast.
+Plan one episode from the digest below. Do NOT write dialogue yet.
+
+Produce exactly one segment per story listed in the airtime budget, in the
+same order. Do not merge stories and do not add any.
+
+AIRTIME BUDGET, decided upstream by relevance scoring:
+{budget or "(not supplied; weight by importance)"}
+
 {_FIDELITY}
 
-FORMAT:
-- Exactly two speakers, labelled "{SPEAKER_A}:" and "{SPEAKER_B}:".
-  Never a third.
-- 900 to 1100 words, which is 5 to 6 minutes spoken. 900 is a FLOOR, not
-  a target you approach cautiously from below. A script that comes in at
-  600 or 700 words is a failed draft, not an appropriately tight one.
-  If you are unsure whether you have enough: you do not. Add another
-  restatement in plainer words, another follow-up question about method,
-  another concrete detail already sitting in the digest, or give the close
-  one more beat. Every one of the 3-4 segments in the plan should get real
-  space, not two lines each. Do not invent new facts to reach length; extend
-  the CRAFT around the facts you already have.
-- Numbers spelled out as words. No digits, no percent signs, no currency
-  symbols, they read badly.
-- English audio tags: at most THREE in the entire script, and prefer none.
-  Allowed: [thoughtful], [dry], [flat]. Do NOT use [surprised], [amazed],
-  [excited], [gasp] - those are what make it sound theatrical and strange.
-- Dialogue lines only. No headings, no stage directions.
+DIGEST:
+{digest}
+"""
 
-PLAN:
-{outline}
+
+def build_cold_open_prompt(plan: dict, digest: str, words: int) -> str:
+    return f"""Write the OPENING of a mobile-gaming industry podcast episode.
+
+{_LANG_LINE}
+
+{_hosts()}
+
+Structure, in this order and nothing else:
+1. {SPEAKER_A} opens with one short orienting line: what this week's episode
+   is about. Concretely, not "welcome to the show". Something like naming the
+   two or three things on the table this week. The listener has just pressed
+   play and needs to know where they are. ONE line only.
+2. Straight into the most arresting concrete detail below. No preamble, no
+   "let's start with", no agenda-reading.
+
+This is a subscription podcast, so a listener arriving cold must not feel
+they have walked in on the middle of a conversation. But nor do they want a
+radio host. One orienting line, then the substance.
+
+ORIENTATION: {plan.get('orientation', '')}
+THROUGH-LINE: {plan.get('through_line', '')}
+COLD OPEN DETAIL: {plan.get('cold_open', '')}
+
+Write about {words} words. That is roughly {max(3, words // 22)} to
+{max(4, words // 16)} turns of dialogue.
+
+{_craft()}
+
+{_FIDELITY}
 
 DIGEST (source of truth for every fact):
 {digest}
 """
 
 
-def build_polish_prompt(script: str, digest: str) -> str:
-    """Self-critique pass. Models are far better at spotting their own tells
-    than at avoiding them first time."""
-    return f"""Edit this podcast script. Return only the edited script, in the
-same "Speaker: line" format, nothing else.
+def build_segment_prompt(seg: dict, digest: str, words: int,
+                         previous_tail: str, is_last: bool) -> str:
+    """One story, one call, one explicit word budget.
 
-Work through these in order and actually change the text:
+    The whole reason this function exists: asking for a 1000-word episode in
+    a single call produced 130 words repeatedly, and no amount of insisting
+    in the prompt changed that. A 250-word target for one story is a request
+    a model actually honours, and five of them add up deterministically.
+    """
+    handoff = (
+        "End on the natural close of this topic. Another segment follows, so "
+        f"do not wrap up the episode. Aim toward: {seg.get('handoff', '')}"
+        if not is_last
+        else "This is the last story before the close. End on its sharpest "
+             "point, do not summarise the episode."
+    )
+    image = seg.get("image", "").strip()
+    image_line = (
+        f"ONE concrete image is available if it fits naturally: {image}\n"
+        "Use it only if it illuminates the mechanism. A forced metaphor is "
+        "worse than none."
+        if image and image.lower() != "none"
+        else "No metaphor for this segment. Stay literal."
+    )
+    return f"""Write ONE segment of an ongoing podcast conversation. The
+hosts are already mid-episode, so do not greet, do not introduce yourselves,
+and do not announce the topic as though starting fresh.
 
-0. MANUFACTURED SURPRISE. Go through every reaction to a number or claim.
-   If more than one is astonishment, rewrite the rest: plain acknowledgement,
-   a method question, mild scepticism, or no reaction at all. Delete
-   exclamation marks. Remove [surprised] and [excited] tags entirely.
-   This is the first pass because it is the most damaging habit.
-1. TURN LENGTH. Find the longest turn. If it is over about forty words, break
-   it with a real interruption from the other host, not a filler nod.
-2. RHYTHM. Are turns all similar length? Insert short reactions. Merge choppy
-   fragments that should be one thought.
-3. THE FLAT NUMBER TEST. Every figure: does someone react to it, or is it
-   recited? Recited numbers get a reaction or get cut.
-4. ASYMMETRY. Could you swap the two speakers' lines without noticing? If so,
-   sharpen {SPEAKER_B} into the one who questions and restates.
-5. OPENING. Does it begin with the most arresting concrete detail? If it
-   begins with any form of greeting or preview, delete that and start again
-   at the interesting part.
-6. ENDING. If it summarises, or offers advice, or trails off politely, cut
-   back to the last genuinely interesting line.
-7. TELLS. Remove "בואו נצלול", mutual compliments, three consecutive
-   agreements, consecutive turns opening on the same word.
-8. LENGTH. The result must land between 900 and 1100 words. If the draft is
-   already in that band, do NOT shorten it: fix the problems above in place.
-   Only if it exceeds 1100 do you cut, and then cut whole exchanges rather
-   than trimming everywhere. Returning a much shorter script is a failure,
-   not a tighter edit.
-9. HEBREW. Anything that reads like translated English gets rewritten the way
-   someone would actually say it out loud.
+{_LANG_LINE}
+
+{_hosts()}
+
+WHAT PRECEDED THIS (continue naturally from it, do not repeat it):
+{previous_tail or "(this is the first story)"}
+
+THIS SEGMENT:
+- CLAIM: {seg.get('claim', '')}
+- FIGURES (exact, do not alter): {seg.get('figures', '')}
+- WHOSE CLAIM: {seg.get('attribution', '')}
+- THE OBJECTION {SPEAKER_B} SHOULD RAISE: {seg.get('objection', '')}
+{image_line}
+
+{handoff}
+
+LENGTH: write {words} words of dialogue, plus or minus fifteen percent.
+This is a hard requirement, not a suggestion. Count as you go. That is
+roughly {max(4, words // 22)} to {max(5, words // 15)} turns. If you reach
+the end of the material before the word count, that means you have not yet
+had {SPEAKER_B} restate the claim in plainer words, or press on method, or
+raise the objection properly, or let {SPEAKER_A} give the concrete detail
+behind the headline figure. Do all of those. Do NOT invent facts to fill
+space; extend the conversation around the facts you were given.
+
+{_craft()}
 
 {_FIDELITY}
 
-Verify against the digest before returning: every figure and attribution must
-still be intact and unchanged. Fix drift rather than keeping a nicer line.
+DIGEST (source of truth for every fact):
+{digest}
+"""
+
+
+def build_close_prompt(plan: dict, digest: str, words: int,
+                       previous_tail: str) -> str:
+    return f"""Write the CLOSING exchange of a podcast episode already in
+progress.
+
+{_LANG_LINE}
+
+{_hosts()}
+
+WHAT PRECEDED THIS:
+{previous_tail}
+
+THE LINE WORTH REMEMBERING: {plan.get('close', '')}
+
+Rules:
+- Do NOT summarise what was discussed. The listener just heard it.
+- Do NOT give advice, a forecast, or a recommendation.
+- Do NOT sign off with pleasantries, thanks, or "see you next week".
+- End on the sharpest fact, restated once, and stop. An abrupt ending is
+  better than a polite one.
+
+Write about {words} words. Three or four turns.
+
+{_craft()}
+
+{_FIDELITY}
+
+DIGEST (source of truth for every fact):
+{digest}
+"""
+
+
+def build_seam_prompt(script: str, digest: str) -> str:
+    """Continuity only. This pass is explicitly forbidden from cutting.
+
+    The previous architecture had a 'polish' pass that was allowed to edit
+    freely, and it repeatedly gutted the script. Here the only permitted
+    edits are at the joins between independently generated segments.
+    """
+    return f"""This podcast script was assembled from separately written
+segments, so the joins between them can read abruptly or repeat a setup.
+Fix ONLY the joins. Return the complete script, nothing else.
+
+Permitted edits:
+- Smooth the transition where one topic ends and the next begins.
+- Remove a duplicated introduction of the same company or figure.
+- Fix a place where a host re-explains something already said.
+- Remove any greeting that appears anywhere except the very first line.
+- Fix consecutive turns that open on the same word.
+
+FORBIDDEN:
+- Do NOT shorten the script. It must come back the same length or longer.
+  Returning a condensed version is a failure of this task.
+- Do NOT delete whole exchanges.
+- Do NOT change any figure, name, or attribution.
+- Do NOT add a summary or a sign-off.
+
+Return every line, in the same "Speaker: text" format.
+
+{_FIDELITY}
 
 DIGEST:
 {digest}
 
-SCRIPT TO EDIT:
+SCRIPT:
 {script}
 """
+
+
+# The free-editing "polish" pass that used to live here has been removed.
+# It was the proximate cause of the 68-second episode: given licence to
+# tighten, it condensed a full script into a fragment, and the guards around
+# it were always one step behind. Segments are now written to length in the
+# first place, and the only post-pass permitted (build_seam_prompt) is
+# explicitly forbidden from cutting.
 
 
 # ---------------------------------------------------------------- fidelity
@@ -791,17 +1001,36 @@ def _is_probe(text: str) -> bool:
 
 
 def parse_turns(script: str) -> list[tuple[str, str]]:
-    turns = []
+    """Split "Speaker: text" lines into turns.
+
+    Tolerant of the decorations models add unbidden: **Dana:**, - Dana:,
+    ## Dana:. A strict matcher here is dangerous rather than merely fussy,
+    because every length check in this file is computed from parse_turns.
+    If it silently matches nothing, a full script measures as zero words and
+    the retry logic concludes the model produced nothing.
+    """
+    turns: list[tuple[str, str]] = []
+    # The trailing [\s*_]* matters as much as the leading one: "**Dana:**"
+    # closes its bold AFTER the colon, so without it the markers land at the
+    # front of the captured text and inflate every word count.
+    pattern = re.compile(
+        rf"^[\s>#*_-]*({re.escape(SPEAKER_A)}|{re.escape(SPEAKER_B)})"
+        rf"[\s*_]*:[\s*_]*(.+)$"
+    )
     for line in script.splitlines():
         line = line.strip()
         if not line:
             continue
-        m = re.match(rf"^({re.escape(SPEAKER_A)}|{re.escape(SPEAKER_B)})\s*:\s*(.+)$", line)
+        m = pattern.match(line)
         if m:
             turns.append((m.group(1), m.group(2).strip()))
         elif turns:
             turns[-1] = (turns[-1][0], turns[-1][1] + " " + line)
     return turns
+
+
+def word_count(script: str) -> int:
+    return sum(len(t.split()) for _, t in parse_turns(script))
 
 
 def lint_script(script: str) -> list[str]:
@@ -923,88 +1152,142 @@ def _issue_kind(msg: str) -> str:
     return "other"
 
 
-def write_script(digest: str, budget: str = "") -> str:
-    """Three passes: plan the arc, write it, then edit against the tells.
-
-    One-shot generation reliably produces a list read aloud. The outline pass
-    is what buys narrative shape; the polish pass is what removes the tells,
-    which models spot far better than they avoid.
-    """
-    log("  pass 1/3: outline")
-    outline = gemini_text(build_outline_prompt(digest, budget))
-
-    log("  pass 2/3: draft")
-    script = gemini_text(build_script_prompt(digest, outline))
-    before = lint_script(script)
-    for w in before:
-        log(f"    draft: {w}")
-
-    log("  pass 3/3: polish")
-    polished = gemini_text(build_polish_prompt(script, digest))
-
-    # Run #2 shipped a 68-second episode. The polish pass, told to cut, cut
-    # most of the script away, and the guard let it through because the draft
-    # was already flagged "thin" so no NEW problem class appeared. Length is
-    # therefore checked on its own terms, before anything else.
-    draft_words = sum(len(t.split()) for _, t in parse_turns(script))
-    polished_words = sum(len(t.split()) for _, t in parse_turns(polished))
-    if draft_words and polished_words < draft_words * 0.75:
-        log(f"    polish cut {draft_words} words to {polished_words} "
-            f"({polished_words / draft_words:.0%}); keeping draft")
-        return script
-
-    after = lint_script(polished)
-
-    # Accept the edit only if it is genuinely not worse. Comparing issue
-    # counts alone is not enough: an edit can trade one problem for another
-    # and score equal while reading much worse. So a polish that introduces
-    # any problem CLASS the draft did not have is rejected outright.
-    if verify_script(polished, digest):
-        log("    polish introduced unverified figures; keeping draft")
-        return script
-
-    new_kinds = {_issue_kind(w) for w in after} - {_issue_kind(w) for w in before}
-    if new_kinds:
-        log(f"    polish introduced new problems {sorted(new_kinds)}; keeping draft")
-        return script
-    if len(after) > len(before):
-        log(f"    polish regressed ({len(before)} -> {len(after)}); keeping draft")
-        return script
-
-    for w in after:
-        log(f"    final: {w}")
-    return polished
-
-
 MIN_EPISODE_WORDS = 820          # ~5 minutes spoken; target band is 900-1100
 
 
-def write_script_checked(digest: str, budget: str = "") -> str:
-    """write_script, with a hard floor on length.
+def _tail(script: str, turns: int = 4) -> str:
+    """The last few turns, as context for the next segment's generation."""
+    return "\n".join(f"{s}: {t}" for s, t in parse_turns(script)[-turns:])
 
-    A too-short episode is not a stylistic problem, it is a broken deliverable.
-    Run #2 shipped 68 seconds; the cause was the polish pass gutting the
-    draft (fixed separately, in write_script). But raising that guard was not
-    enough on its own: the draft pass itself was undershooting, because the
-    script prompt used to say "under is better than over", which reads as
-    permission to stop early. That line is gone now, and the floor here is
-    raised closer to the real target band so a short draft gets caught and
-    retried rather than shipped with a warning. Three attempts, then ship the
-    longest rather than nothing.
+
+def _write_part(prompt: str, target: int, label: str) -> str:
+    """Generate one part and hold it to its own word budget.
+
+    Retrying a 250-word segment is cheap and nearly always converges. That
+    is the whole argument for this architecture over one-shot generation:
+    when the unit of failure is one segment rather than the episode, a
+    failure costs one call and is individually recoverable.
     """
-    best = ""
-    best_words = 0
-    for attempt in (1, 2, 3):
-        script = write_script(digest, budget)
-        words = sum(len(t.split()) for _, t in parse_turns(script))
-        log(f"  script attempt {attempt}: {words} words")
+    floor = int(target * 0.7)
+    best, best_words = "", -1
+    for attempt in (1, 2):
+        try:
+            part = gemini_text_retry(prompt, label=label)
+        except Truncated as e:
+            log(f"    {label}: {e}")
+            continue
+        words = word_count(part)
+        log(f"    {label}: {words} words (target {target})")
         if words > best_words:
-            best, best_words = script, words
-        if words >= MIN_EPISODE_WORDS:
-            return script
-        log(f"  TOO SHORT (floor {MIN_EPISODE_WORDS}); regenerating")
-    log(f"  WARNING: shipping {best_words} words, under the floor")
+            best, best_words = part, words
+        if words >= floor:
+            return part
+        log(f"    {label}: under floor {floor}; retrying")
     return best
+
+
+def write_episode(digest: str, articles: list[dict], budget: str = "") -> str:
+    """Build the episode a segment at a time, then smooth the joins.
+
+    The previous design asked one call for a whole 1000-word episode and
+    checked afterwards whether it had complied. It repeatedly did not, and
+    no amount of stronger wording in the prompt changed that: run #4 came
+    back at roughly 130 words. Insisting harder was never going to work,
+    because the failure was structural.
+
+    Here the episode's length is arithmetic. Each story gets its own call
+    with its own word target derived from the airtime it was allotted
+    upstream, and the targets sum to TARGET_WORDS by construction. A short
+    segment is visible immediately, costs one cheap retry, and cannot drag
+    the rest of the episode down with it.
+    """
+    log("  plan")
+    try:
+        plan = gemini_json(build_plan_prompt(digest, budget), PLAN_SCHEMA)
+    except Exception as e:                                  # noqa: BLE001
+        log(f"  planning failed ({e}); falling back to a flat plan")
+        plan = {}
+    if not isinstance(plan, dict):
+        plan = {}
+
+    segments = plan.get("segments") or []
+    # The plan is asked for one segment per article in order, but a model can
+    # still merge or drop. Airtime comes from the articles, which are the
+    # authority, so pad or trim the plan to match rather than trusting it.
+    if len(segments) != len(articles):
+        log(f"  plan returned {len(segments)} segments for "
+            f"{len(articles)} articles; reconciling")
+    shares = [a.get("_airtime") or (1 / max(len(articles), 1))
+              for a in articles]
+    while len(segments) < len(articles):
+        i = len(segments)
+        segments.append({"title": articles[i]["title"], "claim": "",
+                         "figures": "", "attribution": "", "objection": ""})
+    segments = segments[:len(articles)]
+
+    body_words = TARGET_WORDS - COLD_OPEN_WORDS - CLOSE_WORDS
+    total_share = sum(shares) or 1.0
+    targets = [max(90, int(body_words * s / total_share)) for s in shares]
+    log(f"  word targets: open {COLD_OPEN_WORDS}, "
+        f"segments {targets}, close {CLOSE_WORDS}")
+
+    parts: list[str] = []
+
+    log("  cold open")
+    parts.append(_write_part(
+        build_cold_open_prompt(plan, digest, COLD_OPEN_WORDS),
+        COLD_OPEN_WORDS, "open"))
+
+    for i, (seg, target) in enumerate(zip(segments, targets)):
+        seg = dict(seg)
+        seg.setdefault("title", articles[i]["title"])
+        log(f"  segment {i + 1}/{len(segments)}: {seg.get('title', '')[:48]}")
+        parts.append(_write_part(
+            build_segment_prompt(
+                seg, digest, target,
+                previous_tail=_tail("\n".join(parts)),
+                is_last=(i == len(segments) - 1),
+            ),
+            target, f"seg{i + 1}"))
+
+    log("  close")
+    parts.append(_write_part(
+        build_close_prompt(plan, digest, CLOSE_WORDS,
+                           previous_tail=_tail("\n".join(parts))),
+        CLOSE_WORDS, "close"))
+
+    assembled = "\n".join(p for p in parts if p.strip())
+    assembled_words = word_count(assembled)
+    log(f"  assembled: {assembled_words} words")
+
+    if assembled_words < MIN_EPISODE_WORDS:
+        log(f"  WARNING: below the {MIN_EPISODE_WORDS}-word floor even after "
+            "per-segment retries; shipping what we have")
+
+    # Seam pass. Allowed to fix joins, forbidden to cut. Anything shorter
+    # coming back is rejected outright rather than argued with, which is the
+    # lesson from every previous editing pass in this pipeline.
+    log("  seams")
+    try:
+        seamed = gemini_text_retry(build_seam_prompt(assembled, digest),
+                                   label="seams")
+    except Truncated as e:
+        log(f"  seam pass failed ({e}); keeping assembled version")
+        return assembled
+
+    seamed_words = word_count(seamed)
+    if seamed_words < assembled_words * 0.92:
+        log(f"  seam pass shortened {assembled_words} -> {seamed_words}; "
+            "rejected, keeping assembled version")
+        return assembled
+    if verify_script(seamed, digest):
+        log("  seam pass introduced unverified figures; keeping assembled")
+        return assembled
+
+    log(f"  final: {seamed_words} words")
+    for w in lint_script(seamed):
+        log(f"    lint: {w}")
+    return seamed
 
 
 # ---------------------------------------------------------------- audio
@@ -1031,20 +1314,78 @@ def split_script(script: str) -> list[str]:
     return chunks
 
 
+# 24 kHz, 16-bit, mono.
+PCM_BYTES_PER_SEC = 24000 * 2
+
+# Conversational Hebrew runs about two and a half words a second. 0.22 s/word
+# is roughly 270 wpm, faster than anyone actually speaks, so audio shorter
+# than that for a given word count means content is missing rather than that
+# the voice was brisk.
+MIN_SECONDS_PER_WORD = 0.22
+
+
+def _pcm_seconds(pcm: bytes) -> float:
+    return len(pcm) / PCM_BYTES_PER_SEC
+
+
 def synthesize(script: str, wav_path: pathlib.Path) -> None:
+    """Synthesize, verifying that each chunk produced plausible audio.
+
+    Nothing here used to check that the returned audio corresponded to the
+    text sent. gemini_tts_chunk only asserts that SOME audio came back, so a
+    chunk that synthesized its first sentence and stopped was indistinguishable
+    from a complete one, and the shortfall only became visible as a suspiciously
+    small mp3 nobody was checking either.
+    """
     chunks = split_script(script)
     log(f"synthesizing {len(chunks)} chunks")
     pcm = bytearray()
+    short_chunks = 0
+
     for i, chunk in enumerate(chunks, 1):
-        log(f"  chunk {i}/{len(chunks)} ({len(chunk)} chars)")
-        pcm += gemini_tts_chunk(chunk)
+        expect_words = word_count(chunk) or len(chunk.split())
+        floor = expect_words * MIN_SECONDS_PER_WORD
+        log(f"  chunk {i}/{len(chunks)} ({len(chunk)} chars, "
+            f"{expect_words} words, expect >{floor:.0f}s)")
+
+        audio = b""
+        for attempt in (1, 2, 3):
+            audio = gemini_tts_chunk(chunk)
+            got = _pcm_seconds(audio)
+            if got >= floor:
+                log(f"    {got:.0f}s")
+                break
+            log(f"    only {got:.0f}s for {expect_words} words "
+                f"(attempt {attempt}/3); TTS dropped content, retrying")
+            time.sleep(3)
+        else:
+            short_chunks += 1
+            log(f"    WARNING: chunk {i} still short after 3 attempts")
+
+        pcm += audio
         time.sleep(1)  # be polite to preview-tier rate limits
+
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)      # s16
         wf.setframerate(24000)  # Gemini TTS output rate
         wf.writeframes(bytes(pcm))
-    log(f"wav written: {wav_path} ({wav_path.stat().st_size / 1e6:.1f} MB)")
+
+    total = _pcm_seconds(bytes(pcm))
+    expected = word_count(script) * MIN_SECONDS_PER_WORD
+    log(f"wav written: {wav_path} ({wav_path.stat().st_size / 1e6:.1f} MB, "
+        f"{total:.0f}s)")
+
+    # Publishing a truncated episode is worse than publishing none: the feed
+    # is permanent and the listener has no way to tell a short episode from a
+    # broken one. So this fails the build rather than committing the file.
+    if expected and total < expected * 0.6:
+        raise RuntimeError(
+            f"audio is {total:.0f}s for a {word_count(script)}-word script, "
+            f"expected at least {expected * 0.6:.0f}s. "
+            f"{short_chunks} chunk(s) came back short. Refusing to publish a "
+            "truncated episode."
+        )
 
 
 def to_mp3(wav_path: pathlib.Path, mp3_path: pathlib.Path) -> None:
@@ -1151,7 +1492,7 @@ def main() -> int:
         for a in articles
     )
     log("airtime budget:\n" + budget)
-    digest = gemini_text(build_digest_prompt(articles))
+    digest = gemini_text_retry(build_digest_prompt(articles), label="digest")
 
     # Fidelity gate. One free retry, because a regenerated digest usually
     # comes back clean; if it still drifts, ship it but shout about it.
@@ -1160,7 +1501,8 @@ def main() -> int:
         log(f"FIDELITY: {len(problems)} unverified figure(s); regenerating")
         for w in problems:
             log(f"  ! {w}")
-        digest = gemini_text(build_digest_prompt(articles))
+        digest = gemini_text_retry(build_digest_prompt(articles),
+                                   label="digest retry")
         problems = verify_digest(digest, articles)
 
     sources = "\n".join(f"- [{a['title']}]({a['url']})" for a in articles)
@@ -1182,7 +1524,7 @@ def main() -> int:
     )
 
     log("writing podcast script")
-    script = write_script_checked(digest, budget)
+    script = write_episode(digest, articles, budget)
     for w in verify_script(script, digest):
         log(f"  ! {w}")
     (DIGESTS / f"{today}-script.md").write_text(script, encoding="utf-8")
