@@ -14,7 +14,7 @@ Four stages, cheapest first, so money is only spent on survivors:
   1. LIST     scrape listing pages for candidate links          (no cost)
   2. BLOCK    kill obvious promo from the title alone           (no cost)
   3. SIGNAL   fetch, measure substance: data density, quotes    (no cost)
-  4. SCORE    one batched LLM call rates relevance to YOU       (~$0.002)
+  4. SCORE    one batched Claude call rates relevance to YOU    (~$0.03/batch)
 
 Everything it decides is written to ledger/<date>.md, including what it threw
 away and why. If the filter is wrong you will be able to see that it is wrong,
@@ -44,7 +44,7 @@ except ModuleNotFoundError:           # 3.10 and older
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from gamesforum_pipeline import (          # noqa: E402
-    fetch_article, gemini_json, log, SCORE_MODEL,
+    fetch_article, claude_json, log,
 )
 from sources import collect                # noqa: E402
 
@@ -220,36 +220,48 @@ ARTICLES:
 """
 
 
-# propertyOrdering matters: the model generates fields in this order, so
-# putting reasoning before score means it actually thinks first and commits
-# to a number second. Reversed, the number comes out of nowhere and the
-# reasoning becomes a justification written after the fact.
+# Property definition order matters: the model fills fields in this order,
+# so putting reasoning before score means it actually thinks first and
+# commits to a number second. Reversed, the number comes out of nowhere and
+# the reasoning becomes a justification written after the fact.
+#
+# Claude's tool_use requires an object at the schema root, not a bare array,
+# so the batch of per-article rows is wrapped under "articles" rather than
+# being the top-level shape the way Gemini's responseSchema allowed.
 SCORE_SCHEMA = {
-    "type": "ARRAY",
-    "items": {
-        "type": "OBJECT",
-        "properties": {
-            "id": {"type": "INTEGER"},
-            "reasoning": {
-                "type": "STRING",
-                "description": "What this article actually contains and what "
-                               "it would mean for this specific operator. "
-                               "Two or three sentences.",
+    "type": "object",
+    "properties": {
+        "articles": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "reasoning": {
+                        "type": "string",
+                        "description": "What this article actually contains "
+                                       "and what it would mean for this "
+                                       "specific operator. Two or three "
+                                       "sentences.",
+                    },
+                    "axis": {
+                        "type": "string",
+                        "enum": ["DECISION", "TACTIC", "COMPETITIVE",
+                                 "MARKET", "NONE"],
+                    },
+                    "score": {"type": "integer"},
+                    "why": {
+                        "type": "string",
+                        "description": "One concrete line naming what is "
+                                       "in it.",
+                    },
+                    "topic": {"type": "string"},
+                },
+                "required": ["id", "reasoning", "axis", "score", "why"],
             },
-            "axis": {
-                "type": "STRING",
-                "enum": ["DECISION", "TACTIC", "COMPETITIVE", "MARKET", "NONE"],
-            },
-            "score": {"type": "INTEGER"},
-            "why": {
-                "type": "STRING",
-                "description": "One concrete line naming what is in it.",
-            },
-            "topic": {"type": "STRING"},
         },
-        "propertyOrdering": ["id", "reasoning", "axis", "score", "why", "topic"],
-        "required": ["id", "reasoning", "axis", "score", "why"],
     },
+    "required": ["articles"],
 }
 
 # Batch size for scoring. Seventy-plus articles in one call is where the
@@ -263,11 +275,9 @@ def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
     for start in range(0, len(candidates), SCORE_BATCH):
         batch = candidates[start:start + SCORE_BATCH]
         try:
-            # Mechanical, high-volume, schema-enforced: this is the bulk of
-            # the run's call count, so it goes to the free-tier-safe model
-            # rather than the one reserved for the digest and script.
-            rows = gemini_json(build_scoring_prompt(profile, batch),
-                               SCORE_SCHEMA, model=SCORE_MODEL)
+            result = claude_json(build_scoring_prompt(profile, batch),
+                                 SCORE_SCHEMA)
+            rows = result.get("articles", []) if isinstance(result, dict) else []
         except Exception as e:                          # noqa: BLE001
             log(f"  batch {start // SCORE_BATCH + 1} failed ({e})")
             continue
@@ -649,8 +659,8 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true",
                     help="deterministic stages only, no LLM call, no cost")
     args = ap.parse_args()
-    if not args.dry_run and not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("set GEMINI_API_KEY, or pass --dry-run")
+    if not args.dry_run and not os.environ.get("ANTHROPIC_API_KEY"):
+        sys.exit("set ANTHROPIC_API_KEY, or pass --dry-run")
     select(dry_run=args.dry_run)
 
 

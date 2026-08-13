@@ -8,18 +8,27 @@ Flow:
   1. scrape globalgamesforum.com /features + /news listing pages
   2. skip anything already processed (state.json)
   3. fetch full article text for the new ones
-  4. Gemini writes: (a) markdown digest  (b) 2-speaker podcast script
+  4. Claude writes: relevance scoring, markdown digest, 2-speaker script
   5. Gemini TTS multi-speaker -> chunked PCM -> single mp3
   6. write episodes/, digest/, and a private podcast feed.xml
 
+Why two providers: Gemini's free tier turned out to cap at roughly 20
+generateContent requests per PROJECT per day, not per model - confirmed by
+watching a real run switch models mid-episode and hit the same wall five
+calls later. That is unworkable for a pipeline making 15-20 text calls a run.
+Claude's API has no equivalent free-tier trap and writes better dialogue
+besides, so all reasoning and writing moved there. Gemini remains only for
+TTS, which is a separate quota bucket this pipeline never got close to.
+
 Env vars required:
-  GEMINI_API_KEY   - from aistudio.google.com/apikey
-  PODCAST_BASE_URL - e.g. https://<user>.github.io/<repo>   (no trailing slash)
+  ANTHROPIC_API_KEY - from platform.claude.com, used for every text call
+  GEMINI_API_KEY    - from aistudio.google.com/apikey, used ONLY for TTS
+  PODCAST_BASE_URL  - e.g. https://<user>.github.io/<repo>  (no trailing slash)
 
 Optional:
-  DIGEST_LANG      - "he" (default) or "en"
-  TTS_MODEL        - default gemini-2.5-flash-preview-tts
-                     (gemini-3.1-flash-tts-preview = better, 2x cost, flakier)
+  DIGEST_LANG       - "he" (default) or "en"
+  ANTHROPIC_MODEL   - default claude-sonnet-5
+  TTS_MODEL         - default gemini-2.5-flash-preview-tts
 """
 
 from __future__ import annotations
@@ -42,26 +51,18 @@ from xml.sax.saxutils import escape as xml_escape
 
 # ---------------------------------------------------------------- config
 
-API_KEY = os.environ["GEMINI_API_KEY"]
+# GEMINI_API_KEY is loaded lazily inside the TTS functions, not here, because
+# discovery.py --dry-run and other text-only entry points should not need a
+# Gemini key at all now that Gemini only does audio.
+ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
 LANG = os.environ.get("DIGEST_LANG", "he")
 # Off by default: the digest reports what the articles say, nothing more.
 # Set to "1" to append a clearly fenced machine-commentary section.
 INCLUDE_OPINION = os.environ.get("INCLUDE_OPINION", "0") == "1"
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
-# gemini-3.5-flash sat on a much stingier free-tier daily quota than its
-# generation number suggests - the 429 kept recurring even with pacing
-# applied, which only makes sense as a daily cap, not a burst problem.
-#
-# Split by task instead of dropping the newer model everywhere: relevance
-# scoring is mechanical (schema-enforced JSON, a rubric, a number) and the
-# bulk of the call volume, so it runs on gemini-2.5-flash, which has real
-# free-tier daily headroom. The digest and the podcast script are where
-# nuance actually shows up in the output - phrasing, natural dialogue,
-# metaphor quality - so those stay on the newer model, at a fraction of the
-# call count (roughly 2-11 calls a run vs. the 5+ scoring batches).
-TEXT_MODEL = os.environ.get("TEXT_MODEL", "gemini-3.5-flash")
-SCORE_MODEL = os.environ.get("SCORE_MODEL", "gemini-2.5-flash")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 SITE = "https://www.globalgamesforum.com"
 LISTINGS = [f"{SITE}/features", f"{SITE}/news"]
@@ -194,136 +195,154 @@ def fetch_article(url: str) -> dict | None:
     return {"url": url, "title": title, "text": text[:14000]}
 
 
-# ---------------------------------------------------------------- gemini
+# ---------------------------------------------------------------- claude
+#
+# All reasoning and writing - relevance scoring, the digest, the episode
+# plan, every segment of the script - goes through Claude's API. The prior
+# design ran this on Gemini Flash and spent most of this file fighting a free
+# tier that turned out to cap at roughly 20 generateContent requests per
+# PROJECT per day, confirmed by watching a real run switch models mid-episode
+# and hit the identical wall five calls later. That is not a bug to work
+# around, it is the free tier doing what it is for: prototyping, not a
+# scheduled unattended pipeline. Claude's API has no equivalent trap.
+#
+# Gemini is still used, below this section, for TTS only - a different
+# quota bucket this pipeline never got close to exhausting.
 
 
 class Truncated(RuntimeError):
     """The model ran out of output budget mid-answer."""
 
 
-def gemini_json(prompt: str, schema: dict, model: str | None = None) -> list | dict:
-    """Ask for JSON and have the API enforce the shape.
+ANTHROPIC_VERSION = "2023-06-01"
 
-    Free-text prompting for JSON fails in the field: the model will happily
-    answer in prose, or echo whatever bracket notation appears in the prompt.
-    responseSchema makes malformed output an API-level impossibility rather
-    than something to regex around afterwards.
 
-    model defaults to TEXT_MODEL but callers doing high-volume mechanical
-    work (relevance scoring) pass SCORE_MODEL instead, to keep that call
-    volume off the model whose free-tier quota actually matters for quality.
+def _anthropic_post(payload: dict, tries: int = 5) -> dict:
+    """POST to the Messages API with the retry/backoff/logging this pipeline
+    needs, mirroring what _post_json did for Gemini but without the daily-cap
+    special case - Claude's rate limits are per-minute/per-token on a paid
+    account, not a fixed daily request count, so a plain 429 is worth waiting
+    out rather than something to escape by switching models.
     """
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model or TEXT_MODEL}:generateContent"
-    )
+    body = json.dumps(payload).encode()
+    model = payload.get("model", "?")
+    for attempt in range(tries):
+        _check_deadline()
+        _pace()
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": ANTHROPIC_VERSION,
+            },
+        )
+        started = time.monotonic()
+        try:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+                data = json.loads(r.read())
+            log(f"    [{model} responded in {time.monotonic() - started:.0f}s]")
+            return data
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:400]
+            log(f"API {e.code} after {time.monotonic() - started:.0f}s "
+                f"(attempt {attempt + 1}/{tries}): {detail}")
+            # 429 (rate_limit_error) and 529 (overloaded_error) are both
+            # worth a wait-and-retry; anything else (bad request, auth) is
+            # not going to fix itself.
+            retryable = e.code in (429, 500, 502, 503, 529)
+            if not retryable or attempt == tries - 1:
+                raise
+            time.sleep(min(60, 5 * 2 ** attempt))
+        except Exception as e:  # noqa: BLE001
+            log(f"API error after {time.monotonic() - started:.0f}s "
+                f"(attempt {attempt + 1}/{tries}): {e}")
+            if attempt == tries - 1:
+                raise
+            time.sleep(5 * 2 ** attempt)
+    raise RuntimeError("unreachable")
+
+
+def claude_json(prompt: str, schema: dict, max_tokens: int = 8192) -> dict:
+    """Ask for structured output via a forced tool call.
+
+    Claude has no bare "respond in this JSON shape" mode; the equivalent is
+    a single tool whose input_schema IS the desired shape, with tool_choice
+    forcing that exact tool. The answer arrives as the tool call's `input`,
+    already-parsed JSON rather than text this code would otherwise have to
+    parse and hope was clean - the same reasoning that drove responseSchema
+    on the Gemini side originally, just Claude's version of it.
+
+    schema must be a JSON Schema object (type: "object" at the root; wrap a
+    list result in a named property, e.g. {"type":"object","properties":
+    {"items":{"type":"array", ...}}}) - tool schemas cannot be a bare array.
+    """
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.2,
-            # A truncated JSON array is a parse error rather than a silent
-            # short answer, but it still costs the whole batch, so give it
-            # room and cap thinking the same way gemini_text does.
-            "maxOutputTokens": 16384,
-            "thinkingConfig": {"thinkingBudget": 1024},
-            "responseMimeType": "application/json",
-            "responseSchema": schema,
-        },
+        "model": ANTHROPIC_MODEL,
+        "max_tokens": max_tokens,
+        "temperature": 0.2,
+        "tools": [{
+            "name": "submit",
+            "description": "Submit the answer in the required structure.",
+            "input_schema": schema,
+        }],
+        "tool_choice": {"type": "tool", "name": "submit"},
+        "messages": [{"role": "user", "content": prompt}],
     }
-    data = _post_json(url, payload)
-    cand = (data.get("candidates") or [{}])[0]
-    parts = (cand.get("content") or {}).get("parts", [])
-    raw = "".join(p.get("text", "") for p in parts).strip()
-    if cand.get("finishReason") == "MAX_TOKENS":
-        raise Truncated("scoring batch hit the token ceiling")
-    return json.loads(raw)
+    data = _anthropic_post(payload)
+    if data.get("stop_reason") == "max_tokens":
+        raise Truncated("structured call hit the token ceiling")
+    for block in data.get("content", []):
+        if block.get("type") == "tool_use" and block.get("name") == "submit":
+            return block["input"]
+    raise RuntimeError(f"no tool_use block in response: {str(data)[:300]}")
 
 
-# Mutable so a mid-run quota exhaustion can downgrade every subsequent call
-# without threading a parameter through the whole call chain. Starts as
-# TEXT_MODEL; gemini_text permanently switches it to SCORE_MODEL the first
-# time TEXT_MODEL reports its daily cap is spent, and every later gemini_text
-# call in this process uses whatever it holds. One quality step down for the
-# rest of THIS run beats a crash that ships nothing.
-_ACTIVE_TEXT_MODEL = [TEXT_MODEL]
-
-
-def gemini_text(prompt: str, max_tokens: int = 16384,
-                thinking: int = 2048, temperature: float = 0.4) -> str:
+def claude_text(prompt: str, max_tokens: int = 8192,
+                temperature: float = 0.4) -> str:
     """Generate text, and refuse to return a silently truncated answer.
 
-    This function used to just concatenate the text parts and return. That is
-    how a 57-second episode shipped: three separate things can shorten the
-    output with no error raised anywhere.
-
-      * finishReason MAX_TOKENS. The answer stops mid-sentence and looks like
-        a complete-but-short script to every downstream check.
-      * Thinking tokens. On 2.5-and-later Flash the model reasons before it
-        answers, and that reasoning is billed against the SAME
-        maxOutputTokens ceiling. Hebrew costs roughly two to three tokens a
-        word, so an unbounded thinking budget against the old 8192 ceiling
-        could leave almost nothing for the transcript. Capping thinking
-        explicitly is what reserves room for the actual answer.
-      * An empty candidate. Returns "" and every caller treats it as a very
-        short script rather than a failure.
-
-    Raises Truncated on the first two so the caller can retry with more room,
-    rather than passing a fragment down the pipeline.
+    The Gemini version of this function existed because a MAX_TOKENS
+    finishReason produced a fragment that looked like a complete short
+    answer to every downstream check - that is the direct cause of the
+    57-second episode two rewrites ago. Same guard here: stop_reason ==
+    "max_tokens" raises rather than returning a partial script.
     """
-    model = _ACTIVE_TEXT_MODEL[0]
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model}:generateContent"
-    )
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": temperature,
-            "maxOutputTokens": max_tokens,
-            "thinkingConfig": {"thinkingBudget": thinking},
-        },
+        "model": ANTHROPIC_MODEL,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "messages": [{"role": "user", "content": prompt}],
     }
-    log(f"    -> {model}, {len(prompt)} char prompt, "
+    log(f"    -> {ANTHROPIC_MODEL}, {len(prompt)} char prompt, "
         f"{max_tokens} token ceiling")
-    try:
-        data = _post_json(url, payload)
-    except QuotaExhausted as e:
-        if model == SCORE_MODEL:
-            raise  # already on the fallback; nothing left to fall back to
-        log(f"  {e}; switching to {SCORE_MODEL} for the rest of this run")
-        _ACTIVE_TEXT_MODEL[0] = SCORE_MODEL
-        return gemini_text(prompt, max_tokens=max_tokens,
-                           thinking=thinking, temperature=temperature)
-    cand = (data.get("candidates") or [{}])[0]
-    parts = (cand.get("content") or {}).get("parts", [])
-    text = "".join(p.get("text", "") for p in parts).strip()
+    data = _anthropic_post(payload)
+    text = "".join(
+        b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"
+    ).strip()
 
-    usage = data.get("usageMetadata", {})
-    thought = usage.get("thoughtsTokenCount", 0)
-    out = usage.get("candidatesTokenCount", 0)
-    reason = cand.get("finishReason", "")
-    log(f"    [{out} output tokens, {thought} thinking, finish={reason or '?'}]")
+    usage = data.get("usage", {})
+    reason = data.get("stop_reason", "")
+    log(f"    [{usage.get('output_tokens', '?')} output tokens, "
+        f"finish={reason or '?'}]")
 
-    if reason == "MAX_TOKENS":
-        raise Truncated(
-            f"hit the {max_tokens}-token ceiling "
-            f"({thought} of it spent thinking); answer is a fragment"
-        )
+    if reason == "max_tokens":
+        raise Truncated(f"hit the {max_tokens}-token ceiling; answer is a fragment")
     if not text:
-        raise Truncated(f"empty response (finishReason={reason or '?'})")
+        raise Truncated(f"empty response (stop_reason={reason or '?'})")
     return text
 
 
-def gemini_text_retry(prompt: str, label: str = "") -> str:
-    """gemini_text with escalating room, because truncation is recoverable.
+def claude_text_retry(prompt: str, label: str = "") -> str:
+    """claude_text with escalating room, because truncation is recoverable.
 
-    A fragment is worthless, but the same prompt with a bigger ceiling and a
-    smaller thinking allowance usually completes. Only after both attempts
-    fail does this give up, and then it says so rather than returning junk.
+    A fragment is worthless, but the same prompt with a bigger ceiling
+    usually completes. Only after both attempts fail does this give up.
     """
-    for max_tokens, thinking in ((16384, 2048), (32768, 512)):
+    for max_tokens in (8192, 16384):
         try:
-            return gemini_text(prompt, max_tokens=max_tokens, thinking=thinking)
+            return claude_text(prompt, max_tokens=max_tokens)
         except Truncated as e:
             log(f"  {label} truncated ({e}); retrying with more room")
     raise Truncated(f"{label}: could not get a complete answer")
@@ -401,10 +420,10 @@ TRANSCRIPT:
         },
     }
     # Two distinct failure modes, both documented:
-    #   * HTTP 500 -> handled inside _post_json's retry loop
+    #   * HTTP 500 -> handled inside _gemini_post_json's retry loop
     #   * HTTP 200 with text parts instead of audio -> retried here
     for attempt in range(4):
-        data = _post_json(url, payload, tries=4)
+        data = _gemini_post_json(url, payload, tries=4)
         cand = (data.get("candidates") or [{}])[0]
         for part in (cand.get("content") or {}).get("parts", []):
             inline = part.get("inlineData") or part.get("inline_data")
@@ -421,14 +440,11 @@ TRANSCRIPT:
     raise RuntimeError("TTS returned no audio payload after 4 attempts")
 
 
-# Free-tier Gemini quota is a per-minute request count, typically 10-15 RPM
-# depending on model. A run makes many calls back to back (scoring batches,
-# digest, three script passes, each possibly retried) with no natural
-# spacing between them, so it can burst past that ceiling in well under a
-# minute even though the total for the whole run is modest. Two separate
-# guards: pace every call so we do not burst, and on an actual 429 wait a
-# full quota window rather than a short exponential backoff.
-_MIN_CALL_INTERVAL = float(os.environ.get("MIN_CALL_INTERVAL_SEC", "4.5"))
+# A small minimum gap between calls. Less critical now that text generation
+# is on a paid Claude account rather than a free Gemini tier with a razor-
+# thin per-minute allowance, but still cheap insurance against bursting any
+# provider's rate limit, Claude's TTS calls included.
+_MIN_CALL_INTERVAL = float(os.environ.get("MIN_CALL_INTERVAL_SEC", "1.5"))
 _last_call_at = [0.0]
 
 
@@ -440,12 +456,12 @@ def _pace() -> None:
     _last_call_at[0] = time.monotonic()
 
 
-# Was 300s. Five attempts at a five-minute timeout is a twenty-five-minute
-# stall per call, and gemini_text_retry makes two of those, so a single
-# unlucky request could burn most of an hour with the log showing nothing at
-# all. Run #7 sat for 55 minutes on the digest call for exactly this reason.
-# A Gemini text call that has not answered in two minutes is not going to.
-HTTP_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT_SEC", "120"))
+# Was 300s originally. Five attempts at a five-minute timeout is a twenty-
+# five-minute stall per call, and a retry wrapper could make two of those, so
+# a single unlucky request could burn most of an hour with the log showing
+# nothing at all. Run #7 sat for 55 minutes on one call for exactly this
+# reason. A call that has not answered in two minutes is not going to.
+HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "120"))
 
 # Whole-run budget. Past this, stop rather than sit in a queue burning
 # Actions minutes on a job nobody is watching.
@@ -462,18 +478,15 @@ def _check_deadline() -> None:
         )
 
 
-class QuotaExhausted(RuntimeError):
-    """A confirmed per-day quota, not a per-minute burst.
-
-    Distinguished from a plain 429 because the two need opposite responses:
-    a per-minute 429 is worth a ~65s wait and a retry on the SAME model. A
-    per-day 429 is not going to clear in this run no matter how long we
-    wait, so the only useful reaction is to stop hammering this model and
-    switch, which happens one level up in gemini_text.
+def _gemini_post_json(url: str, payload: dict, tries: int = 4) -> dict:
+    """POST to a Gemini endpoint. TTS only now - see the module docstring for
+    why text generation moved off Gemini entirely.
     """
-
-
-def _post_json(url: str, payload: dict, tries: int = 4) -> dict:
+    if not GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set. It is still required for TTS even "
+            "though text generation now runs on Claude."
+        )
     body = json.dumps(payload).encode()
     model = url.rsplit("/", 1)[-1].split(":")[0]
     for attempt in range(tries):
@@ -484,7 +497,7 @@ def _post_json(url: str, payload: dict, tries: int = 4) -> dict:
             data=body,
             headers={
                 "Content-Type": "application/json",
-                "x-goog-api-key": API_KEY,
+                "x-goog-api-key": GEMINI_API_KEY,
             },
         )
         started = time.monotonic()
@@ -495,19 +508,12 @@ def _post_json(url: str, payload: dict, tries: int = 4) -> dict:
             return data
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:400]
+            retryable = e.code in (429, 500, 502, 503, 504)
             log(f"API {e.code} after {time.monotonic() - started:.0f}s "
                 f"(attempt {attempt + 1}/{tries}): {detail}")
-            if e.code == 429 and "free_tier_requests" in detail:
-                # Run #8's actual failure: this kept retrying a daily cap
-                # with 65s sleeps, four times, before giving up. Waiting
-                # cannot fix a daily quota within the same run.
-                raise QuotaExhausted(f"{model}: daily free-tier quota used up")
-            retryable = e.code in (429, 500, 502, 503, 504)
             if not retryable or attempt == tries - 1:
                 raise
-            # A per-minute 429 clears in well under a minute; a 500/502/503
-            # gets the usual short exponential backoff.
-            time.sleep(65 if e.code == 429 else min(30, 4 * 2 ** attempt))
+            time.sleep(min(60, 4 * 2 ** attempt))
         except Exception as e:  # noqa: BLE001
             log(f"API error after {time.monotonic() - started:.0f}s "
                 f"(attempt {attempt + 1}/{tries}): {e}")
@@ -688,68 +694,68 @@ COLD_OPEN_WORDS = 80
 CLOSE_WORDS = 55
 
 
+# Standard JSON Schema, consumed by Claude's tool_use as the input_schema
+# for a forced "submit" tool. Property definition order is what steers the
+# order the model fills fields in (through_line before segments before
+# close), the same reasoning Gemini's propertyOrdering existed for, just
+# expressed as plain dict insertion order rather than an extra key.
 PLAN_SCHEMA = {
-    "type": "OBJECT",
+    "type": "object",
     "properties": {
         "through_line": {
-            "type": "STRING",
+            "type": "string",
             "description": "One sentence naming the tension connecting these "
                            "items. Not a topic but a tension. If they truly "
                            "do not connect, say so plainly.",
         },
         "orientation": {
-            "type": "STRING",
+            "type": "string",
             "description": "One short sentence naming what this week's "
                            "episode covers, so a listener knows where they "
                            "are. Plain and factual, not a sales pitch.",
         },
         "cold_open": {
-            "type": "STRING",
+            "type": "string",
             "description": "The single most arresting concrete detail in the "
                            "digest: a number, a reversal, a named company "
                            "doing a specific thing.",
         },
         "segments": {
-            "type": "ARRAY",
+            "type": "array",
             "description": "One per story, in the order given, same count.",
             "items": {
-                "type": "OBJECT",
+                "type": "object",
                 "properties": {
-                    "title": {"type": "STRING"},
-                    "claim": {"type": "STRING",
+                    "title": {"type": "string"},
+                    "claim": {"type": "string",
                               "description": "The claim in one sentence."},
-                    "figures": {"type": "STRING",
+                    "figures": {"type": "string",
                                 "description": "The hard numbers that carry "
                                                "it, exactly as in the digest."},
-                    "attribution": {"type": "STRING",
+                    "attribution": {"type": "string",
                                     "description": "Whose claim it is."},
-                    "image": {"type": "STRING",
+                    "image": {"type": "string",
                               "description": "ONE concrete image drawn strictly "
                                              "from the mechanism described. "
                                              "'none' if nothing honest fits."},
-                    "objection": {"type": "STRING",
+                    "objection": {"type": "string",
                                   "description": "The obvious objection a "
                                                  "smart listener would raise."},
-                    "handoff": {"type": "STRING",
+                    "handoff": {"type": "string",
                                 "description": "How this connects to the next "
                                                "story. 'Second thing' is not a "
                                                "handoff."},
                 },
-                "propertyOrdering": ["title", "claim", "figures",
-                                     "attribution", "image", "objection",
-                                     "handoff"],
                 "required": ["title", "claim", "figures", "attribution",
                              "objection"],
             },
         },
         "close": {
-            "type": "STRING",
+            "type": "string",
             "description": "The one line worth remembering. A restatement of "
                            "the sharpest fact, not a lesson and not advice.",
         },
     },
-    "propertyOrdering": ["through_line", "orientation", "cold_open",
-                         "segments", "close"],
     "required": ["through_line", "orientation", "cold_open", "segments",
                  "close"],
 }
@@ -880,12 +886,13 @@ def build_group_prompt(segs: list[dict], digest: str, words: int,
     """Several low-airtime stories in one call instead of one call each.
 
     A story given eleven percent of the episode gets roughly a hundred
-    words, which is a real generation call for very little airtime. Five
-    such calls is where run #8 burned through the daily quota on
-    TEXT_MODEL before the episode was even half written. Grouping the
-    minor stories into a single "quick items" pass covers the same ground
-    in one call instead of three or four, which is the actual lever on
-    quota, not a compromise on what gets covered.
+    words, which is a lot of API round-trip for very little airtime. Five
+    such calls is what burned through Gemini's free-tier daily cap in an
+    earlier version of this pipeline before the episode was even half
+    written; that specific ceiling is gone now that generation runs on
+    Claude, but a call per hundred-word story is still wasteful on its own
+    terms. Grouping the minor stories into a single "quick items" pass
+    covers the same ground in one call instead of three or four.
     """
     items = "\n\n".join(
         f"STORY {i + 1}: {s.get('title', '')}\n"
@@ -1295,7 +1302,7 @@ def _write_part(prompt: str, target: int, label: str) -> str:
     best, best_words = "", -1
     for attempt in (1, 2):
         try:
-            part = gemini_text_retry(prompt, label=label)
+            part = claude_text_retry(prompt, label=label)
         except Truncated as e:
             log(f"    {label}: {e}")
             continue
@@ -1326,12 +1333,7 @@ def write_episode(digest: str, articles: list[dict], budget: str = "") -> str:
     """
     log("  plan")
     try:
-        # Schema-enforced extraction from the digest, same shape of task as
-        # relevance scoring, so it runs on SCORE_MODEL. That is one fewer
-        # call against the quota that matters, for a call whose output is a
-        # structured plan, not prose the listener hears directly.
-        plan = gemini_json(build_plan_prompt(digest, budget), PLAN_SCHEMA,
-                           model=SCORE_MODEL)
+        plan = claude_json(build_plan_prompt(digest, budget), PLAN_SCHEMA)
     except Exception as e:                                  # noqa: BLE001
         log(f"  planning failed ({e}); falling back to a flat plan")
         plan = {}
@@ -1425,7 +1427,7 @@ def write_episode(digest: str, articles: list[dict], budget: str = "") -> str:
     # lesson from every previous editing pass in this pipeline.
     log("  seams")
     try:
-        seamed = gemini_text_retry(build_seam_prompt(assembled, digest),
+        seamed = claude_text_retry(build_seam_prompt(assembled, digest),
                                    label="seams")
     except Truncated as e:
         log(f"  seam pass failed ({e}); keeping assembled version")
@@ -1648,7 +1650,7 @@ def main() -> int:
         for a in articles
     )
     log("airtime budget:\n" + budget)
-    digest = gemini_text_retry(build_digest_prompt(articles), label="digest")
+    digest = claude_text_retry(build_digest_prompt(articles), label="digest")
 
     # Fidelity gate. One free retry, because a regenerated digest usually
     # comes back clean; if it still drifts, ship it but shout about it.
@@ -1657,7 +1659,7 @@ def main() -> int:
         log(f"FIDELITY: {len(problems)} unverified figure(s); regenerating")
         for w in problems:
             log(f"  ! {w}")
-        digest = gemini_text_retry(build_digest_prompt(articles),
+        digest = claude_text_retry(build_digest_prompt(articles),
                                    label="digest retry")
         problems = verify_digest(digest, articles)
 
