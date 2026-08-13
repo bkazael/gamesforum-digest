@@ -239,6 +239,15 @@ def gemini_json(prompt: str, schema: dict, model: str | None = None) -> list | d
     return json.loads(raw)
 
 
+# Mutable so a mid-run quota exhaustion can downgrade every subsequent call
+# without threading a parameter through the whole call chain. Starts as
+# TEXT_MODEL; gemini_text permanently switches it to SCORE_MODEL the first
+# time TEXT_MODEL reports its daily cap is spent, and every later gemini_text
+# call in this process uses whatever it holds. One quality step down for the
+# rest of THIS run beats a crash that ships nothing.
+_ACTIVE_TEXT_MODEL = [TEXT_MODEL]
+
+
 def gemini_text(prompt: str, max_tokens: int = 16384,
                 thinking: int = 2048, temperature: float = 0.4) -> str:
     """Generate text, and refuse to return a silently truncated answer.
@@ -261,9 +270,10 @@ def gemini_text(prompt: str, max_tokens: int = 16384,
     Raises Truncated on the first two so the caller can retry with more room,
     rather than passing a fragment down the pipeline.
     """
+    model = _ACTIVE_TEXT_MODEL[0]
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{TEXT_MODEL}:generateContent"
+        f"{model}:generateContent"
     )
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -273,9 +283,17 @@ def gemini_text(prompt: str, max_tokens: int = 16384,
             "thinkingConfig": {"thinkingBudget": thinking},
         },
     }
-    log(f"    -> {TEXT_MODEL}, {len(prompt)} char prompt, "
+    log(f"    -> {model}, {len(prompt)} char prompt, "
         f"{max_tokens} token ceiling")
-    data = _post_json(url, payload)
+    try:
+        data = _post_json(url, payload)
+    except QuotaExhausted as e:
+        if model == SCORE_MODEL:
+            raise  # already on the fallback; nothing left to fall back to
+        log(f"  {e}; switching to {SCORE_MODEL} for the rest of this run")
+        _ACTIVE_TEXT_MODEL[0] = SCORE_MODEL
+        return gemini_text(prompt, max_tokens=max_tokens,
+                           thinking=thinking, temperature=temperature)
     cand = (data.get("candidates") or [{}])[0]
     parts = (cand.get("content") or {}).get("parts", [])
     text = "".join(p.get("text", "") for p in parts).strip()
@@ -444,6 +462,17 @@ def _check_deadline() -> None:
         )
 
 
+class QuotaExhausted(RuntimeError):
+    """A confirmed per-day quota, not a per-minute burst.
+
+    Distinguished from a plain 429 because the two need opposite responses:
+    a per-minute 429 is worth a ~65s wait and a retry on the SAME model. A
+    per-day 429 is not going to clear in this run no matter how long we
+    wait, so the only useful reaction is to stop hammering this model and
+    switch, which happens one level up in gemini_text.
+    """
+
+
 def _post_json(url: str, payload: dict, tries: int = 4) -> dict:
     body = json.dumps(payload).encode()
     model = url.rsplit("/", 1)[-1].split(":")[0]
@@ -466,14 +495,18 @@ def _post_json(url: str, payload: dict, tries: int = 4) -> dict:
             return data
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:400]
-            retryable = e.code in (429, 500, 502, 503, 504)
             log(f"API {e.code} after {time.monotonic() - started:.0f}s "
                 f"(attempt {attempt + 1}/{tries}): {detail}")
+            if e.code == 429 and "free_tier_requests" in detail:
+                # Run #8's actual failure: this kept retrying a daily cap
+                # with 65s sleeps, four times, before giving up. Waiting
+                # cannot fix a daily quota within the same run.
+                raise QuotaExhausted(f"{model}: daily free-tier quota used up")
+            retryable = e.code in (429, 500, 502, 503, 504)
             if not retryable or attempt == tries - 1:
                 raise
-            # A 429 on the free tier means the per-minute bucket is empty,
-            # not that anything is wrong. A ~65s wait crosses a full window;
-            # a 500/502/503 gets the usual short exponential backoff.
+            # A per-minute 429 clears in well under a minute; a 500/502/503
+            # gets the usual short exponential backoff.
             time.sleep(65 if e.code == 429 else min(30, 4 * 2 ** attempt))
         except Exception as e:  # noqa: BLE001
             log(f"API error after {time.monotonic() - started:.0f}s "
@@ -832,6 +865,65 @@ had {SPEAKER_B} restate the claim in plainer words, or press on method, or
 raise the objection properly, or let {SPEAKER_A} give the concrete detail
 behind the headline figure. Do all of those. Do NOT invent facts to fill
 space; extend the conversation around the facts you were given.
+
+{_craft()}
+
+{_FIDELITY}
+
+DIGEST (source of truth for every fact):
+{digest}
+"""
+
+
+def build_group_prompt(segs: list[dict], digest: str, words: int,
+                       previous_tail: str, is_last: bool) -> str:
+    """Several low-airtime stories in one call instead of one call each.
+
+    A story given eleven percent of the episode gets roughly a hundred
+    words, which is a real generation call for very little airtime. Five
+    such calls is where run #8 burned through the daily quota on
+    TEXT_MODEL before the episode was even half written. Grouping the
+    minor stories into a single "quick items" pass covers the same ground
+    in one call instead of three or four, which is the actual lever on
+    quota, not a compromise on what gets covered.
+    """
+    items = "\n\n".join(
+        f"STORY {i + 1}: {s.get('title', '')}\n"
+        f"- CLAIM: {s.get('claim', '')}\n"
+        f"- FIGURES (exact, do not alter): {s.get('figures', '')}\n"
+        f"- WHOSE CLAIM: {s.get('attribution', '')}"
+        for i, s in enumerate(segs)
+    )
+    handoff = (
+        "End on the last item's natural close. Another part of the episode "
+        "follows, so do not wrap up the whole episode."
+        if not is_last
+        else "This is the last material before the close. End on the "
+             "sharpest of the items, do not summarise the episode."
+    )
+    return f"""Write a "quick items" segment of an ongoing podcast
+conversation: several shorter stories covered briskly, one after another.
+The hosts are already mid-episode; do not greet or re-introduce the show.
+
+{_LANG_LINE}
+
+{_hosts()}
+
+WHAT PRECEDED THIS (continue naturally from it, do not repeat it):
+{previous_tail or "(this is the first material)"}
+
+Cover EACH of these {len(segs)} stories, in order, with a real but brief
+exchange for each (roughly {max(2, words // max(1, len(segs)) // 20)} turns
+per story). A one-line mention is not enough airtime; a full segment is more
+than these deserve. Land in between: the claim, the number, one beat of
+reaction or restatement, then move to the next.
+
+{items}
+
+{handoff}
+
+LENGTH: write {words} words total across all {len(segs)} stories, plus or
+minus fifteen percent. Do NOT invent facts to fill space.
 
 {_craft()}
 
@@ -1234,7 +1326,12 @@ def write_episode(digest: str, articles: list[dict], budget: str = "") -> str:
     """
     log("  plan")
     try:
-        plan = gemini_json(build_plan_prompt(digest, budget), PLAN_SCHEMA)
+        # Schema-enforced extraction from the digest, same shape of task as
+        # relevance scoring, so it runs on SCORE_MODEL. That is one fewer
+        # call against the quota that matters, for a call whose output is a
+        # structured plan, not prose the listener hears directly.
+        plan = gemini_json(build_plan_prompt(digest, budget), PLAN_SCHEMA,
+                           model=SCORE_MODEL)
     except Exception as e:                                  # noqa: BLE001
         log(f"  planning failed ({e}); falling back to a flat plan")
         plan = {}
@@ -1262,6 +1359,30 @@ def write_episode(digest: str, articles: list[dict], budget: str = "") -> str:
     log(f"  word targets: open {COLD_OPEN_WORDS}, "
         f"segments {targets}, close {CLOSE_WORDS}")
 
+    # A call per story is the right granularity for a lead or second story,
+    # which genuinely need the room. It is overkill for a story given eleven
+    # percent of the episode, and overkill is what burned the daily quota in
+    # run #8: five stories meant five calls before the episode was half
+    # written. So anything under this threshold gets bundled with its
+    # neighbours into one "quick items" call instead of one call each.
+    SOLO_FLOOR = 150
+    units: list[tuple[list[dict], int, bool]] = []   # (segs, target, is_group)
+    i = 0
+    for seg, target in zip(segments, targets):
+        seg = dict(seg)
+        seg.setdefault("title", articles[i]["title"])
+        i += 1
+        if target >= SOLO_FLOOR:
+            units.append(([seg], target, False))
+        elif units and units[-1][2]:
+            group_segs, group_target, _ = units[-1]
+            units[-1] = (group_segs + [seg], group_target + target, True)
+        else:
+            units.append(([seg], target, True))
+    if len(units) != len(segments):
+        log(f"  {len(segments)} segments bundled into {len(units)} "
+            "generation call(s)")
+
     parts: list[str] = []
 
     log("  cold open")
@@ -1269,17 +1390,21 @@ def write_episode(digest: str, articles: list[dict], budget: str = "") -> str:
         build_cold_open_prompt(plan, digest, COLD_OPEN_WORDS),
         COLD_OPEN_WORDS, "open"))
 
-    for i, (seg, target) in enumerate(zip(segments, targets)):
-        seg = dict(seg)
-        seg.setdefault("title", articles[i]["title"])
-        log(f"  segment {i + 1}/{len(segments)}: {seg.get('title', '')[:48]}")
-        parts.append(_write_part(
-            build_segment_prompt(
-                seg, digest, target,
-                previous_tail=_tail("\n".join(parts)),
-                is_last=(i == len(segments) - 1),
-            ),
-            target, f"seg{i + 1}"))
+    for u, (segs, target, is_group) in enumerate(units):
+        titles = ", ".join(s.get("title", "")[:32] for s in segs)
+        log(f"  unit {u + 1}/{len(units)}"
+            f"{' (grouped)' if is_group else ''}: {titles[:70]}")
+        last = (u == len(units) - 1)
+        prompt = (
+            build_group_prompt(segs, digest, target,
+                               previous_tail=_tail("\n".join(parts)),
+                               is_last=last)
+            if is_group else
+            build_segment_prompt(segs[0], digest, target,
+                                 previous_tail=_tail("\n".join(parts)),
+                                 is_last=last)
+        )
+        parts.append(_write_part(prompt, target, f"unit{u + 1}"))
 
     log("  close")
     parts.append(_write_part(
