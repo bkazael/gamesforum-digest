@@ -273,6 +273,8 @@ def gemini_text(prompt: str, max_tokens: int = 16384,
             "thinkingConfig": {"thinkingBudget": thinking},
         },
     }
+    log(f"    -> {TEXT_MODEL}, {len(prompt)} char prompt, "
+        f"{max_tokens} token ceiling")
     data = _post_json(url, payload)
     cand = (data.get("candidates") or [{}])[0]
     parts = (cand.get("content") or {}).get("parts", [])
@@ -420,9 +422,33 @@ def _pace() -> None:
     _last_call_at[0] = time.monotonic()
 
 
-def _post_json(url: str, payload: dict, tries: int = 5) -> dict:
+# Was 300s. Five attempts at a five-minute timeout is a twenty-five-minute
+# stall per call, and gemini_text_retry makes two of those, so a single
+# unlucky request could burn most of an hour with the log showing nothing at
+# all. Run #7 sat for 55 minutes on the digest call for exactly this reason.
+# A Gemini text call that has not answered in two minutes is not going to.
+HTTP_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT_SEC", "120"))
+
+# Whole-run budget. Past this, stop rather than sit in a queue burning
+# Actions minutes on a job nobody is watching.
+RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
+_run_started = time.monotonic()
+
+
+def _check_deadline() -> None:
+    elapsed = time.monotonic() - _run_started
+    if elapsed > RUN_DEADLINE_SEC:
+        raise RuntimeError(
+            f"run exceeded {RUN_DEADLINE_SEC / 60:.0f} minutes "
+            f"({elapsed / 60:.0f}m elapsed); aborting rather than hanging"
+        )
+
+
+def _post_json(url: str, payload: dict, tries: int = 4) -> dict:
     body = json.dumps(payload).encode()
+    model = url.rsplit("/", 1)[-1].split(":")[0]
     for attempt in range(tries):
+        _check_deadline()
         _pace()
         req = urllib.request.Request(
             url,
@@ -432,13 +458,17 @@ def _post_json(url: str, payload: dict, tries: int = 5) -> dict:
                 "x-goog-api-key": API_KEY,
             },
         )
+        started = time.monotonic()
         try:
-            with urllib.request.urlopen(req, timeout=300) as r:
-                return json.loads(r.read())
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+                data = json.loads(r.read())
+            log(f"    [{model} responded in {time.monotonic() - started:.0f}s]")
+            return data
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:400]
             retryable = e.code in (429, 500, 502, 503, 504)
-            log(f"API {e.code} (attempt {attempt + 1}/{tries}): {detail}")
+            log(f"API {e.code} after {time.monotonic() - started:.0f}s "
+                f"(attempt {attempt + 1}/{tries}): {detail}")
             if not retryable or attempt == tries - 1:
                 raise
             # A 429 on the free tier means the per-minute bucket is empty,
@@ -446,7 +476,8 @@ def _post_json(url: str, payload: dict, tries: int = 5) -> dict:
             # a 500/502/503 gets the usual short exponential backoff.
             time.sleep(65 if e.code == 429 else min(30, 4 * 2 ** attempt))
         except Exception as e:  # noqa: BLE001
-            log(f"API error (attempt {attempt + 1}/{tries}): {e}")
+            log(f"API error after {time.monotonic() - started:.0f}s "
+                f"(attempt {attempt + 1}/{tries}): {e}")
             if attempt == tries - 1:
                 raise
             time.sleep(4 * 2 ** attempt)

@@ -43,11 +43,20 @@ wants = """
 [[sources]]
 name = "Gamesforum"
 kind = "html"
+# They reorganised the site: the listing pages moved under /news-media in
+# August 2026 and the old paths now 404. Article URLs themselves did NOT
+# move, so link_pattern below still matches /features/<slug> and /news/<slug>.
 urls = [
-  "https://www.globalgamesforum.com/features",
-  "https://www.globalgamesforum.com/news",
+  "https://www.globalgamesforum.com/news-media/features",
+  "https://www.globalgamesforum.com/news-media/news",
 ]
-link_pattern = '/(?:features|news)/[a-z0-9][a-z0-9\-.]{8,}'
+# Article links on the listing pages are now /news-media/<slug>. The older
+# /features/<slug> and /news/<slug> forms still resolve and still appear
+# elsewhere on the site, so both are matched.
+# The lookahead excludes the section pages themselves (/news-media/features)
+# and their pagination (/news-media/features/P16), which would otherwise be
+# scraped as if they were articles.
+link_pattern = '/(?:news-media|features|news)/(?!features|news|media|reports)[a-z0-9][a-z0-9\-.]{8,}'
 weight = 1.0
 max_per_episode = 2
 
