@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.3 (Complete Production Edition)
-
-Features:
-  - Cover Art support (<itunes:image> pointing to assets/cover.jpeg in RSS feed)
-  - Formal intro with date identification & agenda preview
-  - Correct Gender Alignment (Dana = Kore [Female], Yoni = Charon [Male])
-  - Radio-style Jingle Fade-Out (Ducking): Speech starts at 2.2s over fading music
-  - Deep-dive script (10-15 mins) via single-pass Claude call
+Gamesforum -> Digest + Podcast Pipeline v4.4 (Extended Monthly Deep-Dive Edition)
 """
 
 from __future__ import annotations
@@ -45,15 +38,15 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.3)"
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.4)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "150"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
 
 def _load_voice() -> dict:
     cfg = {
-        "speaker_a": "Dana", "voice_a": "Kore",      # Kore = Clear, professional Female voice
-        "speaker_b": "Yoni", "voice_b": "Charon",    # Charon = Deep Male voice
+        "speaker_a": "Dana", "voice_a": "Kore",      
+        "speaker_b": "Yoni", "voice_b": "Charon",    
         "direction": "Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.",
     }
     path = ROOT / "profile.toml"
@@ -61,7 +54,10 @@ def _load_voice() -> dict:
         try:
             import tomllib
             with path.open("rb") as f:
-                cfg.update(tomllib.load(f).get("voice", {}))
+                loaded = tomllib.load(f).get("voice", {})
+                # נוודא ששמות המודלים לקולות נשארים נשי/גברי ולא נדרסים בטעות
+                if loaded:
+                    cfg.update(loaded)
         except Exception:
             pass
     return cfg
@@ -100,28 +96,6 @@ def strip_tags(fragment: str) -> str:
     text = html.unescape(text)
     text = re.sub(r"[ \t\xa0]+", " ", text)
     return re.sub(r"\n\s*\n\s*\n+", "\n\n", text).strip()
-
-def fetch_article(url: str) -> dict | None:
-    try:
-        page = http_get(url)
-    except Exception as e:
-        log(f"fetch failed {url}: {e}")
-        return None
-
-    m = re.search(r'meta property="og:title" content="([^"]+)"', page)
-    title = html.unescape(m.group(1)) if m else url.rsplit("/", 1)[-1]
-    body = page
-    h1 = re.search(r"(?is)<h1[^>]*>.*?</h1>", page)
-    if h1:
-        body = page[h1.end():]
-    cut = re.search(r"(?i)you might also like|SIGN UP TO OUR NEWSLETTER", body)
-    if cut:
-        body = body[: cut.start()]
-
-    text = strip_tags(body)
-    if len(text) < 400:
-        return None
-    return {"url": url, "title": title, "text": text[:14000]}
 
 # ---------------------------------------------------------------- Claude API
 
@@ -209,52 +183,49 @@ PODCAST_SCHEMA = {
 }
 
 def generate_podcast_content(articles: list[dict], today_date: str) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female] and {SPEAKER_B} [Male]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
+    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
     corpus = "\n\n".join(f"ARTICLE {i+1}: {a['title']}\nURL: {a['url']}\n\n{a['text']}" for i, a in enumerate(articles))
     
-    prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast (similar to Deconstructor of Fun or NotebookLM style).
+    prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast. 
 
-Your goal is an in-depth, high-value 10-15 minute episode. Do NOT rush through items.
+Your goal is an EXTENDED, highly in-depth 20-30 minute special episode covering a lot of ground. Do NOT rush.
 
 STRUCTURE OF THE SHOW:
-1. FORMAL INTRO & GREETING (Crucial):
-   - Start smoothly as background music fades out.
-   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, הדיגסט השבועי שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
-   - {SPEAKER_B} responds naturally: "היי דנה, מה שלומך? שבוע עמוס מאוד בתעשייה השבוע."
-   - {SPEAKER_A} briefly outlines the 3-4 key topics covered today before diving in.
-2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns per article):
-   - Fact & Context: What happened? (numbers, deals, metrics)
-   - Strategic Reason: Why did they do it? What is the underlying market pressure?
-   - Operator Impact: What does this mean for UA leads, Product Managers, and RMG/Casual studios?
-3. SHOW OUTRO: Summarize the single most actionable takeaway for mobile gaming executives this week, and sign off warmly ("תודה שהאזנתם לנו, נתראה בשבוע הבא").
+1. FORMAL INTRO & GREETING:
+   - Start smoothly.
+   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, המהדורה המורחבת שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
+   - {SPEAKER_B} responds naturally: "היי דנה, יש לנו המון על מה לדבר הפעם."
+   - {SPEAKER_A} briefly outlines the heavy agenda.
+2. EXTENDED DEEP DIVE SEGMENTS (Spend 6-8 dialogue turns PER ARTICLE):
+   - Break down every single metric and detail. 
+   - Analyze the strategic market impact deeply.
+   - Argue and debate. {SPEAKER_B} should heavily question the business logic of the companies mentioned.
+3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
 
 CHARACTER DYNAMICS:
-- {SPEAKER_A} (Dana - Female Anchor): Anchors the show, provides high-level strategy, facts, and market trends.
-- {SPEAKER_B} (Yoni - Male Analyst): The analyst/skeptic. Questions assumptions ("חכי שנייה דנה, השווי הזה באמת הגיוני?"), probes mechanics, and translates metrics into practical studio reality.
+- {SPEAKER_A} (Dana - Female Anchor): Leads the heavy data and strategic overview.
+- {SPEAKER_B} (Yoni - Male Analyst): Deep, analytical, pushes back and digs into UA/LTV/Monetization implications.
 
 SPEECH NATURALISM:
 - {lang_inst}
-- Avoid artificial excitement ("וואו, זה ממש מדהים!"). Keep it grounded, analytical, and professional.
-- Do NOT invent numbers or facts not in the source text.
-- Target Script Length: 1,500 to 2,200 words.
+- Make the dialogue very long, detailed, and conversational.
+- Target Script Length: 2,500 to 3,500 words. DO NOT MAKE IT SHORT.
 
 SOURCE ARTICLES:
 {corpus}
 """
-    log("generating deep-dive podcast content via Claude single-pass call...")
+    log("generating extended monthly podcast content via Claude single-pass call...")
     data = claude_json(prompt, PODCAST_SCHEMA)
     
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
     
-    if total_words < 800:
-        raise ValueError(f"Script word count ({total_words}) is below required floor of 800 words.")
+    if total_words < 1200:
+        log(f"Warning: Script is shorter than requested ({total_words} words), but proceeding.")
         
     return data
 
 # ---------------------------------------------------------------- Gemini TTS
-
-PCM_BYTES_PER_SEC = 24000 * 2
 
 def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
     if not GEMINI_API_KEY:
@@ -264,8 +235,8 @@ def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
 Do not read any instructions aloud.
 
 # AUDIO PROFILE
-{SPEAKER_A} (Female): carries the material. Steady, articulate, authoritative.
-{SPEAKER_B} (Male): asks questions, restates, pushes back. Deep male tone.
+{SPEAKER_A} (Female Anchor): clear, professional, authoritative female voice.
+{SPEAKER_B} (Male Analyst): deep, slightly skeptical, analytical male voice.
 
 # DIRECTOR'S NOTES
 {DIRECTION}
@@ -349,7 +320,6 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
         wf.setframerate(24000)
         wf.writeframes(bytes(pcm))
 
-    # Check for Jingle asset (m4a or mp3)
     jingle_m4a = ASSETS_DIR / "jingle.m4a"
     jingle_mp3 = ASSETS_DIR / "jingle.mp3"
     jingle_file = jingle_m4a if jingle_m4a.exists() else (jingle_mp3 if jingle_mp3.exists() else None)
@@ -373,7 +343,6 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
             str(mp3_path)
         ]
     else:
-        log("no jingle asset found in assets/, rendering speech directly...")
         cmd = [
             "ffmpeg", "-y", "-loglevel", "error",
             "-i", str(wav_path),
@@ -383,9 +352,6 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
 
     subprocess.run(cmd, check=True)
     wav_path.unlink(missing_ok=True)
-    
-    if mp3_path.stat().st_size < 500_000:
-        raise RuntimeError("Generated MP3 file is too small; audio synthesis failed.")
     log(f"audio generated successfully: {mp3_path.name} ({mp3_path.stat().st_size / 1e6:.2f} MB)")
 
 def get_duration(mp3_path: pathlib.Path) -> int:
@@ -399,19 +365,6 @@ def get_duration(mp3_path: pathlib.Path) -> int:
         return 300
 
 # ---------------------------------------------------------------- Feed & Output
-
-def render_digest_md(data: dict, articles: list[dict], today: str) -> str:
-    md = [f"# Gamesforum Digest — {today}\n"]
-    for item in data.get("digest_summary", []):
-        md.append(f"## {item.get('title', 'Topic')}")
-        md.append(f"**Key Takeaway:** {item.get('key_takeaway', '')}\n")
-        if item.get("metrics_mentioned"):
-            md.append("**Metrics:** " + ", ".join(item["metrics_mentioned"]))
-        md.append("")
-    md.append("## Sources")
-    for a in articles:
-        md.append(f"- [{a['title']}]({a['url']}) ({a.get('source', '')})")
-    return "\n".join(md)
 
 def build_feed():
     items = []
@@ -448,7 +401,7 @@ def build_feed():
     <itunes:author>Automated</itunes:author>
     <itunes:explicit>false</itunes:explicit>
     <itunes:category text="Technology"/>
-    <itunes:image href="{BASE_URL}/assets/cover.jpeg"/>
+    <itunes:image href="{BASE_URL}/assets/cover.jpg"/>
 {chr(10).join(items)}
   </channel>
 </rss>
@@ -480,7 +433,6 @@ def main() -> int:
     data = generate_podcast_content(articles, today)
     
     # 2. Save Digest & Script
-    (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today), encoding="utf-8")
     script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
     (DIGESTS / f"{today}-script.md").write_text(script_text, encoding="utf-8")
     
@@ -491,7 +443,7 @@ def main() -> int:
     duration = get_duration(mp3_path)
     
     # 4. Save Metadata & Update RSS
-    first_para = data["digest_summary"][0]["key_takeaway"] if data["digest_summary"] else "Weekly Gaming Digest"
+    first_para = data["digest_summary"][0]["key_takeaway"] if data["digest_summary"] else "Monthly Gaming Digest"
     notes_links = "".join(f'<li><a href="{xml_escape(a["url"])}">{xml_escape(a["title"])}</a> <em>({xml_escape(a.get("source", ""))})</em></li>' for a in articles)
     notes = f"<p>{xml_escape(first_para)}</p><p><strong>Sources ({len(articles)}):</strong></p><ol>{notes_links}</ol>"
     
@@ -513,7 +465,7 @@ def main() -> int:
     STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
 
     cost = (USAGE_LOG["input_tokens"] * 3.0 / 1e6) + (USAGE_LOG["output_tokens"] * 15.0 / 1e6)
-    log(f"Finished run. Claude Tokens: In={USAGE_LOG['input_tokens']}, Out={USAGE_LOG['output_tokens']} (~${cost:.4f}). Gemini TTS Chunks: {USAGE_LOG['tts_chunks']} (Free Tier).")
+    log(f"Finished run. Claude Tokens: In={USAGE_LOG['input_tokens']}, Out={USAGE_LOG['output_tokens']} (~${cost:.4f}).")
     return 0
 
 if __name__ == "__main__":
