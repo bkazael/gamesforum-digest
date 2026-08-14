@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.0 (Claude JSON Schema + Gemini TTS Batched)
+Gamesforum -> Digest + Podcast Pipeline v4.1 (Deep-Dive Edition + Jingle Support)
 
 Flow:
   1. Discovery & Filtering (discovery.py -> select)
-  2. Single-pass LLM Call (Claude API) with forced JSON Schema (Tool Use)
-     -> Produces structured digest + full dialogue script (HostA & HostB)
-  3. Quality Gates (Schema validity, word count floor >= 500, audio file size)
-  4. TTS Synthesis (Gemini Multi-Speaker TTS with Batched Chunking & Retries)
-  5. RSS & Feed update
+  2. Single-pass LLM Call (Claude API) with forced JSON Schema
+     -> Produces 10-15 min structured script (Cold Open, Intro, Deep Dives, Outro)
+  3. Quality Gates (Schema validity, word count floor >= 800)
+  4. TTS Synthesis (Gemini Multi-Speaker TTS)
+  5. Audio Assembly (ffmpeg stitching assets/jingle.m4a + dialogue + assets/jingle.m4a)
+  6. RSS & Feed update
 """
 
 from __future__ import annotations
@@ -44,9 +45,10 @@ ROOT = pathlib.Path(__file__).resolve().parent
 EPISODES = ROOT / "episodes"
 DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
+ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.0)"
-HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "120"))
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.1)"
+HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "150"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
 
@@ -54,7 +56,7 @@ def _load_voice() -> dict:
     cfg = {
         "speaker_a": "Dana", "voice_a": "Charon",
         "speaker_b": "Yoni", "voice_b": "Umbriel",
-        "direction": "Two industry colleagues talking. Measured, unhurried, genuinely interested.",
+        "direction": "Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.",
     }
     path = ROOT / "profile.toml"
     if path.exists():
@@ -176,7 +178,7 @@ def claude_json(prompt: str, schema: dict) -> dict:
             return block["input"]
     raise RuntimeError("Failed to extract JSON tool response.")
 
-# ---------------------------------------------------------------- JSON Schema & Prompt
+# ---------------------------------------------------------------- JSON Schema & Deep Prompt
 
 PODCAST_SCHEMA = {
     "type": "object",
@@ -209,36 +211,47 @@ PODCAST_SCHEMA = {
 }
 
 def generate_podcast_content(articles: list[dict]) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli gaming executives (use {SPEAKER_A} and {SPEAKER_B}). Keep English terms like UA, CPI, ROAS, LTV in English." if LANG == "he" else "Write in natural spoken English."
+    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} and {SPEAKER_B}). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
     corpus = "\n\n".join(f"ARTICLE {i+1}: {a['title']}\nURL: {a['url']}\n\n{a['text']}" for i, a in enumerate(articles))
     
-    prompt = f"""You are a podcast producer for mobile gaming leaders (Casual, Hybrid-Casual, RMG).
+    prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast (similar to Deconstructor of Fun or NotebookLM style).
 
-TASK:
-1. Extract digest summary points in `digest_summary`.
-2. Write a continuous, engaging script in `script` using speakers "{SPEAKER_A}" and "{SPEAKER_B}".
+Your goal is an in-depth, high-value 10-15 minute episode. Do NOT rush through items.
 
-RULES:
-- {SPEAKER_A}: Leads strategic discussions, frames business impact.
-- {SPEAKER_B}: Analytical expert, probes metrics, UA/LTV, and tech mechanics.
+STRUCTURE OF THE SHOW:
+1. COLD OPEN: Start immediately with an arresting metric or strategic statement before any intro.
+2. SHOW INTRO & AGENDA: {SPEAKER_A} welcomes listeners and briefly outlines the topics covered today.
+3. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns per article):
+   - Fact & Context: What happened? (numbers, deals, metrics)
+   - Strategic Reason: Why did they do it? What is the underlying market pressure?
+   - Operator Impact: What does this mean for UA leads, Product Managers, and RMG/Casual studios?
+4. SHOW OUTRO: Summarize the single most actionable takeaway for mobile gaming executives this week.
+
+CHARACTER DYNAMICS:
+- {SPEAKER_A} ({SPEAKER_A}): Anchors the show, provides high-level strategy, facts, and market trends.
+- {SPEAKER_B} ({SPEAKER_B}): The analyst/skeptic. Questions assumptions ("Wait, is that valuation realistic?"), probes mechanics, and translates metrics into practical studio reality.
+
+SPEECH NATURALISM:
 - {lang_inst}
-- Do NOT invent figures or dates not present in sources.
-- Avoid fake excitement. Keep it professional and grounded.
+- Avoid artificial excitement ("Wow, that's amazing!"). Keep it grounded, analytical, and professional.
+- Do NOT invent numbers or facts not in the source text.
+- Target Script Length: 1,500 to 2,200 words.
 
 SOURCE ARTICLES:
 {corpus}
 """
-    log("generating podcast content via Claude single-pass call...")
+    log("generating deep-dive podcast content via Claude single-pass call...")
     data = claude_json(prompt, PODCAST_SCHEMA)
     
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
-    if total_words < 500:
-        raise ValueError(f"Script too short ({total_words} words). Minimum is 500.")
+    
+    if total_words < 800:
+        raise ValueError(f"Script word count ({total_words}) is below the required deep-dive minimum of 800 words.")
         
     return data
 
-# ---------------------------------------------------------------- Gemini TTS (with Retry Loop)
+# ---------------------------------------------------------------- Gemini TTS (with Retry)
 
 PCM_BYTES_PER_SEC = 24000 * 2
 
@@ -309,9 +322,10 @@ TRANSCRIPT:
 def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path: pathlib.Path):
     lines = [f"{turn['speaker']}: {turn['text']}" for turn in script_turns]
     
+    # Bundle into chunks (~1800 chars each) to keep Gemini API calls to ~4-6 total
     chunks, current_chunk, current_len = [], [], 0
     for line in lines:
-        if current_len + len(line) > 1500 and current_chunk:
+        if current_len + len(line) > 1800 and current_chunk:
             chunks.append("\n".join(current_chunk))
             current_chunk, current_len = [], 0
         current_chunk.append(line)
@@ -334,11 +348,34 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
         wf.setsampwidth(2)
         wf.setframerate(24000)
         wf.writeframes(bytes(pcm))
-        
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav_path), "-codec:a", "libmp3lame", "-b:a", "96k", str(mp3_path)],
-        check=True
-    )
+
+    # Check for Jingle asset (m4a or mp3)
+    jingle_m4a = ASSETS_DIR / "jingle.m4a"
+    jingle_mp3 = ASSETS_DIR / "jingle.mp3"
+    jingle_file = jingle_m4a if jingle_m4a.exists() else (jingle_mp3 if jingle_mp3.exists() else None)
+
+    if jingle_file:
+        log(f"found jingle asset ({jingle_file.name}), concatenating intro & outro with ffmpeg...")
+        cmd = [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", str(jingle_file),
+            "-i", str(wav_path),
+            "-i", str(jingle_file),
+            "-filter_complex", "[0:a][1:a][2:a]concat=n=3:v=0:a=1[outa]",
+            "-map", "[outa]",
+            "-codec:a", "libmp3lame", "-b:a", "96k",
+            str(mp3_path)
+        ]
+    else:
+        log("no jingle asset found in assets/, rendering speech directly...")
+        cmd = [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", str(wav_path),
+            "-codec:a", "libmp3lame", "-b:a", "96k",
+            str(mp3_path)
+        ]
+
+    subprocess.run(cmd, check=True)
     wav_path.unlink(missing_ok=True)
     
     if mp3_path.stat().st_size < 500_000:
@@ -417,6 +454,7 @@ def build_feed():
 def main() -> int:
     EPISODES.mkdir(exist_ok=True)
     DIGESTS.mkdir(exist_ok=True)
+    ASSETS_DIR.mkdir(exist_ok=True)
 
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
     done: set[str] = set(state.get("processed", []))
@@ -439,7 +477,7 @@ def main() -> int:
     script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
     (DIGESTS / f"{today}-script.md").write_text(script_text, encoding="utf-8")
     
-    # 3. Audio Synthesis via Gemini TTS
+    # 3. Audio Synthesis via Gemini TTS + Jingle Assembly
     wav_path = EPISODES / f"{today}.wav"
     mp3_path = EPISODES / f"{today}.mp3"
     synthesize_audio(data["script"], wav_path, mp3_path)
