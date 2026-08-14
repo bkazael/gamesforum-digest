@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.6 (Extended Timeout Edition)
+Gamesforum -> Digest + Podcast Pipeline v4.7 (Calibrated Deep-Dive Edition)
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.6)"
-HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "360")) # הוגדל ל-6 דקות לתסריטים ארוכים
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.7)"
+HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
 
@@ -148,6 +148,7 @@ def _anthropic_post(payload: dict, tries: int = 4) -> dict:
             log(f"    [Claude responded in {time.monotonic() - started:.1f}s]")
             return data
         except Exception as e:
+            log(f"    Anthropic API attempt {attempt + 1}/{tries} failed: {e}")
             if attempt == tries - 1:
                 raise
             time.sleep(5 * 2 ** attempt)
@@ -209,40 +210,38 @@ def generate_podcast_content(articles: list[dict], today_date: str) -> dict:
     
     prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast. 
 
-Your goal is an EXTENDED, highly in-depth special episode covering a lot of ground. Do NOT rush.
+Your goal is an in-depth, highly structured episode covering key developments.
 
 STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
    - Start smoothly as background music fades out.
-   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, המהדורה המורחבת שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
-   - {SPEAKER_B} responds naturally: "היי דנה, יש לנו המון על מה לדבר הפעם."
-   - {SPEAKER_A} briefly outlines the agenda.
-2. EXTENDED DEEP DIVE SEGMENTS (Spend 5-7 dialogue turns PER ARTICLE):
-   - Break down every single metric and detail. 
-   - Analyze the strategic market impact deeply.
-   - Argue and debate. {SPEAKER_B} should heavily question the business logic of the companies mentioned.
+   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, הדיגסט השבועי שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
+   - {SPEAKER_B} responds naturally: "היי דנה, שבוע מרתק בתעשייה."
+   - {SPEAKER_A} outlines the main topics briefly.
+2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns PER ARTICLE):
+   - Break down metrics, deals, and strategic implications.
+   - Debate mechanics and UA/LTV impact.
 3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
 
 CHARACTER DYNAMICS:
-- {SPEAKER_A} (Dana - Female Anchor): Leads the heavy data and strategic overview.
-- {SPEAKER_B} (Yoni - Male Analyst): Deep, analytical, pushes back and digs into UA/LTV/Monetization implications.
+- {SPEAKER_A} (Dana - Female Anchor): Leads strategy, numbers, and overarching market trends.
+- {SPEAKER_B} (Yoni - Male Analyst): Analytical, questions assumptions, probes UA/LTV realities.
 
 SPEECH NATURALISM:
 - {lang_inst}
-- Make the dialogue detailed, comprehensive, and conversational.
-- Target Script Length: 2,200 to 3,000 words.
+- Target Script Length: 1,500 to 1,900 words. Keep it detailed, engaging, and professional.
 
 SOURCE ARTICLES:
 {corpus}
 """
-    log("generating extended monthly podcast content via Claude single-pass call...")
+    log("generating podcast content via Claude single-pass call...")
     data = claude_json(prompt, PODCAST_SCHEMA)
     
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
     
-    if total_words < 800:
-        log(f"Warning: Script is shorter than requested ({total_words} words), but proceeding.")
+    if total_words < 600:
+        log(f"Warning: Script is short ({total_words} words), but proceeding.")
         
     return data
 
