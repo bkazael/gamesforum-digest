@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.4 (Extended Monthly Deep-Dive Edition)
+Gamesforum -> Digest + Podcast Pipeline v4.5 (Extended Monthly Edition - Fixed Import)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.4)"
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.5)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "150"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -55,7 +55,6 @@ def _load_voice() -> dict:
             import tomllib
             with path.open("rb") as f:
                 loaded = tomllib.load(f).get("voice", {})
-                # נוודא ששמות המודלים לקולות נשארים נשי/גברי ולא נדרסים בטעות
                 if loaded:
                     cfg.update(loaded)
         except Exception:
@@ -96,6 +95,28 @@ def strip_tags(fragment: str) -> str:
     text = html.unescape(text)
     text = re.sub(r"[ \t\xa0]+", " ", text)
     return re.sub(r"\n\s*\n\s*\n+", "\n\n", text).strip()
+
+def fetch_article(url: str) -> dict | None:
+    try:
+        page = http_get(url)
+    except Exception as e:
+        log(f"fetch failed {url}: {e}")
+        return None
+
+    m = re.search(r'meta property="og:title" content="([^"]+)"', page)
+    title = html.unescape(m.group(1)) if m else url.rsplit("/", 1)[-1]
+    body = page
+    h1 = re.search(r"(?is)<h1[^>]*>.*?</h1>", page)
+    if h1:
+        body = page[h1.end():]
+    cut = re.search(r"(?i)you might also like|SIGN UP TO OUR NEWSLETTER", body)
+    if cut:
+        body = body[: cut.start()]
+
+    text = strip_tags(body)
+    if len(text) < 400:
+        return None
+    return {"url": url, "title": title, "text": text[:14000]}
 
 # ---------------------------------------------------------------- Claude API
 
@@ -192,10 +213,10 @@ Your goal is an EXTENDED, highly in-depth 20-30 minute special episode covering 
 
 STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
-   - Start smoothly.
+   - Start smoothly as background music fades out.
    - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, המהדורה המורחבת שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
    - {SPEAKER_B} responds naturally: "היי דנה, יש לנו המון על מה לדבר הפעם."
-   - {SPEAKER_A} briefly outlines the heavy agenda.
+   - {SPEAKER_A} briefly outlines the agenda.
 2. EXTENDED DEEP DIVE SEGMENTS (Spend 6-8 dialogue turns PER ARTICLE):
    - Break down every single metric and detail. 
    - Analyze the strategic market impact deeply.
@@ -220,7 +241,7 @@ SOURCE ARTICLES:
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
     
-    if total_words < 1200:
+    if total_words < 800:
         log(f"Warning: Script is shorter than requested ({total_words} words), but proceeding.")
         
     return data
@@ -366,6 +387,19 @@ def get_duration(mp3_path: pathlib.Path) -> int:
 
 # ---------------------------------------------------------------- Feed & Output
 
+def render_digest_md(data: dict, articles: list[dict], today: str) -> str:
+    md = [f"# Gamesforum Digest — {today}\n"]
+    for item in data.get("digest_summary", []):
+        md.append(f"## {item.get('title', 'Topic')}")
+        md.append(f"**Key Takeaway:** {item.get('key_takeaway', '')}\n")
+        if item.get("metrics_mentioned"):
+            md.append("**Metrics:** " + ", ".join(item["metrics_mentioned"]))
+        md.append("")
+    md.append("## Sources")
+    for a in articles:
+        md.append(f"- [{a['title']}]({a['url']}) ({a.get('source', '')})")
+    return "\n".join(md)
+
 def build_feed():
     items = []
     for mp3 in sorted(EPISODES.glob("*.mp3"), reverse=True):
@@ -433,6 +467,7 @@ def main() -> int:
     data = generate_podcast_content(articles, today)
     
     # 2. Save Digest & Script
+    (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today), encoding="utf-8")
     script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
     (DIGESTS / f"{today}-script.md").write_text(script_text, encoding="utf-8")
     
