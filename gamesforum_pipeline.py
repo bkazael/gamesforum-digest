@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.2 (Professional Production Edition)
+Gamesforum -> Digest + Podcast Pipeline v4.3 (Complete Production Edition)
 
 Features:
-  - Formal intro with date/episode identification & agenda preview
-  - Correct Gender Voice Alignment (Dana = Kore [Female], Yoni = Charon/Umbriel [Male])
+  - Cover Art support (<itunes:image> pointing to assets/cover.jpeg in RSS feed)
+  - Formal intro with date identification & agenda preview
+  - Correct Gender Alignment (Dana = Kore [Female], Yoni = Charon [Male])
   - Radio-style Jingle Fade-Out (Ducking): Speech starts at 2.2s over fading music
+  - Deep-dive script (10-15 mins) via single-pass Claude call
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.2)"
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.3)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "150"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -51,7 +53,7 @@ _run_started = time.monotonic()
 def _load_voice() -> dict:
     cfg = {
         "speaker_a": "Dana", "voice_a": "Kore",      # Kore = Clear, professional Female voice
-        "speaker_b": "Yoni", "voice_b": "Charon",    # Charon / Umbriel = Deep Male voice
+        "speaker_b": "Yoni", "voice_b": "Charon",    # Charon = Deep Male voice
         "direction": "Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.",
     }
     path = ROOT / "profile.toml"
@@ -354,7 +356,6 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
 
     if jingle_file:
         log(f"found jingle asset ({jingle_file.name}), applying radio ducking & outro fade...")
-        # Speech delayed by 2.2s; Jingle fades out from 2.0s to 4.5s underneath the intro speech
         filter_complex = (
             "[0:a]afade=t=out:st=2.0:d=2.5[jingle_fade];"
             "[1:a]adelay=2200|2200[speech_delayed];"
@@ -447,6 +448,7 @@ def build_feed():
     <itunes:author>Automated</itunes:author>
     <itunes:explicit>false</itunes:explicit>
     <itunes:category text="Technology"/>
+    <itunes:image href="{BASE_URL}/assets/cover.jpeg"/>
 {chr(10).join(items)}
   </channel>
 </rss>
