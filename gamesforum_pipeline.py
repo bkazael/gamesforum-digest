@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.1 (Deep-Dive Edition + Jingle Support)
+Gamesforum -> Digest + Podcast Pipeline v4.2 (Professional Production Edition)
 
-Flow:
-  1. Discovery & Filtering (discovery.py -> select)
-  2. Single-pass LLM Call (Claude API) with forced JSON Schema
-     -> Produces 10-15 min structured script (Cold Open, Intro, Deep Dives, Outro)
-  3. Quality Gates (Schema validity, word count floor >= 800)
-  4. TTS Synthesis (Gemini Multi-Speaker TTS)
-  5. Audio Assembly (ffmpeg stitching assets/jingle.m4a + dialogue + assets/jingle.m4a)
-  6. RSS & Feed update
+Features:
+  - Formal intro with date/episode identification & agenda preview
+  - Correct Gender Voice Alignment (Dana = Kore [Female], Yoni = Charon/Umbriel [Male])
+  - Radio-style Jingle Fade-Out (Ducking): Speech starts at 2.2s over fading music
 """
 
 from __future__ import annotations
@@ -47,15 +43,15 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.1)"
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.2)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "150"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
 
 def _load_voice() -> dict:
     cfg = {
-        "speaker_a": "Dana", "voice_a": "Charon",
-        "speaker_b": "Yoni", "voice_b": "Umbriel",
+        "speaker_a": "Dana", "voice_a": "Kore",      # Kore = Clear, professional Female voice
+        "speaker_b": "Yoni", "voice_b": "Charon",    # Charon / Umbriel = Deep Male voice
         "direction": "Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.",
     }
     path = ROOT / "profile.toml"
@@ -178,7 +174,7 @@ def claude_json(prompt: str, schema: dict) -> dict:
             return block["input"]
     raise RuntimeError("Failed to extract JSON tool response.")
 
-# ---------------------------------------------------------------- JSON Schema & Deep Prompt
+# ---------------------------------------------------------------- JSON Schema & Prompt
 
 PODCAST_SCHEMA = {
     "type": "object",
@@ -210,8 +206,8 @@ PODCAST_SCHEMA = {
     "required": ["digest_summary", "script"]
 }
 
-def generate_podcast_content(articles: list[dict]) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} and {SPEAKER_B}). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
+def generate_podcast_content(articles: list[dict], today_date: str) -> dict:
+    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female] and {SPEAKER_B} [Male]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
     corpus = "\n\n".join(f"ARTICLE {i+1}: {a['title']}\nURL: {a['url']}\n\n{a['text']}" for i, a in enumerate(articles))
     
     prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast (similar to Deconstructor of Fun or NotebookLM style).
@@ -219,21 +215,24 @@ def generate_podcast_content(articles: list[dict]) -> dict:
 Your goal is an in-depth, high-value 10-15 minute episode. Do NOT rush through items.
 
 STRUCTURE OF THE SHOW:
-1. COLD OPEN: Start immediately with an arresting metric or strategic statement before any intro.
-2. SHOW INTRO & AGENDA: {SPEAKER_A} welcomes listeners and briefly outlines the topics covered today.
-3. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns per article):
+1. FORMAL INTRO & GREETING (Crucial):
+   - Start smoothly as background music fades out.
+   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, הדיגסט השבועי שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
+   - {SPEAKER_B} responds naturally: "היי דנה, מה שלומך? שבוע עמוס מאוד בתעשייה השבוע."
+   - {SPEAKER_A} briefly outlines the 3-4 key topics covered today before diving in.
+2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns per article):
    - Fact & Context: What happened? (numbers, deals, metrics)
    - Strategic Reason: Why did they do it? What is the underlying market pressure?
    - Operator Impact: What does this mean for UA leads, Product Managers, and RMG/Casual studios?
-4. SHOW OUTRO: Summarize the single most actionable takeaway for mobile gaming executives this week.
+3. SHOW OUTRO: Summarize the single most actionable takeaway for mobile gaming executives this week, and sign off warmly ("תודה שהאזנתם לנו, נתראה בשבוע הבא").
 
 CHARACTER DYNAMICS:
-- {SPEAKER_A} ({SPEAKER_A}): Anchors the show, provides high-level strategy, facts, and market trends.
-- {SPEAKER_B} ({SPEAKER_B}): The analyst/skeptic. Questions assumptions ("Wait, is that valuation realistic?"), probes mechanics, and translates metrics into practical studio reality.
+- {SPEAKER_A} (Dana - Female Anchor): Anchors the show, provides high-level strategy, facts, and market trends.
+- {SPEAKER_B} (Yoni - Male Analyst): The analyst/skeptic. Questions assumptions ("חכי שנייה דנה, השווי הזה באמת הגיוני?"), probes mechanics, and translates metrics into practical studio reality.
 
 SPEECH NATURALISM:
 - {lang_inst}
-- Avoid artificial excitement ("Wow, that's amazing!"). Keep it grounded, analytical, and professional.
+- Avoid artificial excitement ("וואו, זה ממש מדהים!"). Keep it grounded, analytical, and professional.
 - Do NOT invent numbers or facts not in the source text.
 - Target Script Length: 1,500 to 2,200 words.
 
@@ -247,11 +246,11 @@ SOURCE ARTICLES:
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
     
     if total_words < 800:
-        raise ValueError(f"Script word count ({total_words}) is below the required deep-dive minimum of 800 words.")
+        raise ValueError(f"Script word count ({total_words}) is below required floor of 800 words.")
         
     return data
 
-# ---------------------------------------------------------------- Gemini TTS (with Retry)
+# ---------------------------------------------------------------- Gemini TTS
 
 PCM_BYTES_PER_SEC = 24000 * 2
 
@@ -263,8 +262,8 @@ def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
 Do not read any instructions aloud.
 
 # AUDIO PROFILE
-{SPEAKER_A}: carries the material. Steady and authoritative.
-{SPEAKER_B}: asks questions, restates, pushes back.
+{SPEAKER_A} (Female): carries the material. Steady, articulate, authoritative.
+{SPEAKER_B} (Male): asks questions, restates, pushes back. Deep male tone.
 
 # DIRECTOR'S NOTES
 {DIRECTION}
@@ -322,7 +321,6 @@ TRANSCRIPT:
 def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path: pathlib.Path):
     lines = [f"{turn['speaker']}: {turn['text']}" for turn in script_turns]
     
-    # Bundle into chunks (~1800 chars each) to keep Gemini API calls to ~4-6 total
     chunks, current_chunk, current_len = [], [], 0
     for line in lines:
         if current_len + len(line) > 1800 and current_chunk:
@@ -355,13 +353,20 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
     jingle_file = jingle_m4a if jingle_m4a.exists() else (jingle_mp3 if jingle_mp3.exists() else None)
 
     if jingle_file:
-        log(f"found jingle asset ({jingle_file.name}), concatenating intro & outro with ffmpeg...")
+        log(f"found jingle asset ({jingle_file.name}), applying radio ducking & outro fade...")
+        # Speech delayed by 2.2s; Jingle fades out from 2.0s to 4.5s underneath the intro speech
+        filter_complex = (
+            "[0:a]afade=t=out:st=2.0:d=2.5[jingle_fade];"
+            "[1:a]adelay=2200|2200[speech_delayed];"
+            "[jingle_fade][speech_delayed]amix=inputs=2:weights=1 1:dropout_transition=2[intro_mixed];"
+            "[intro_mixed][2:a]concat=n=2:v=0:a=1[outa]"
+        )
         cmd = [
             "ffmpeg", "-y", "-loglevel", "error",
             "-i", str(jingle_file),
             "-i", str(wav_path),
             "-i", str(jingle_file),
-            "-filter_complex", "[0:a][1:a][2:a]concat=n=3:v=0:a=1[outa]",
+            "-filter_complex", filter_complex,
             "-map", "[outa]",
             "-codec:a", "libmp3lame", "-b:a", "96k",
             str(mp3_path)
@@ -470,14 +475,14 @@ def main() -> int:
     today = dt.date.today().isoformat()
     
     # 1. Claude Single-Pass
-    data = generate_podcast_content(articles)
+    data = generate_podcast_content(articles, today)
     
     # 2. Save Digest & Script
     (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today), encoding="utf-8")
     script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
     (DIGESTS / f"{today}-script.md").write_text(script_text, encoding="utf-8")
     
-    # 3. Audio Synthesis via Gemini TTS + Jingle Assembly
+    # 3. Audio Synthesis via Gemini TTS + Ducking Jingle Assembly
     wav_path = EPISODES / f"{today}.wav"
     mp3_path = EPISODES / f"{today}.mp3"
     synthesize_audio(data["script"], wav_path, mp3_path)
