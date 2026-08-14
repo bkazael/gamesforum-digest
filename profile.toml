@@ -24,7 +24,6 @@ who = """
 ומשם הוא יחליט במה להעמיק.
 """
 
-# מה הוא רוצה לצאת איתו מפרק. משמש את שכבת החשיבה בדירוג.
 wants = """
 1. מה מתחרים עושים, במיוחד ב-casual, puzzle, hybrid-casual ו-RMG
 2. טקטיקות שאפשר ליישם, ברמת פירוט שמאפשרת לנסות
@@ -33,37 +32,17 @@ wants = """
 """
 
 # ---------------------------------------------------------------- מקורות
-#
-# weight          מכפיל על ציון הרלוונטיות. מקור חלש יותר לא נחסם, רק צריך
-#                 להיות טוב יותר כדי להיכנס.
-# max_per_episode תקרה קשיחה לכל מקור. זה הדבר שמונע ממקור בעל נפח גבוה
-#                 להשתלט על הפרק רק כי הוא מפרסם הרבה. חשוב.
-# block           דפוסי כותרת שנפסלים לפני הורדה, בנוסף לרשימה הגלובלית.
 
 [[sources]]
 name = "Gamesforum"
 kind = "html"
-# They reorganised the site: the listing pages moved under /news-media in
-# August 2026 and the old paths now 404. Article URLs themselves did NOT
-# move, so link_pattern below still matches /features/<slug> and /news/<slug>.
 urls = [
   "https://www.globalgamesforum.com/news-media/features",
   "https://www.globalgamesforum.com/news-media/news",
 ]
-# Article links on the listing pages are now /news-media/<slug>. The older
-# /features/<slug> and /news/<slug> forms still resolve and still appear
-# elsewhere on the site, so both are matched.
-# The lookahead excludes the section pages themselves (/news-media/features)
-# and their pagination (/news-media/features/P16), which would otherwise be
-# scraped as if they were articles.
 link_pattern = '/(?:news-media|features|news)/(?!features|news|media|reports)[a-z0-9][a-z0-9\-.]{8,}'
 weight = 1.0
 max_per_episode = 2
-
-# Gamesforum מפרסמים סיכומים שבועיים בדיוק כמו PocketGamer. הם נקראים
-# כדי לחלץ מהם לינקים ולתת בוסט לכתבות שהובלטו, אבל לא נכנסים כתוכן.
-# בלי זה סיכום ששכב על סיפור אחד נכנס לפרק לצד הכתבה המקורית עליו,
-# ואז אותו סיפור נשמע פעמיים עם שני מספרים סותרים.
 roundup_patterns = [
   "the gaming dispatch", "the roundup", "the weekly round-up",
   "weekly roundup", "this week's biggest stories", "week in views",
@@ -76,23 +55,13 @@ kind = "rss"
 urls = ["https://www.pocketgamer.biz/index.rss"]
 weight = 1.0
 max_per_episode = 3
-
-# הסיכומים השבועיים שלהם. הם לא נכנסים לפרק כתוכן — אם נסכם סיכום
-# נאבד את המספרים ונקבל דחיסה כפולה. במקום זה הם נקראים כדי לחלץ מהם
-# את הלינקים, וכל כתבה שהעורכים שלהם בחרו להבליט מקבלת בוסט.
-# זה השימוש הנכון בהם: אות עריכתי, לא חומר גלם.
 roundup_patterns = ["hot five", "week in views", "week in mobile games"]
 roundup_boost = 1.6
-
-# פורמטים חוזרים שמייצרים ערך גבוה באופן עקבי.
 boost = [
-  "in the hot seat",       # ראיונות עומק עם מפעילים
-  "charticle",             # ניתוח מבוסס נתונים
-  "mobile mavens",         # פאנל אנליסטים
+  "in the hot seat", "charticle", "mobile mavens", 
   "q[1-4] results", "revenue up", "revenue rises", "net bookings",
   "earnings", "benchmark",
 ]
-
 block = [
   "pgc\\b", "pg connects", "pocket gamer connects", "speaker lineup",
   "who's coming", "summit shanghai",
@@ -101,10 +70,6 @@ block = [
   "in association with", "sponsored", "esports nations",
 ]
 
-# אזהרה: pocketgamer.com הוא אתר צרכני, לא B2B. רוב התוכן שם ביקורות,
-# מדריכים ורשימות "המשחקים הכי טובים", שלא רלוונטיים לך כמפעיל.
-# השארתי אותו בפנים במשקל נמוך ועם חסימות אגרסיביות. אם ה-ledger מראה
-# שהוא לא מייצר ערך אחרי כמה שבועות, פשוט תמחק את הבלוק הזה.
 [[sources]]
 name = "PocketGamer.com"
 kind = "rss"
@@ -118,6 +83,14 @@ block = [
   "update .* patch notes", "giveaway",
 ]
 
+# הוספת מקור חדש כפי שביקשת
+[[sources]]
+name = "MobileGamer.biz"
+kind = "rss"
+urls = ["https://mobilegamer.biz/feed/"]
+weight = 1.0
+max_per_episode = 2
+
 # ---------------------------------------------------------------- טעם
 
 [interests]
@@ -129,26 +102,19 @@ core = [
   "בנצ'מרקים ונתונים קשים על ביצועי ז'אנרים",
   "מהלכי שוק: רכישות, מדיניות חנויות, עמלות, רגולציה",
   "DTC, web shops, מכירה ישירה, עקיפת עמלות הפלטפורמה",
-
-  # הענף שהיה חסר לגמרי
   "משחקי כסף אמיתי מבוססי מיומנות: רגולציה פדרלית ומדינתית, פסיקות skill מול chance, איסורים טריטוריאליים",
   "תשלומים במשחקי RMG: הפקדות, משיכות, KYC, ספקי תשלום, הונאה, קנוניה בין שחקנים, בוטים",
   "מדיניות אפל וגוגל לגבי אפליקציות עם כסף אמיתי ותחרויות בכסף",
   "מתחרים ישירים ב-RMG ובטורנירים מבוססי מיומנות",
-
-  # התאמה לז'אנרים שלו
   "מהלכים של סטודיואים ב-casual, puzzle, match-3 ו-hybrid-casual",
   "כותרים ספציפיים שעלו או נפלו בז'אנרים האלה, ולמה",
 ]
 
-# הוא לא סימן שום דבר כמיותר. לכן זו רשימה קצרה בכוונה: רק דברים
-# שבאמת לא נוגעים אליו. בספק, נכניס. עדיף שיפסל בשמיעה מאשר שיפוספס.
 deprioritize = [
   "חדשות קונסולות או PC בלבד, בלי שום זווית מובייל",
   "ביקורות משחקים ומדריכים שמכוונים לשחקנים ולא למפעילים",
 ]
 
-# נחסם בכל המקורות.
 [hard_block]
 title_patterns = [
   "meet the speakers", "register now", "book your", "tickets",
@@ -157,54 +123,33 @@ title_patterns = [
   "last chance", "days remaining", "sponsor",
 ]
 
-[thresholds]
-min_score = 6          # ציון רלוונטיות מינימלי אחרי המשקל
-max_articles = 5       # סה"כ כתבות בפרק
-min_words = 250        # מתחת לזה זה קצרמר
-max_age_days = 10      # מתעלם מארכיון, מונע הצפה בריצה ראשונה
+# ---------------------------------------------------------------- הגדרות ריצה (כרגע במוד חודשי)
 
-# ---------------------------------------------------------------- זמן אוויר
-#
-# איך הציון מתורגם לזמן דיבור בפרק. הכתבה החזקה מקבלת סיפור, החלשה
-# מקבלת משפט. בלי זה כל פריט מקבל אותו נפח וזה נשמע כמו רשימה.
+[thresholds]
+min_score = 6
+max_articles = 8       # הוגדל מ-5 כדי לייצר פרק חודשי ארוך יותר
+min_words = 250
+max_age_days = 30      # הוגדל מ-7 ל-30 כדי לסרוק את כל החודש האחרון
 
 # ---------------------------------------------------------------- קולות
-#
-# 30 קולות זמינים. שמע אותם ב-aistudio.google.com/generate-speech
-#
-# רגועים ומקצועיים (מומלץ כאן):
-#   Charon מוסר מידע · Rasalgethi מוסר מידע · Sadaltager יודע דבר
-#   Schedar אחיד · Umbriel נינוח · Zubenelgenubi יומיומי
-#   Algieba חלק · Iapetus צלול · Vindemiatrix עדין · Achird ידידותי
-#
-# הימנע מאלה, הם מייצרים בדיוק את הטון הנלהב מדי:
-#   Puck · Fenrir · Laomedeia · Sadachbia · Zephyr
 
 [voice]
 speaker_a = "Dana"
-voice_a   = "Charon"      # נושאת את החומר. מוסרת מידע, לא מוכרת אותו
-speaker_b = "Yoni"        # שואל ומנסח מחדש
-voice_b   = "Umbriel"     # נינוח. לא נלהב, לא אדיש
+voice_a   = "Kore"       # קול נשי (תוקן)
+speaker_b = "Yoni"
+voice_b   = "Charon"     # קול גברי
 
-# הוראות הבימוי שנשלחות ל-TTS. זה מה שקובע אם זה נשמע כמו שיחה
-# או כמו הקראה. ערוך בחופשיות אם הטון לא יושב לך.
 direction = """
-שני עמיתים ותיקים בתעשיית המשחקים, יושבים ומדברים על מה שקרה השבוע.
+Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.
+שני עמיתים ותיקים בתעשיית המשחקים, יושבים ומדברים על מה שקרה בתעשייה לאחרונה.
 לא שידור, לא הרצאה, לא מכירה. שיחה בין אנשים שמכירים אחד את השני.
-
-הטון: מיושב וענייני. הם מתעניינים בחומר כי הוא באמת מעניין אותם,
-לא כי הם צריכים להישמע מתעניינים. הביטחון של אנשים שלא צריכים
-להוכיח כלום.
-
-קצב: טבעי, לא ממהר. משפטים נגמרים בירידה, לא בעלייה.
-נשימות במקומות הגיוניים. מותר שקט קצר לפני נקודה חשובה.
-
-מה לא לעשות: לא התלהבות של רדיו בוקר. לא הפתעה מוגזמת. לא הדגשה
-של כל מספר. לא חיוך בקול. וגם לא השטחה מונוטונית של מי שקורא
-מדף. אמצע החיים.
+הטון: מיושב וענייני. מתעניינים בחומר כי הוא מעניין. קצב טבעי, לא ממהר. משפטים נגמרים בירידה, לא בעלייה.
+מה לא לעשות: לא התלהבות של רדיו בוקר. לא הפתעה מוגזמת. לא חיוך בקול. אמצע החיים.
 """
 
+# ---------------------------------------------------------------- זמן אוויר
+
 [airtime]
-lead_share = 0.40      # הסיפור המוביל מקבל 40% מהפרק
+lead_share = 0.40
 second_share = 0.25
-remainder_share = 0.35 # מתחלק בין השאר
+remainder_share = 0.35
