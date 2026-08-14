@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.5 (Extended Monthly Edition - Fixed Import)
+Gamesforum -> Digest + Podcast Pipeline v4.6 (Extended Timeout Edition)
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.5)"
-HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "150"))
+UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.6)"
+HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "360")) # הוגדל ל-6 דקות לתסריטים ארוכים
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
 
@@ -209,7 +209,7 @@ def generate_podcast_content(articles: list[dict], today_date: str) -> dict:
     
     prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast. 
 
-Your goal is an EXTENDED, highly in-depth 20-30 minute special episode covering a lot of ground. Do NOT rush.
+Your goal is an EXTENDED, highly in-depth special episode covering a lot of ground. Do NOT rush.
 
 STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
@@ -217,7 +217,7 @@ STRUCTURE OF THE SHOW:
    - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, המהדורה המורחבת שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
    - {SPEAKER_B} responds naturally: "היי דנה, יש לנו המון על מה לדבר הפעם."
    - {SPEAKER_A} briefly outlines the agenda.
-2. EXTENDED DEEP DIVE SEGMENTS (Spend 6-8 dialogue turns PER ARTICLE):
+2. EXTENDED DEEP DIVE SEGMENTS (Spend 5-7 dialogue turns PER ARTICLE):
    - Break down every single metric and detail. 
    - Analyze the strategic market impact deeply.
    - Argue and debate. {SPEAKER_B} should heavily question the business logic of the companies mentioned.
@@ -229,8 +229,8 @@ CHARACTER DYNAMICS:
 
 SPEECH NATURALISM:
 - {lang_inst}
-- Make the dialogue very long, detailed, and conversational.
-- Target Script Length: 2,500 to 3,500 words. DO NOT MAKE IT SHORT.
+- Make the dialogue detailed, comprehensive, and conversational.
+- Target Script Length: 2,200 to 3,000 words.
 
 SOURCE ARTICLES:
 {corpus}
