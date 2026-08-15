@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v6.1 (Pure Gemini Edition - Rate Limit Safe)
+Gamesforum -> Digest + Podcast Pipeline v6.2 (Pure Gemini Edition - Extreme Rate Limit Safe)
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/6.1)"
+UA = "Mozilla/5.0 (compatible; bens-digest/6.2)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -162,7 +162,7 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
             time.sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")
 
-# Alias for backwards compatibility with discovery module
+# Alias for backwards compatibility
 claude_json = gemini_json
 
 # ---------------------------------------------------------------- JSON Schema & Prompt
@@ -245,7 +245,7 @@ SOURCE ARTICLES:
 
 # ---------------------------------------------------------------- Gemini TTS
 
-def gemini_tts_chunk(script_chunk_text: str, tries: int = 6) -> bytes:
+def gemini_tts_chunk(script_chunk_text: str, tries: int = 8) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
         
@@ -305,7 +305,9 @@ TRANSCRIPT:
             log(f"    TTS error (attempt {attempt + 1}/{tries}): {e}")
             if attempt == tries - 1:
                 raise
-        time.sleep(10 * (attempt + 1))
+        
+        # Exponential backoff on steroids (20s, 40s, 60s, 80s...)
+        time.sleep(20 * (attempt + 1))
         
     raise RuntimeError("Gemini TTS returned no audio payload after retries.")
 
@@ -330,7 +332,8 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
         audio_bytes = gemini_tts_chunk(chunk_text)
         pcm += audio_bytes
-        time.sleep(8)
+        # Wait 20 full seconds before even attempting the next chunk
+        time.sleep(20)
         
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
