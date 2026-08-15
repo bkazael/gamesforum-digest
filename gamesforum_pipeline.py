@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.8 (Ben's Weekly Digest Rebrand)
+Gamesforum -> Digest + Podcast Pipeline v4.9 (Catchy Titles & V2 Release)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/4.8)"
+UA = "Mozilla/5.0 (compatible; bens-digest/4.9)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -177,6 +177,10 @@ def claude_json(prompt: str, schema: dict) -> dict:
 PODCAST_SCHEMA = {
     "type": "object",
     "properties": {
+        "episode_title": {
+            "type": "string",
+            "description": "A catchy, curiosity-inducing podcast episode title based on the stories (e.g. 'The Webstore Boom & Apple\\'s New Tax')"
+        },
         "digest_summary": {
             "type": "array",
             "items": {
@@ -201,7 +205,7 @@ PODCAST_SCHEMA = {
             }
         }
     },
-    "required": ["digest_summary", "script"]
+    "required": ["episode_title", "digest_summary", "script"]
 }
 
 def generate_podcast_content(articles: list[dict], today_date: str) -> dict:
@@ -215,13 +219,14 @@ Your goal is an in-depth, highly structured episode covering key developments.
 STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
    - Start smoothly as background music fades out.
-   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Ben's Weekly Digest, הפודקאסט השבועי שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
+   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Ben's Weekly Digest. אני דנה, ואיתי יוני."
    - {SPEAKER_B} responds naturally: "היי דנה, שבוע מרתק בתעשייה."
    - {SPEAKER_A} outlines the main topics briefly.
 2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns PER ARTICLE):
    - Break down metrics, deals, and strategic implications.
    - Debate mechanics and UA/LTV impact.
 3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
+4. EPISODE METADATA: Generate a highly engaging, catchy episode title based on the stories covered.
 
 CHARACTER DYNAMICS:
 - {SPEAKER_A} (Dana - Female Anchor): Leads strategy, numbers, and overarching market trends.
@@ -386,8 +391,8 @@ def get_duration(mp3_path: pathlib.Path) -> int:
 
 # ---------------------------------------------------------------- Feed & Output
 
-def render_digest_md(data: dict, articles: list[dict], today: str) -> str:
-    md = [f"# Ben's Weekly Digest — {today}\n"]
+def render_digest_md(data: dict, articles: list[dict], today: str, episode_title: str) -> str:
+    md = [f"# {episode_title}\n"]
     for item in data.get("digest_summary", []):
         md.append(f"## {item.get('title', 'Topic')}")
         md.append(f"**Key Takeaway:** {item.get('key_takeaway', '')}\n")
@@ -402,23 +407,25 @@ def render_digest_md(data: dict, articles: list[dict], today: str) -> str:
 def build_feed():
     items = []
     for mp3 in sorted(EPISODES.glob("*.mp3"), reverse=True):
-        date = mp3.stem
+        date_str = mp3.stem.replace("-v2", "")
         meta_path = mp3.with_suffix(".json")
         meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
         try:
-            pub = dt.datetime.strptime(date, "%Y-%m-%d").replace(hour=6, tzinfo=dt.timezone.utc)
+            pub = dt.datetime.strptime(date_str, "%Y-%m-%d").replace(hour=6, tzinfo=dt.timezone.utc)
         except ValueError:
             continue
         notes = meta.get("notes") or meta.get("summary", "")
         plain = xml_escape(re.sub(r"<[^>]+>", " ", notes).strip()[:900])
         
+        title = xml_escape(meta.get('title', f"Ben's Weekly Digest {date_str}"))
+        
         items.append(f"""    <item>
-      <title>{xml_escape(meta.get('title', f"Ben's Weekly Digest {date}"))}</title>
+      <title>{title}</title>
       <description><![CDATA[{notes}]]></description>
       <content:encoded><![CDATA[{notes}]]></content:encoded>
       <itunes:summary>{plain}</itunes:summary>
       <pubDate>{format_datetime(pub)}</pubDate>
-      <guid isPermaLink="false">bens-digest-{date}</guid>
+      <guid isPermaLink="false">bens-digest-{mp3.stem}</guid>
       <enclosure url="{BASE_URL}/episodes/{mp3.name}" length="{mp3.stat().st_size}" type="audio/mpeg"/>
       <itunes:duration>{meta.get('duration', 0)}</itunes:duration>
       <itunes:explicit>false</itunes:explicit>
@@ -460,13 +467,18 @@ def main() -> int:
         STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
         return 0
 
+    # תוספת v2 כדי שאפל תוריד את הקובץ החדש
     today = dt.date.today().isoformat() + "-v2"
     
     # 1. Claude Single-Pass
     data = generate_podcast_content(articles, today)
     
+    # חילוץ הכותרת המסקרנת
+    episode_title = data.get("episode_title", "Weekly Gaming Digest")
+    full_title = f"{episode_title} | Ben's Weekly Digest"
+    
     # 2. Save Digest & Script
-    (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today), encoding="utf-8")
+    (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today, full_title), encoding="utf-8")
     script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
     (DIGESTS / f"{today}-script.md").write_text(script_text, encoding="utf-8")
     
@@ -477,13 +489,13 @@ def main() -> int:
     duration = get_duration(mp3_path)
     
     # 4. Save Metadata & Update RSS
-    first_para = data["digest_summary"][0]["key_takeaway"] if data["digest_summary"] else "Weekly Gaming Digest"
+    first_para = data["digest_summary"][0]["key_takeaway"] if data.get("digest_summary") else "Monthly Gaming Digest"
     notes_links = "".join(f'<li><a href="{xml_escape(a["url"])}">{xml_escape(a["title"])}</a> <em>({xml_escape(a.get("source", ""))})</em></li>' for a in articles)
     notes = f"<p>{xml_escape(first_para)}</p><p><strong>Sources ({len(articles)}):</strong></p><ol>{notes_links}</ol>"
     
     mp3_path.with_suffix(".json").write_text(
         json.dumps({
-            "title": f"Ben's Weekly Digest {today}",
+            "title": full_title,
             "summary": first_para,
             "notes": notes,
             "duration": duration,
