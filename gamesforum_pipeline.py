@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.9 (Catchy Titles & V2 Release)
+Gamesforum -> Digest + Podcast Pipeline v5.0 (400 Bad Request Fix & Catchy Titles)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/4.9)"
+UA = "Mozilla/5.0 (compatible; bens-digest/5.0)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -147,6 +147,12 @@ def _anthropic_post(payload: dict, tries: int = 4) -> dict:
             USAGE_LOG["output_tokens"] += usage.get("output_tokens", 0)
             log(f"    [Claude responded in {time.monotonic() - started:.1f}s]")
             return data
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", "replace")
+            log(f"    Anthropic API attempt {attempt + 1}/{tries} failed: HTTP {e.code} - {err_body}")
+            if attempt == tries - 1:
+                raise
+            time.sleep(5 * 2 ** attempt)
         except Exception as e:
             log(f"    Anthropic API attempt {attempt + 1}/{tries} failed: {e}")
             if attempt == tries - 1:
@@ -157,7 +163,7 @@ def _anthropic_post(payload: dict, tries: int = 4) -> dict:
 def claude_json(prompt: str, schema: dict) -> dict:
     payload = {
         "model": ANTHROPIC_MODEL,
-        "max_tokens": 8192,
+        "max_tokens": 4096,
         "tools": [{
             "name": "submit",
             "description": "Submit structured output matching schema.",
@@ -179,7 +185,7 @@ PODCAST_SCHEMA = {
     "properties": {
         "episode_title": {
             "type": "string",
-            "description": "A catchy, curiosity-inducing podcast episode title based on the stories (e.g. 'The Webstore Boom & Apple\\'s New Tax')"
+            "description": "Catchy podcast title based on top stories"
         },
         "digest_summary": {
             "type": "array",
@@ -467,13 +473,11 @@ def main() -> int:
         STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
         return 0
 
-    # תוספת v2 כדי שאפל תוריד את הקובץ החדש
     today = dt.date.today().isoformat() + "-v2"
     
     # 1. Claude Single-Pass
     data = generate_podcast_content(articles, today)
     
-    # חילוץ הכותרת המסקרנת
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
     full_title = f"{episode_title} | Ben's Weekly Digest"
     
@@ -489,7 +493,7 @@ def main() -> int:
     duration = get_duration(mp3_path)
     
     # 4. Save Metadata & Update RSS
-    first_para = data["digest_summary"][0]["key_takeaway"] if data.get("digest_summary") else "Monthly Gaming Digest"
+    first_para = data["digest_summary"][0]["key_takeaway"] if data.get("digest_summary") else "Weekly Gaming Digest"
     notes_links = "".join(f'<li><a href="{xml_escape(a["url"])}">{xml_escape(a["title"])}</a> <em>({xml_escape(a.get("source", ""))})</em></li>' for a in articles)
     notes = f"<p>{xml_escape(first_para)}</p><p><strong>Sources ({len(articles)}):</strong></p><ol>{notes_links}</ol>"
     
