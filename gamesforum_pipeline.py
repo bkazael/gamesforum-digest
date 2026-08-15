@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v5.0 (400 Bad Request Fix & Catchy Titles)
+Gamesforum -> Digest + Podcast Pipeline v6.0 (Pure Gemini Edition - 100% Free)
 """
 
 from __future__ import annotations
@@ -23,9 +23,8 @@ from xml.sax.saxutils import escape as xml_escape
 
 # ---------------------------------------------------------------- config
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
+GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
 
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
@@ -38,7 +37,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/5.0)"
+UA = "Mozilla/5.0 (compatible; bens-digest/6.0)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -118,94 +117,82 @@ def fetch_article(url: str) -> dict | None:
         return None
     return {"url": url, "title": title, "text": text[:14000]}
 
-# ---------------------------------------------------------------- Claude API
+# ---------------------------------------------------------------- Gemini Text API
 
-ANTHROPIC_VERSION = "2023-06-01"
+def gemini_json(prompt: str, schema: dict | None = None) -> dict:
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is required.")
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_TEXT_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    
+    gen_config = {"responseMimeType": "application/json"}
+    if schema:
+        gen_config["responseSchema"] = schema
 
-def _anthropic_post(payload: dict, tries: int = 4) -> dict:
-    if not ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY is required.")
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": gen_config
+    }
     
     body = json.dumps(payload).encode()
-    for attempt in range(tries):
+    for attempt in range(4):
         _check_deadline()
         req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=body,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": ANTHROPIC_VERSION,
-            },
+            url, data=body,
+            headers={"Content-Type": "application/json"}
         )
         started = time.monotonic()
         try:
             with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
                 data = json.loads(r.read())
-            usage = data.get("usage", {})
-            USAGE_LOG["input_tokens"] += usage.get("input_tokens", 0)
-            USAGE_LOG["output_tokens"] += usage.get("output_tokens", 0)
-            log(f"    [Claude responded in {time.monotonic() - started:.1f}s]")
-            return data
+            cand = (data.get("candidates") or [{}])[0]
+            text = (cand.get("content") or {}).get("parts", [{}])[0].get("text", "")
+            log(f"    [Gemini responded in {time.monotonic() - started:.1f}s]")
+            return json.loads(text)
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", "replace")
-            log(f"    Anthropic API attempt {attempt + 1}/{tries} failed: HTTP {e.code} - {err_body}")
-            if attempt == tries - 1:
+            log(f"    Gemini API attempt {attempt + 1}/4 failed: HTTP {e.code} - {err_body}")
+            if attempt == 3:
                 raise
             time.sleep(5 * 2 ** attempt)
         except Exception as e:
-            log(f"    Anthropic API attempt {attempt + 1}/{tries} failed: {e}")
-            if attempt == tries - 1:
+            log(f"    Gemini API attempt {attempt + 1}/4 failed: {e}")
+            if attempt == 3:
                 raise
             time.sleep(5 * 2 ** attempt)
     raise RuntimeError("unreachable")
 
-def claude_json(prompt: str, schema: dict) -> dict:
-    payload = {
-        "model": ANTHROPIC_MODEL,
-        "max_tokens": 4096,
-        "tools": [{
-            "name": "submit",
-            "description": "Submit structured output matching schema.",
-            "input_schema": schema,
-        }],
-        "tool_choice": {"type": "tool", "name": "submit"},
-        "messages": [{"role": "user", "content": prompt}],
-    }
-    data = _anthropic_post(payload)
-    for block in data.get("content", []):
-        if block.get("type") == "tool_use" and block.get("name") == "submit":
-            return block["input"]
-    raise RuntimeError("Failed to extract JSON tool response.")
+# Alias for backwards compatibility with discovery module
+claude_json = gemini_json
 
 # ---------------------------------------------------------------- JSON Schema & Prompt
 
 PODCAST_SCHEMA = {
-    "type": "object",
+    "type": "OBJECT",
     "properties": {
         "episode_title": {
-            "type": "string",
+            "type": "STRING",
             "description": "Catchy podcast title based on top stories"
         },
         "digest_summary": {
-            "type": "array",
+            "type": "ARRAY",
             "items": {
-                "type": "object",
+                "type": "OBJECT",
                 "properties": {
-                    "title": {"type": "string"},
-                    "key_takeaway": {"type": "string"},
-                    "metrics_mentioned": {"type": "array", "items": {"type": "string"}}
+                    "title": {"type": "STRING"},
+                    "key_takeaway": {"type": "STRING"},
+                    "metrics_mentioned": {"type": "ARRAY", "items": {"type": "STRING"}}
                 },
                 "required": ["title", "key_takeaway", "metrics_mentioned"]
             }
         },
         "script": {
-            "type": "array",
+            "type": "ARRAY",
             "items": {
-                "type": "object",
+                "type": "OBJECT",
                 "properties": {
-                    "speaker": {"type": "string", "enum": [SPEAKER_A, SPEAKER_B]},
-                    "text": {"type": "string"}
+                    "speaker": {"type": "STRING", "enum": [SPEAKER_A, SPEAKER_B]},
+                    "text": {"type": "STRING"}
                 },
                 "required": ["speaker", "text"]
             }
@@ -245,8 +232,8 @@ SPEECH NATURALISM:
 SOURCE ARTICLES:
 {corpus}
 """
-    log("generating podcast content via Claude single-pass call...")
-    data = claude_json(prompt, PODCAST_SCHEMA)
+    log("generating podcast content via Gemini text call...")
+    data = gemini_json(prompt, PODCAST_SCHEMA)
     
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
@@ -275,7 +262,7 @@ Do not read any instructions aloud.
 TRANSCRIPT:
 {script_chunk_text}"""
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{TTS_MODEL}:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{TTS_MODEL}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -297,7 +284,7 @@ TRANSCRIPT:
         _check_deadline()
         req = urllib.request.Request(
             url, data=body,
-            headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
+            headers={"Content-Type": "application/json"}
         )
         try:
             with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
@@ -475,7 +462,7 @@ def main() -> int:
 
     today = dt.date.today().isoformat() + "-v2"
     
-    # 1. Claude Single-Pass
+    # 1. Gemini Single-Pass Text & Script Generation
     data = generate_podcast_content(articles, today)
     
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
@@ -514,8 +501,7 @@ def main() -> int:
     state["last_run"] = today
     STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
 
-    cost = (USAGE_LOG["input_tokens"] * 3.0 / 1e6) + (USAGE_LOG["output_tokens"] * 15.0 / 1e6)
-    log(f"Finished run. Claude Tokens: In={USAGE_LOG['input_tokens']}, Out={USAGE_LOG['output_tokens']} (~${cost:.4f}).")
+    log("Finished run cleanly using Gemini API.")
     return 0
 
 if __name__ == "__main__":
