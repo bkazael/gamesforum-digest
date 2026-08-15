@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v6.2 (Pure Gemini Edition - Extreme Rate Limit Safe)
+Gamesforum -> Digest + Podcast Pipeline v6.3 (Gemini 3-Chunk TTS Edition)
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/6.2)"
+UA = "Mozilla/5.0 (compatible; bens-digest/6.3)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -306,17 +306,17 @@ TRANSCRIPT:
             if attempt == tries - 1:
                 raise
         
-        # Exponential backoff on steroids (20s, 40s, 60s, 80s...)
-        time.sleep(20 * (attempt + 1))
+        time.sleep(25 * (attempt + 1))
         
     raise RuntimeError("Gemini TTS returned no audio payload after retries.")
 
 def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path: pathlib.Path):
     lines = [f"{turn['speaker']}: {turn['text']}" for turn in script_turns]
     
+    # Chunk size increased to 3800 chars to restrict total chunks to ~2-3
     chunks, current_chunk, current_len = [], [], 0
     for line in lines:
-        if current_len + len(line) > 1800 and current_chunk:
+        if current_len + len(line) > 3800 and current_chunk:
             chunks.append("\n".join(current_chunk))
             current_chunk, current_len = [], 0
         current_chunk.append(line)
@@ -332,8 +332,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
         audio_bytes = gemini_tts_chunk(chunk_text)
         pcm += audio_bytes
-        # Wait 20 full seconds before even attempting the next chunk
-        time.sleep(20)
+        time.sleep(25)
         
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
