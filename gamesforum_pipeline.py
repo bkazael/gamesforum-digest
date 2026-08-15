@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v6.0 (Pure Gemini Edition - 100% Free)
+Gamesforum -> Digest + Podcast Pipeline v6.1 (Pure Gemini Edition - Rate Limit Safe)
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/6.0)"
+UA = "Mozilla/5.0 (compatible; bens-digest/6.1)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -135,7 +135,7 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
     }
     
     body = json.dumps(payload).encode()
-    for attempt in range(4):
+    for attempt in range(6):
         _check_deadline()
         req = urllib.request.Request(
             url, data=body,
@@ -151,15 +151,15 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
             return json.loads(text)
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", "replace")
-            log(f"    Gemini API attempt {attempt + 1}/4 failed: HTTP {e.code} - {err_body}")
-            if attempt == 3:
+            log(f"    Gemini API attempt {attempt + 1}/6 failed: HTTP {e.code} - {err_body}")
+            if attempt == 5:
                 raise
-            time.sleep(5 * 2 ** attempt)
+            time.sleep(10 * (attempt + 1))
         except Exception as e:
-            log(f"    Gemini API attempt {attempt + 1}/4 failed: {e}")
-            if attempt == 3:
+            log(f"    Gemini API attempt {attempt + 1}/6 failed: {e}")
+            if attempt == 5:
                 raise
-            time.sleep(5 * 2 ** attempt)
+            time.sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")
 
 # Alias for backwards compatibility with discovery module
@@ -245,7 +245,7 @@ SOURCE ARTICLES:
 
 # ---------------------------------------------------------------- Gemini TTS
 
-def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
+def gemini_tts_chunk(script_chunk_text: str, tries: int = 6) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
         
@@ -305,7 +305,7 @@ TRANSCRIPT:
             log(f"    TTS error (attempt {attempt + 1}/{tries}): {e}")
             if attempt == tries - 1:
                 raise
-        time.sleep(5 * (attempt + 1))
+        time.sleep(10 * (attempt + 1))
         
     raise RuntimeError("Gemini TTS returned no audio payload after retries.")
 
@@ -330,7 +330,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
         audio_bytes = gemini_tts_chunk(chunk_text)
         pcm += audio_bytes
-        time.sleep(2)
+        time.sleep(8)
         
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
