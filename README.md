@@ -1,2 +1,2 @@
-# gamesforum-digest
+# Bens-Weekly-Digest
 My Gaming Podcast
