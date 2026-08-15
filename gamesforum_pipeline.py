@@ -460,7 +460,7 @@ def main() -> int:
         STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
         return 0
 
-    today = dt.date.today().isoformat()
+    today = dt.date.today().isoformat() + "-v2"
     
     # 1. Claude Single-Pass
     data = generate_podcast_content(articles, today)
