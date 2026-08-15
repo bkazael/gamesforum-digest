@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gamesforum -> Digest + Podcast Pipeline v4.7 (Calibrated Deep-Dive Edition)
+Gamesforum -> Digest + Podcast Pipeline v4.8 (Ben's Weekly Digest Rebrand)
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; gamesforum-digest/4.7)"
+UA = "Mozilla/5.0 (compatible; bens-digest/4.8)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 _run_started = time.monotonic()
@@ -215,7 +215,7 @@ Your goal is an in-depth, highly structured episode covering key developments.
 STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
    - Start smoothly as background music fades out.
-   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Gamesforum Weekly Digest, הדיגסט השבועי שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
+   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Ben's Weekly Digest, הפודקאסט השבועי שלנו לתאריך {today_date}. אני דנה, ואיתי יוני."
    - {SPEAKER_B} responds naturally: "היי דנה, שבוע מרתק בתעשייה."
    - {SPEAKER_A} outlines the main topics briefly.
 2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns PER ARTICLE):
@@ -387,7 +387,7 @@ def get_duration(mp3_path: pathlib.Path) -> int:
 # ---------------------------------------------------------------- Feed & Output
 
 def render_digest_md(data: dict, articles: list[dict], today: str) -> str:
-    md = [f"# Gamesforum Digest — {today}\n"]
+    md = [f"# Ben's Weekly Digest — {today}\n"]
     for item in data.get("digest_summary", []):
         md.append(f"## {item.get('title', 'Topic')}")
         md.append(f"**Key Takeaway:** {item.get('key_takeaway', '')}\n")
@@ -413,12 +413,12 @@ def build_feed():
         plain = xml_escape(re.sub(r"<[^>]+>", " ", notes).strip()[:900])
         
         items.append(f"""    <item>
-      <title>{xml_escape(meta.get('title', f'Gamesforum Digest {date}'))}</title>
+      <title>{xml_escape(meta.get('title', f"Ben's Weekly Digest {date}"))}</title>
       <description><![CDATA[{notes}]]></description>
       <content:encoded><![CDATA[{notes}]]></content:encoded>
       <itunes:summary>{plain}</itunes:summary>
       <pubDate>{format_datetime(pub)}</pubDate>
-      <guid isPermaLink="false">gamesforum-{date}</guid>
+      <guid isPermaLink="false">bens-digest-{date}</guid>
       <enclosure url="{BASE_URL}/episodes/{mp3.name}" length="{mp3.stat().st_size}" type="audio/mpeg"/>
       <itunes:duration>{meta.get('duration', 0)}</itunes:duration>
       <itunes:explicit>false</itunes:explicit>
@@ -427,7 +427,7 @@ def build_feed():
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>Gamesforum Digest</title>
+    <title>Ben's Weekly Digest</title>
     <link>{BASE_URL}</link>
     <description>Weekly mobile-gaming briefing.</description>
     <language>{'he' if LANG == 'he' else 'en'}</language>
@@ -477,13 +477,13 @@ def main() -> int:
     duration = get_duration(mp3_path)
     
     # 4. Save Metadata & Update RSS
-    first_para = data["digest_summary"][0]["key_takeaway"] if data["digest_summary"] else "Monthly Gaming Digest"
+    first_para = data["digest_summary"][0]["key_takeaway"] if data["digest_summary"] else "Weekly Gaming Digest"
     notes_links = "".join(f'<li><a href="{xml_escape(a["url"])}">{xml_escape(a["title"])}</a> <em>({xml_escape(a.get("source", ""))})</em></li>' for a in articles)
     notes = f"<p>{xml_escape(first_para)}</p><p><strong>Sources ({len(articles)}):</strong></p><ol>{notes_links}</ol>"
     
     mp3_path.with_suffix(".json").write_text(
         json.dumps({
-            "title": f"Gamesforum Digest {today}",
+            "title": f"Ben's Weekly Digest {today}",
             "summary": first_para,
             "notes": notes,
             "duration": duration,
