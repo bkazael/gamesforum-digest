@@ -49,12 +49,15 @@ class DiscoveryEngine:
         with open(profile_path, "rb") as f:
             self.config = tomli.load(f)
         
-        self.max_age_days = self.config["discovery"]["max_age_days"]
-        self.max_articles = self.config["discovery"]["max_articles"]
+        # קריאה בטוחה של הגדרות ה-Discovery
+        discovery_config = self.config.get("discovery", {})
+        self.max_age_days = discovery_config.get("max_age_days", 7)
+        self.max_articles = discovery_config.get("max_items_to_process", discovery_config.get("max_articles", 30))
+        
         self.sources = self.config.get("sources", [])
         self.memory_path = memory_path
         self.memory_data = self.load_memory()
-
+    
     def load_memory(self) -> list:
         """טעינת הזיכרון של הפרקים הקודמים מקובץ JSON."""
         if os.path.exists(self.memory_path):
