@@ -1,0 +1,24 @@
+# קובץ בדיקה זמני - אינו משפיע על הפרודקשן
+
+[podcast]
+name = "Test Sandbox Episode"
+language = "he"
+
+[thresholds]
+min_score = 6
+max_articles = 3        # כמות קטנה של כתבות לניסיון מהיר
+min_words = 150
+max_age_days = 2       # יסרוק רק כתבות מהיומיים האחרונים
+
+[discovery]
+max_age_days = 2
+max_items_to_process = 15
+max_articles = 3
+
+[voice]
+speaker_a = "Dana"
+voice_a   = "Kore"
+speaker_b = "Yoni"
+voice_b   = "Charon"
+
+direction = "Two industry colleagues having a brief strategic catch-up."
