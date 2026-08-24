@@ -21,6 +21,8 @@ import wave
 from email.utils import format_datetime
 from xml.sax.saxutils import escape as xml_escape
 
+import memory
+
 # ---------------------------------------------------------------- config
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -40,12 +42,18 @@ ASSETS_DIR = ROOT / "assets"
 UA = "Mozilla/5.0 (compatible; bens-digest/6.3)"
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
+
+# One source of truth for the TTS chunk split, so test_episode.py's chunking
+# test can import this instead of hand-copying the number -- a copy is
+# exactly how that test drifted out of sync with production before (it
+# tested against 1500 while this was already 3800).
+TTS_CHUNK_CHAR_LIMIT = 3800
 _run_started = time.monotonic()
 
 def _load_voice() -> dict:
     cfg = {
-        "speaker_a": "Dana", "voice_a": "Kore",      
-        "speaker_b": "Yoni", "voice_b": "Charon",    
+        "speaker_a": "Dana", "voice_a": "Kore",
+        "speaker_b": "Yoni", "voice_b": "Charon",
         "direction": "Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.",
     }
     path = ROOT / "profile.toml"
@@ -122,9 +130,9 @@ def fetch_article(url: str) -> dict | None:
 def gemini_json(prompt: str, schema: dict | None = None) -> dict:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required.")
-        
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_TEXT_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    
+
     gen_config = {"responseMimeType": "application/json"}
     if schema:
         gen_config["responseSchema"] = schema
@@ -133,7 +141,7 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": gen_config
     }
-    
+
     body = json.dumps(payload).encode()
     for attempt in range(6):
         _check_deadline()
@@ -161,9 +169,6 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
                 raise
             time.sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")
-
-# Alias for backwards compatibility
-claude_json = gemini_json
 
 # ---------------------------------------------------------------- JSON Schema & Prompt
 
@@ -201,14 +206,37 @@ PODCAST_SCHEMA = {
     "required": ["episode_title", "digest_summary", "script"]
 }
 
-def generate_podcast_content(articles: list[dict], today_date: str) -> dict:
+def generate_podcast_content(articles: list[dict], today_date: str, memory_context: str = "",
+                              target_words: int | None = None) -> dict:
     lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
     corpus = "\n\n".join(f"ARTICLE {i+1}: {a['title']}\nURL: {a['url']}\n\n{a['text']}" for i, a in enumerate(articles))
-    
-    prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast. 
+
+    # target_words exists only for live_smoke.py (Tier 2): production
+    # (main(), below) never passes it, so this branch never runs for a real
+    # episode and the show's target length is untouched.
+    if target_words:
+        length_inst = f"Target Script Length: about {target_words} words. This is a short smoke-test run -- keep it brief."
+    else:
+        length_inst = "Target Script Length: 1,500 to 1,900 words. Keep it detailed, engaging, and professional."
+
+    # Continuity is opt-in in the prompt itself: the section only exists when
+    # there is real history to draw on, and the instruction is explicit about
+    # not forcing a callback. A memory feature that makes every episode open
+    # with "as we discussed last week" would work against the calm, unforced
+    # tone the show is already tuned for -- so this is additive, not a
+    # rewrite of how the hosts talk.
+    memory_block = ""
+    if memory_context:
+        memory_block = f"""
+PREVIOUS EPISODES (for natural continuity -- mention only when genuinely
+relevant to today's stories; never force a callback):
+{memory_context}
+"""
+
+    prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast.
 
 Your goal is an in-depth, highly structured episode covering key developments.
-
+{memory_block}
 STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
    - Start smoothly as background music fades out.
@@ -227,20 +255,20 @@ CHARACTER DYNAMICS:
 
 SPEECH NATURALISM:
 - {lang_inst}
-- Target Script Length: 1,500 to 1,900 words. Keep it detailed, engaging, and professional.
+- {length_inst}
 
 SOURCE ARTICLES:
 {corpus}
 """
     log("generating podcast content via Gemini text call...")
     data = gemini_json(prompt, PODCAST_SCHEMA)
-    
+
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
-    
+
     if total_words < 600:
         log(f"Warning: Script is short ({total_words} words), but proceeding.")
-        
+
     return data
 
 # ---------------------------------------------------------------- Gemini TTS
@@ -248,7 +276,7 @@ SOURCE ARTICLES:
 def gemini_tts_chunk(script_chunk_text: str, tries: int = 8) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
-        
+
     prompt = f"""Synthesize the following conversation as speech.
 Do not read any instructions aloud.
 
@@ -277,9 +305,9 @@ TRANSCRIPT:
             },
         },
     }
-    
+
     body = json.dumps(payload).encode()
-    
+
     for attempt in range(tries):
         _check_deadline()
         req = urllib.request.Request(
@@ -289,13 +317,13 @@ TRANSCRIPT:
         try:
             with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
                 data = json.loads(r.read())
-                
+
             cand = (data.get("candidates") or [{}])[0]
             for part in (cand.get("content") or {}).get("parts", []):
                 inline = part.get("inlineData") or part.get("inline_data")
                 if inline and inline.get("data"):
                     return base64.b64decode(inline["data"])
-                    
+
             log(f"    TTS chunk returned no audio data (attempt {attempt + 1}/{tries}); retrying...")
         except urllib.error.HTTPError as e:
             log(f"    TTS HTTP {e.code} (attempt {attempt + 1}/{tries})")
@@ -305,35 +333,35 @@ TRANSCRIPT:
             log(f"    TTS error (attempt {attempt + 1}/{tries}): {e}")
             if attempt == tries - 1:
                 raise
-        
+
         time.sleep(25 * (attempt + 1))
-        
+
     raise RuntimeError("Gemini TTS returned no audio payload after retries.")
 
 def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path: pathlib.Path):
     lines = [f"{turn['speaker']}: {turn['text']}" for turn in script_turns]
-    
-    # Chunk size increased to 3800 chars to restrict total chunks to ~2-3
+
+    # Chunk size set to restrict total chunks to ~2-3
     chunks, current_chunk, current_len = [], [], 0
     for line in lines:
-        if current_len + len(line) > 3800 and current_chunk:
+        if current_len + len(line) > TTS_CHUNK_CHAR_LIMIT and current_chunk:
             chunks.append("\n".join(current_chunk))
             current_chunk, current_len = [], 0
         current_chunk.append(line)
         current_len += len(line)
     if current_chunk:
         chunks.append("\n".join(current_chunk))
-        
+
     log(f"synthesizing audio via Gemini TTS in {len(chunks)} batched chunks...")
     USAGE_LOG["tts_chunks"] = len(chunks)
-    
+
     pcm = bytearray()
     for idx, chunk_text in enumerate(chunks, 1):
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
         audio_bytes = gemini_tts_chunk(chunk_text)
         pcm += audio_bytes
         time.sleep(25)
-        
+
     with wave.open(str(wav_path), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
@@ -411,9 +439,9 @@ def build_feed():
             continue
         notes = meta.get("notes") or meta.get("summary", "")
         plain = xml_escape(re.sub(r"<[^>]+>", " ", notes).strip()[:900])
-        
+
         title = xml_escape(meta.get('title', f"Ben's Weekly Digest {date_str}"))
-        
+
         items.append(f"""    <item>
       <title>{title}</title>
       <description><![CDATA[{notes}]]></description>
@@ -463,29 +491,34 @@ def main() -> int:
         return 0
 
     today = dt.date.today().isoformat() + "-v2"
-    
+
+    # Recent-episode context for the script prompt. Reads memory.json
+    # directly (no LLM call), so this costs nothing and cannot itself fail
+    # the run -- see memory.py for why.
+    memory_context = memory.load_recent_context()
+
     # 1. Gemini Single-Pass Text & Script Generation
-    data = generate_podcast_content(articles, today)
-    
+    data = generate_podcast_content(articles, today, memory_context)
+
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
     full_title = f"{episode_title} | Ben's Weekly Digest"
-    
+
     # 2. Save Digest & Script
     (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today, full_title), encoding="utf-8")
     script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
     (DIGESTS / f"{today}-script.md").write_text(script_text, encoding="utf-8")
-    
+
     # 3. Audio Synthesis via Gemini TTS + Ducking Jingle Assembly
     wav_path = EPISODES / f"{today}.wav"
     mp3_path = EPISODES / f"{today}.mp3"
     synthesize_audio(data["script"], wav_path, mp3_path)
     duration = get_duration(mp3_path)
-    
+
     # 4. Save Metadata & Update RSS
     first_para = data["digest_summary"][0]["key_takeaway"] if data.get("digest_summary") else "Weekly Gaming Digest"
     notes_links = "".join(f'<li><a href="{xml_escape(a["url"])}">{xml_escape(a["title"])}</a> <em>({xml_escape(a.get("source", ""))})</em></li>' for a in articles)
     notes = f"<p>{xml_escape(first_para)}</p><p><strong>Sources ({len(articles)}):</strong></p><ol>{notes_links}</ol>"
-    
+
     mp3_path.with_suffix(".json").write_text(
         json.dumps({
             "title": full_title,
@@ -502,6 +535,10 @@ def main() -> int:
     state["processed"] = sorted(done | {a["url"] for a in articles})
     state["last_run"] = today
     STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
+
+    # Written only after everything above succeeded, so a failed run never
+    # leaves a phantom episode in the show's memory.
+    memory.append_entry(memory.build_entry(full_title, data.get("digest_summary", [])))
 
     log("Finished run cleanly using Gemini API.")
     return 0

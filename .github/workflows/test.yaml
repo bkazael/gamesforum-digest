@@ -1,0 +1,35 @@
+name: CI Test Suite (zero-token, every push)
+
+# Tier 0/1: pure logic + mocked wiring/contract checks. No network, no
+# GEMINI_API_KEY, no cost, runs in seconds. This is deliberately separate
+# from manual_test.yaml (Tier 2), which spends a small amount of real
+# Gemini budget and only runs when someone triggers it on purpose -- see
+# README.md for the full tier breakdown.
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No `pip install` step on purpose: gamesforum_pipeline.py, discovery.py,
+      # sources.py and memory.py are stdlib-only (urllib, tomllib, etc.), and
+      # so are these three test files. If a future change needs a real
+      # dependency here, that dependency belongs in requirements.txt and this
+      # step should install from it -- not a hand-typed list that can drift.
+      - name: Run zero-token tests
+        env:
+          GEMINI_API_KEY: test-key   # never used for a real call in this tier
+        run: |
+          python test_episode.py
+          python test_memory.py
+          python test_contracts.py

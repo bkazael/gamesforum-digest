@@ -7,7 +7,6 @@ import os
 import pathlib
 import sys
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
@@ -37,10 +36,14 @@ check("Word count calculation", words == 550, f"Got {words} words")
 check("Script passes word count floor (>=500 words)", words >= 500)
 
 # 3. Test Text Chunking for Gemini TTS Batching
+# Imports the real limit from gamesforum_pipeline instead of hand-copying
+# the number, so this test can't silently drift out of sync with
+# production the way it previously did (it used to test against 1500 while
+# synthesize_audio() was already using 3800).
 lines = [f"{turn['speaker']}: {turn['text']}" for turn in mock_data["script"]]
 chunks, current_chunk, current_len = [], [], 0
 for line in lines:
-    if current_len + len(line) > 1500 and current_chunk:
+    if current_len + len(line) > P.TTS_CHUNK_CHAR_LIMIT and current_chunk:
         chunks.append("\n".join(current_chunk))
         current_chunk, current_len = [], 0
     current_chunk.append(line)

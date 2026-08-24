@@ -14,7 +14,7 @@ Four stages, cheapest first, so money is only spent on survivors:
   1. LIST     scrape listing pages for candidate links          (no cost)
   2. BLOCK    kill obvious promo from the title alone           (no cost)
   3. SIGNAL   fetch, measure substance: data density, quotes    (no cost)
-  4. SCORE    one batched Claude call rates relevance to YOU    (~$0.03/batch)
+  4. SCORE    one batched Gemini call rates relevance to YOU    (one API call per ~20 articles)
 
 Everything it decides is written to ledger/<date>.md, including what it threw
 away and why. If the filter is wrong you will be able to see that it is wrong,
@@ -44,7 +44,7 @@ except ModuleNotFoundError:           # 3.10 and older
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from gamesforum_pipeline import (          # noqa: E402
-    fetch_article, claude_json, log,
+    fetch_article, gemini_json, log,
 )
 from sources import collect                # noqa: E402
 
@@ -225,37 +225,45 @@ ARTICLES:
 # commits to a number second. Reversed, the number comes out of nowhere and
 # the reasoning becomes a justification written after the fact.
 #
-# Claude's tool_use requires an object at the schema root, not a bare array,
-# so the batch of per-article rows is wrapped under "articles" rather than
-# being the top-level shape the way Gemini's responseSchema allowed.
+# The batch of per-article rows is wrapped under "articles" rather than
+# being a bare top-level array, so a partially-valid response still parses
+# as a dict with whatever survived, instead of failing to parse at all.
+#
+# Type names are UPPERCASE ("OBJECT", "STRING", ...): that's what Gemini's
+# responseSchema expects, matching PODCAST_SCHEMA above. This schema used to
+# be sent to a different API (see CHANGELOG) whose schema convention is
+# lowercase JSON Schema types, and the casing was never updated when the
+# call underneath switched -- Gemini likely rejected every scoring batch
+# outright, silently pushing every article onto the substance-signal
+# fallback below instead of a real relevance judgment.
 SCORE_SCHEMA = {
-    "type": "object",
+    "type": "OBJECT",
     "properties": {
         "articles": {
-            "type": "array",
+            "type": "ARRAY",
             "items": {
-                "type": "object",
+                "type": "OBJECT",
                 "properties": {
-                    "id": {"type": "integer"},
+                    "id": {"type": "INTEGER"},
                     "reasoning": {
-                        "type": "string",
+                        "type": "STRING",
                         "description": "What this article actually contains "
                                        "and what it would mean for this "
                                        "specific operator. Two or three "
                                        "sentences.",
                     },
                     "axis": {
-                        "type": "string",
+                        "type": "STRING",
                         "enum": ["DECISION", "TACTIC", "COMPETITIVE",
                                  "MARKET", "NONE"],
                     },
-                    "score": {"type": "integer"},
+                    "score": {"type": "INTEGER"},
                     "why": {
-                        "type": "string",
+                        "type": "STRING",
                         "description": "One concrete line naming what is "
                                        "in it.",
                     },
-                    "topic": {"type": "string"},
+                    "topic": {"type": "STRING"},
                 },
                 "required": ["id", "reasoning", "axis", "score", "why"],
             },
@@ -275,7 +283,7 @@ def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
     for start in range(0, len(candidates), SCORE_BATCH):
         batch = candidates[start:start + SCORE_BATCH]
         try:
-            result = claude_json(build_scoring_prompt(profile, batch),
+            result = gemini_json(build_scoring_prompt(profile, batch),
                                  SCORE_SCHEMA)
             rows = result.get("articles", []) if isinstance(result, dict) else []
         except Exception as e:                          # noqa: BLE001
@@ -536,6 +544,26 @@ def select(dry_run: bool = False) -> list[dict]:
             to_fetch.append(cand)
     log(f"  {len(found) - len(to_fetch)} blocked, {len(to_fetch)} to fetch")
 
+    # Runtime safety valve: fetching is one sequential HTTP request per
+    # candidate, with retries on each. Fine at today's 4 sources; if more
+    # get added later the fetch stage is where a much longer candidate list
+    # would first threaten the Action's 20-minute timeout. Cap it here,
+    # loudly, rather than let a slow run fail partway through TTS having
+    # already spent the text-generation budget.
+    max_fetch = thr.get("max_candidates_to_fetch", 150)
+    if len(to_fetch) > max_fetch:
+        log(f"  {len(to_fetch)} candidates to fetch exceeds "
+            f"max_candidates_to_fetch ({max_fetch}); keeping the first "
+            f"{max_fetch}, dropping the rest for this run")
+        for cand in to_fetch[max_fetch:]:
+            rows.append({
+                "title": cand["title"], "url": cand["url"],
+                "source": cand["source"], "score": None,
+                "why": f"מעל תקרת max_candidates_to_fetch ({max_fetch})",
+                "verdict": "SKIPPED",
+            })
+        to_fetch = to_fetch[:max_fetch]
+
     log("stage 3: fetch + substance signals")
     for cand in to_fetch:
         art = fetch_article(cand["url"])
@@ -659,8 +687,8 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true",
                     help="deterministic stages only, no LLM call, no cost")
     args = ap.parse_args()
-    if not args.dry_run and not os.environ.get("ANTHROPIC_API_KEY"):
-        sys.exit("set ANTHROPIC_API_KEY, or pass --dry-run")
+    if not args.dry_run and not os.environ.get("GEMINI_API_KEY"):
+        sys.exit("set GEMINI_API_KEY, or pass --dry-run")
     select(dry_run=args.dry_run)
 
 
