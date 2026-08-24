@@ -20,16 +20,16 @@ jobs:
         run: |
           pip install google-genai pydantic feedparser beautifulsoup4 requests jinja2 toml tomli
 
-      - name: Run Test Pipeline via Main Engine
+      - name: Run Sandbox Pipeline
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # הרצת המנוע המרכזי במוד בדיקה
-          python gamesforum_pipeline.py
+          # הרצת קובץ ה-Sandbox המבודד
+          python sandbox_pipeline.py
 
-      - name: Upload Generated Test Audio
+      - name: Upload Generated Test Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: test-episode-audio
-          path: ./episodes/*.mp3
+          name: test-episode-output
+          path: ./output/*
           retention-days: 2
