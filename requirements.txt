@@ -1,0 +1,7 @@
+google-genai
+pydantic
+feedparser
+beautifulsoup4
+requests
+jinja2
+toml
