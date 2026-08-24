@@ -1,0 +1,35 @@
+name: Manual Test Episode Generation (Sandbox)
+
+on:
+  workflow_dispatch: # מאפשר הרצה ידנית מתוך הממשק של GitHub
+
+jobs:
+  run-test-episode:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Test Pipeline (No Feed Update)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # הרצת הצינור במוד טסט (שמרני, מבוסס memory.json קיים)
+          python test_pipeline.py --generate-audio --output-dir ./test_artifacts
+
+      - name: Upload Generated Test Audio
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-episode-audio
+          path: ./test_artifacts/*.mp3
+          retention-days: 2
