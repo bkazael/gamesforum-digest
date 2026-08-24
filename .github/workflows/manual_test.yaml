@@ -1,7 +1,7 @@
 name: Manual Test Episode Generation (Sandbox)
 
 on:
-  workflow_dispatch: # מאפשר הרצה ידנית מתוך הממשק של GitHub
+  workflow_dispatch:
 
 jobs:
   run-test-episode:
@@ -18,18 +18,18 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
+          pip install google-genai pydantic feedparser beautifulsoup4 requests jinja2 toml tomli
 
-      - name: Run Test Pipeline (No Feed Update)
+      - name: Run Test Pipeline via Main Engine
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # הרצת הצינור במוד טסט (שמרני, מבוסס memory.json קיים)
-          python test_pipeline.py --generate-audio --output-dir ./test_artifacts
+          # הרצת המנוע המרכזי במוד בדיקה
+          python gamesforum_pipeline.py
 
       - name: Upload Generated Test Audio
         uses: actions/upload-artifact@v4
         with:
           name: test-episode-audio
-          path: ./test_artifacts/*.mp3
+          path: ./episodes/*.mp3
           retention-days: 2
