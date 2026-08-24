@@ -83,7 +83,6 @@ block = [
   "update .* patch notes", "giveaway",
 ]
 
-# הוספת מקור חדש כפי שביקשת
 [[sources]]
 name = "MobileGamer.biz"
 kind = "rss"
@@ -131,13 +130,19 @@ max_articles = 8       # הוגדל מ-5 כדי לייצר פרק חודשי א�
 min_words = 250
 max_age_days = 30      # הוגדל מ-7 ל-30 כדי לסרוק את כל החודש האחרון
 
+# תאימות תוכנתית בלבד למנוע ה-Discovery:
+[discovery]
+max_age_days = 30
+max_items_to_process = 30
+max_articles = 8
+
 # ---------------------------------------------------------------- קולות
 
 [voice]
 speaker_a = "Dana"
-voice_a   = "Kore"       # קול נשי (תוקן)
+voice_a   = "Kore"     # קול נשי (תוקן)
 speaker_b = "Yoni"
-voice_b   = "Charon"     # קול גברי
+voice_b   = "Charon"   # קול גברי
 
 direction = """
 Two industry colleagues talking. Measured, unhurried, genuinely interested. Strategic and deep.
