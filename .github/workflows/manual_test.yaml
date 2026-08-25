@@ -1,35 +1,43 @@
-name: Manual Test Episode Generation (Sandbox)
+name: Live smoke test (manual, small real cost)
+
+# Tier 2. Deliberately workflow_dispatch-only -- never on push, PR, or a
+# schedule. This is the one workflow in the repo that spends real
+# GEMINI_API_KEY budget: one short script generation + one TTS call
+# (live_smoke.py explains exactly why that's cheap). Trigger it by hand
+# before trusting a model, schema, or prompt change in production; for
+# everything else, test.yaml's zero-token suite runs on every push already.
+#
+# It replaces the old sandbox_pipeline.py / DiscoveryEngine-based sandbox
+# workflow, which called a class that no longer exists in discovery.py and
+# discovered zero articles on every run.
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
-  run-test-episode:
+  live-smoke:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 5
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.12"
 
-      - name: Install Dependencies
-        run: |
-          pip install google-genai pydantic feedparser beautifulsoup4 requests jinja2 toml tomli
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Run Sandbox Pipeline
+      # No pip install: live_smoke.py and the modules it imports are
+      # stdlib-only, same as the production pipeline.
+      - name: Run live smoke test
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          # הרצת קובץ ה-Sandbox המבודד
-          python sandbox_pipeline.py
+        run: python live_smoke.py
 
-      - name: Upload Generated Test Artifacts
+      - name: Upload smoke output
         uses: actions/upload-artifact@v4
         with:
-          name: test-episode-output
-          path: ./output/*
+          name: live-smoke-output
+          path: ./smoke_output/*
           retention-days: 2
