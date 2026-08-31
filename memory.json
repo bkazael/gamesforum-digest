@@ -37,5 +37,20 @@
       "פייוולים הופכים מבעיית מונטיזציה לבעיית שיווק ומיתוג"
     ],
     "key_takeaways": "אפל מגיבה סוף סוף ל-DMA באירופה עם עמלה של 5% לחנויות חלופיות — המשך ישיר לוויכוח על עמלת ה-link-out בארה\"ב שעלה לפני שבועיים, הפעם בטריטוריה אחרת ובתנאים נדיבים יותר; אפיק גיימס עדיין קורא לזה \"דמי זבל\". נושא ה-D2C ממשיך להעמיק בפרק הרביעי ברציפות: Xsolla עם שישה כלים חדשים, ולצידה שחקן חדש בשם ZBD שמשיק תשתית פיננסית שלמה (חשבונות, תשלומים, תגמולים) וגייס 90 מיליון דולר — כדאי לעקוב אחרי החברה הזו. Playamp (החטיבה שקיבלה מיתוג מחדש לפני שבועיים) עכשיו מדווחת על תוצאות קונקרטיות מ-AI: זמן פיתוח שלבים קוצר מ-10 שבועות ל-3. ולבסוף, פייוולים — כבר לא שאלה של כמה לגבות, אלא מתי ואיך למסגר את ההצעה, מה שהופך את זה לבעיה שיווקית לא פחות ממונטיזציה."
+  },
+  {
+    "episode_id": "ep_004",
+    "date": "2026-08-31",
+    "title": "פליק פלופים פלטפורמטיים: גוגל מהדקת, אפל מדממת, והשחקנים בורחים ל-D2C | Ben's Weekly Digest",
+    "topics_covered": [
+      "Google Play reveals new performance requirements for apps and games",
+      "Only 2,500 of 190,000 mobile games released in 2025 surpassed 500,000 downloads",
+      "ZBD Launches Financial Infrastructure for Real-Money Gaming Payments",
+      "Google settles UK app developers’ class action lawsuit for $353m",
+      "Apple reportedly saw US App Store spending fall for the first time in a decade, and Tim Sweeney has thoughts",
+      "Data digest: Miniclip, Learnings and Tripledot top July’s US ad revenue chart, Smash Fest stats, fundraising news, more",
+      "Mistplay Accelerates Expansion in Rewarded Advertising with MyChips Acquisition"
+    ],
+    "key_takeaways": "Google Play implements new mandatory performance requirements for apps and games (memory, DEX optimization) from Feb 2027, with non-compliant apps facing reduced visibility. Zero-Tap Sign-In becomes mandatory for eligible apps from Apr 2027. | A Moloco report indicates extreme competition: only 2,500 out of 190,000 new mobile games in 2025 exceeded 500,000 downloads. Breakout success relies on paid acquisition, long-term monetization, and later-stage whale conversion, with IAP revenue per install up 126% in the US. | ZBD launches a full embedded financial infrastructure for games, covering money in, through, and out. The platform, backed by $90M, offers embedded accounts, payouts, and rewards, enabling two-way financial relationships and extending to PC/console, aiming to boost engagement and loyalty. | Google settles a class-action lawsuit with UK app developers for £260 million ($353.21M) over alleged abuse of its dominant position and unfair commissions. The settlement, awaiting approval, allocates £160M for developers and £100M for legal costs. | US consumer spending on Apple's App Store fell 6% in Q2 2026, the first decline in a decade, largely due to legal battles forcing external payment links. Epic Games' Tim Sweeney blames Apple's '30% junk fees' and App Store ads for 'breaking mobile gaming'. | Miniclip led July's US ad revenue with $47.8M from a diversified portfolio. The 'Smash Puzzle' genre exploded with 70 new titles, and Ten Square Games reported D2C sales at 24% of bookings. Makers Fund closed a new $250M fund, highlighting continued investment in gaming. | Mistplay acquired MyChips, expanding its rewarded advertising footprint globally. This move reinforces the importance of opt-in, performance-driven ad formats for superior engagement, retention, and monetization, integrating MyChips' distribution into Mistplay's LoyaltyPlay network."
   }
 ]

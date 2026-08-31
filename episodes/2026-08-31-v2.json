@@ -1,0 +1,43 @@
+{
+  "title": "פליק פלופים פלטפורמטיים: גוגל מהדקת, אפל מדממת, והשחקנים בורחים ל-D2C | Ben's Weekly Digest",
+  "summary": "Google Play implements new mandatory performance requirements for apps and games (memory, DEX optimization) from Feb 2027, with non-compliant apps facing reduced visibility. Zero-Tap Sign-In becomes mandatory for eligible apps from Apr 2027.",
+  "notes": "<p>Google Play implements new mandatory performance requirements for apps and games (memory, DEX optimization) from Feb 2027, with non-compliant apps facing reduced visibility. Zero-Tap Sign-In becomes mandatory for eligible apps from Apr 2027.</p><p><strong>Sources (7):</strong></p><ol><li><a href=\"https://www.pocketgamer.biz/google-play-reveals-new-performance-requirements-for-apps-and-games/\">Google Play reveals new performance requirements for apps and games</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/report-only-2500-of-190000-mobile-games-released-in-2025-surpassed-500000-downloads/\">Only 2,500 of 190,000 mobile games released in 2025 surpassed 500,000 downloads</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.globalgamesforum.com/news-media/zbd-unveils-embedded-financial-infrastructure-for-video-games\">ZBD Launches Financial Infrastructure for Real-Money Gaming Payments</a> <em>(Gamesforum)</em></li><li><a href=\"https://www.pocketgamer.biz/google-settles-uk-app-developers-class-action-lawsuit-for-353m/\">Google settles UK app developers’ class action lawsuit for $353m</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://mobilegamer.biz/us-app-store-spending-falls-for-the-first-time-in-a-decade-and-tim-sweeney-has-thoughts/\">Apple reportedly saw US App Store spending fall for the first time in a decade, and Tim Sweeney has thoughts</a> <em>(MobileGamer.biz)</em></li><li><a href=\"https://mobilegamer.biz/data-digest-miniclip-learnings-and-tripledot-top-julys-us-ad-revenue-chart-smash-fest-stats-fundraising-news-more/\">Data digest: Miniclip, Learnings and Tripledot top July’s US ad revenue chart, Smash Fest stats, fundraising news, more</a> <em>(MobileGamer.biz)</em></li><li><a href=\"https://www.globalgamesforum.com/news-media/mistplay-mychips-acquisition\">Mistplay Accelerates Expansion in Rewarded Advertising with MyChips Acquisition</a> <em>(Gamesforum)</em></li></ol>",
+  "duration": 879,
+  "sources": [
+    {
+      "title": "Google Play reveals new performance requirements for apps and games",
+      "url": "https://www.pocketgamer.biz/google-play-reveals-new-performance-requirements-for-apps-and-games/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Only 2,500 of 190,000 mobile games released in 2025 surpassed 500,000 downloads",
+      "url": "https://www.pocketgamer.biz/report-only-2500-of-190000-mobile-games-released-in-2025-surpassed-500000-downloads/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "ZBD Launches Financial Infrastructure for Real-Money Gaming Payments",
+      "url": "https://www.globalgamesforum.com/news-media/zbd-unveils-embedded-financial-infrastructure-for-video-games",
+      "source": "Gamesforum"
+    },
+    {
+      "title": "Google settles UK app developers’ class action lawsuit for $353m",
+      "url": "https://www.pocketgamer.biz/google-settles-uk-app-developers-class-action-lawsuit-for-353m/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Apple reportedly saw US App Store spending fall for the first time in a decade, and Tim Sweeney has thoughts",
+      "url": "https://mobilegamer.biz/us-app-store-spending-falls-for-the-first-time-in-a-decade-and-tim-sweeney-has-thoughts/",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "Data digest: Miniclip, Learnings and Tripledot top July’s US ad revenue chart, Smash Fest stats, fundraising news, more",
+      "url": "https://mobilegamer.biz/data-digest-miniclip-learnings-and-tripledot-top-julys-us-ad-revenue-chart-smash-fest-stats-fundraising-news-more/",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "Mistplay Accelerates Expansion in Rewarded Advertising with MyChips Acquisition",
+      "url": "https://www.globalgamesforum.com/news-media/mistplay-mychips-acquisition",
+      "source": "Gamesforum"
+    }
+  ]
+}
