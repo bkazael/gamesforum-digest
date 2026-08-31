@@ -412,58 +412,103 @@ def _fingerprint(art: dict) -> set[str]:
     return {t.strip(".,'") for t in tokens if t not in STOPWORDS} - {""}
 
 
-def dedupe_stories(chosen: list[dict], min_shared: int = 3,
-                   min_overlap: float = 0.18) -> list[dict]:
-    """Drop a second telling of a story already in the episode.
+def _heuristic_clash(art: dict, kept: list[dict], min_shared: int = 3,
+                     min_overlap: float = 0.18) -> dict | None:
+    """Cheap first pass: do two articles share enough distinctive names to be
+    worth CHECKING for duplication? This does not itself decide they are
+    duplicates -- shared company names and the model's own formulaic
+    connector words ("impacting", "reveals") in its "why" line can cross
+    this bar for two genuinely different stories. Seen in production on
+    2026-08-31: "Google settles a $353m lawsuit" and "Google Play's new
+    performance requirements" matched on {google, play, impacting} alone --
+    unrelated announcements, same company.
 
-    URL de-duplication only catches literal repeats. Two outlets covering the
-    same court ruling produce two different URLs, two different headlines and,
-    as seen in run #2, two conflicting dollar figures for one event.
-
-    Detection is by shared NAMES, not overall word overlap. A weekly roundup
-    covering five stories shares little vocabulary with a single-story piece
-    even when one contains the other, so plain Jaccard scores it as unrelated.
-    But "skillz" and "papaya" appearing in both is close to conclusive.
-
-    Two conditions, both required, to keep false merges rare:
+    Two conditions, both required, to keep this pre-filter tight enough that
+    confirm_same_story() below isn't called on every pair that merely
+    mentions the same brand:
       * at least `min_shared` distinctive names in common
       * overlap of at least `min_overlap` against the smaller item
     """
-    kept: list[dict] = []
-    for art in chosen:                      # already sorted best first
-        fp = _fingerprint(art)
-        clash = None
-        for other in kept:
-            ofp = _fingerprint(other)
-            if not fp or not ofp:
-                continue
-            shared = fp & ofp
-            distinctive = {t for t in shared if _is_name(t)}
-            overlap = len(shared) / min(len(fp), len(ofp))
-            if len(distinctive) >= min_shared and overlap >= min_overlap:
-                log(f"    shared names: {sorted(distinctive)[:5]}")
-                clash = other
-                break
-        if clash:
-            art["_reject"] = f"אותו סיפור כמו \"{clash['title'][:40]}\""
-            log(f"  duplicate story dropped: {art['title'][:56]}")
-            # Keep the link, so the show notes still credit both outlets.
-            clash.setdefault("_also", []).append(
-                {"title": art["title"], "url": art["url"],
-                 "source": art.get("source", "")}
-            )
+    fp = _fingerprint(art)
+    if not fp:
+        return None
+    for other in kept:
+        ofp = _fingerprint(other)
+        if not ofp:
             continue
-        kept.append(art)
-    return kept
+        shared = fp & ofp
+        distinctive = {t for t in shared if _is_name(t)}
+        overlap = len(shared) / min(len(fp), len(ofp))
+        if len(distinctive) >= min_shared and overlap >= min_overlap:
+            return other
+    return None
 
 
-def apply_caps(scored: list[dict], sources: list[dict], thr: dict) -> list[dict]:
-    """Rank globally, then enforce a per-source ceiling.
+DEDUPE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "same_story": {
+            "type": "BOOLEAN",
+            "description": "True ONLY if both articles report the same "
+                           "specific underlying news event -- the same "
+                           "announcement, ruling, launch or figures. Being "
+                           "about the same company or general topic is not "
+                           "enough.",
+        },
+        "reasoning": {"type": "STRING"},
+    },
+    "required": ["same_story", "reasoning"],
+}
 
-    This is the part that stops publication volume from becoming editorial
-    influence. PocketGamer.biz posts several times a day; Gamesforum posts a
-    few times a week. On raw score alone the high-volume feed would fill every
-    episode, not because it matters more but because there is more of it.
+
+def confirm_same_story(a: dict, b: dict) -> bool:
+    """Ask the model to actually judge a heuristic clash, instead of trusting
+    shared keywords alone. Rare in practice (0-3 times a week, only when
+    _heuristic_clash already flagged a pair), so the extra call costs
+    nothing meaningful next to one scoring batch.
+
+    Fails closed toward keeping both articles: an API error here should
+    cost the episode a little redundancy, never a whole topic silently
+    dropped because a confirmation call happened to time out.
+    """
+    prompt = f"""Two article summaries from a mobile-gaming industry news
+feed matched on a keyword heuristic and might report the same underlying
+story, or might simply be two different stories about the same company or
+general subject.
+
+ARTICLE A: {a.get('title', '')}
+{a.get('_why', '')}
+
+ARTICLE B: {b.get('title', '')}
+{b.get('_why', '')}
+
+Are these genuinely the SAME underlying news event -- the same announcement,
+ruling, launch, or figures -- not merely related or about the same company?"""
+    try:
+        result = gemini_json(prompt, DEDUPE_SCHEMA)
+        same = bool(result.get("same_story"))
+        log(f"    dedupe check: {a['title'][:40]!r} vs {b['title'][:40]!r} "
+            f"-> {'SAME' if same else 'distinct'} "
+            f"({result.get('reasoning', '')[:80]})")
+        return same
+    except Exception as e:                              # noqa: BLE001
+        log(f"    dedupe confirmation failed ({e}); treating as distinct stories")
+        return False
+
+
+def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[dict]:
+    """Rank once; take each candidate if it clears the per-source cap AND is
+    not a CONFIRMED duplicate of something already kept -- both checked
+    together, in one pass, so a cap slot a duplicate would have used stays
+    available for the next candidate from that source instead of being lost.
+
+    This replaces a two-pass design (cap on a widened limit, dedupe after)
+    that could fill a source's cap with a pick dedupe then removed, with
+    nothing behind it to backfill the freed slot. On 2026-08-31 that alone
+    cut what should have been a 7-article episode to 5: Gamesforum's 2-slot
+    cap and PocketGamer.biz's 3-slot cap each lost one pick to a dedupe hit,
+    and the next-best candidate from that same source -- sitting right
+    there, unrelated to the dropped story -- was never reconsidered.
     """
     caps = {s["name"]: s.get("max_per_episode", 99) for s in sources}
     used: dict[str, int] = {}
@@ -480,6 +525,18 @@ def apply_caps(scored: list[dict], sources: list[dict], thr: dict) -> list[dict]
         if len(chosen) >= thr["max_articles"]:
             art["_reject"] = f"מחוץ ל-top {thr['max_articles']}"
             continue
+
+        clash = _heuristic_clash(art, chosen)
+        if clash and confirm_same_story(art, clash):
+            art["_reject"] = f"אותו סיפור כמו \"{clash['title'][:40]}\" (מאושר ע\"י Gemini)"
+            log(f"  duplicate story dropped: {art['title'][:56]}")
+            # Keep the link, so the show notes still credit both outlets.
+            clash.setdefault("_also", []).append(
+                {"title": art["title"], "url": art["url"],
+                 "source": art.get("source", "")}
+            )
+            continue
+
         used[src] = used.get(src, 0) + 1
         chosen.append(art)
 
@@ -651,11 +708,7 @@ def select(dry_run: bool = False) -> list[dict]:
         if notes:
             art["_why"] += " · " + " · ".join(notes)
 
-    # Over-select, drop repeat tellings, then trim to the real limit, so a
-    # duplicate costs the episode nothing.
-    wanted = thr["max_articles"]
-    thr_wide = {**thr, "max_articles": wanted + 3}
-    chosen = dedupe_stories(apply_caps(survivors, sources, thr_wide))[:wanted]
+    chosen = select_stories(survivors, sources, thr)
     assign_airtime(chosen, profile)
     chosen_urls = {a["url"] for a in chosen}
 

@@ -80,7 +80,7 @@ python discovery.py               # דירוג מלא, כותב ledger
 
 | רמה | קובץ | עלות | מתי רץ |
 |---|---|---|---|
-| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_contracts.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
+| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
 | 2 — smoke אמיתי | `live_smoke.py` | טוקנים אמיתיים, מינימלי | ידני בלבד (`manual_test.yaml`) |
 | 3 — הריצה האמיתית | `gamesforum_pipeline.py` | מלא | שבועי, מתוזמן (`weekly-digest.yml`) |
 
@@ -92,5 +92,5 @@ python discovery.py               # דירוג מלא, כותב ledger
 
 הרצה מקומית של הכל, בלי מפתח API אמיתי ובלי עלות:
 ```
-python test_episode.py && python test_memory.py && python test_contracts.py
+python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py
 ```
