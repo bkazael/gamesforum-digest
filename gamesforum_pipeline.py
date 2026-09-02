@@ -430,7 +430,17 @@ def render_digest_md(data: dict, articles: list[dict], today: str, episode_title
 def build_feed():
     items = []
     for mp3 in sorted(EPISODES.glob("*.mp3"), reverse=True):
-        date_str = mp3.stem.replace("-v2", "")
+        # Filenames are "<date>[-vN]" (a version suffix is added whenever an
+        # already-published episode gets regenerated -- see CHANGELOG,
+        # 2026-08-31 guid incident). Pull the leading date out directly
+        # instead of stripping a specific hardcoded suffix: the old
+        # `.replace("-v2", "")` silently dropped every non-"-v2" episode
+        # from the feed, because a failed strptime() just skips it.
+        m = re.match(r"^(\d{4}-\d{2}-\d{2})", mp3.stem)
+        if not m:
+            log(f"  skipping {mp3.name}: filename doesn't start with a date")
+            continue
+        date_str = m.group(1)
         meta_path = mp3.with_suffix(".json")
         meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
         try:
