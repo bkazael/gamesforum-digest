@@ -3,11 +3,13 @@
 Offline tests for Gamesforum Digest v4.0 (JSON Schema + Gemini TTS Pipeline).
 """
 
+import base64
 import json
 import os
 import pathlib
 import sys
 import tempfile
+from unittest.mock import patch
 
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -90,6 +92,48 @@ with tempfile.TemporaryDirectory() as tmp:
               item_count == 3, f"got {item_count} <item> entries")
     finally:
         P.EPISODES, P.ROOT = real_episodes, real_root
+
+# 5. gemini_tts_chunk() must not silently hand back truncated audio.
+# Real incident (2026-09-07): a chunk's audio hit the model's own output
+# ceiling mid-sentence, the API returned finishReason=MAX_TOKENS along with
+# whatever partial inlineData it had produced, and the old code returned
+# that partial audio as if it were the complete chunk -- nothing checked
+# finishReason at all. This mocks urlopen (not gemini_tts_chunk itself) so
+# it actually exercises the response-parsing code that had the bug.
+class _FakeResponse:
+    def __init__(self, body: bytes):
+        self._body = body
+    def read(self):
+        return self._body
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+
+def _tts_response(finish_reason):
+    payload = {
+        "candidates": [{
+            "finishReason": finish_reason,
+            "content": {"parts": [{"inlineData": {"data": base64.b64encode(b"fake-pcm").decode()}}]},
+        }]
+    }
+    return _FakeResponse(json.dumps(payload).encode())
+
+with patch("time.sleep"):
+    with patch("urllib.request.urlopen", return_value=_tts_response("STOP")):
+        result = P.gemini_tts_chunk("some script text", tries=2)
+        check("gemini_tts_chunk() returns audio when finishReason is STOP", result == b"fake-pcm")
+
+    with patch("urllib.request.urlopen", return_value=_tts_response("MAX_TOKENS")):
+        try:
+            P.gemini_tts_chunk("some script text", tries=3)
+            check("gemini_tts_chunk() raises instead of returning truncated audio", False,
+                  "no exception was raised")
+        except P.TTSTruncatedError:
+            check("gemini_tts_chunk() raises instead of returning truncated audio", True)
+        except Exception as e:
+            check("gemini_tts_chunk() raises instead of returning truncated audio", False,
+                  f"wrong exception type: {type(e).__name__}: {e}")
 
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

@@ -273,6 +273,18 @@ SOURCE ARTICLES:
 
 # ---------------------------------------------------------------- Gemini TTS
 
+# finishReason values other than STOP mean the model stopped generating
+# audio before it reached the end of the transcript it was given (hit its
+# own output-length ceiling, a safety filter, etc). The API still returns
+# whatever partial inlineData it produced, so this can't be told apart from
+# a normal successful response just by looking at "is there audio bytes" --
+# without this check gemini_tts_chunk() happily returns a clipped-mid-word
+# recording as if it were the full chunk. This is what produced the
+# 2026-09-07 episode's audio cutting off mid-sentence: one chunk was long
+# enough to hit the ceiling, and nothing downstream noticed.
+class TTSTruncatedError(RuntimeError):
+    pass
+
 def gemini_tts_chunk(script_chunk_text: str, tries: int = 8) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
@@ -319,16 +331,33 @@ TRANSCRIPT:
                 data = json.loads(r.read())
 
             cand = (data.get("candidates") or [{}])[0]
+            finish_reason = cand.get("finishReason")
+            audio_bytes = None
             for part in (cand.get("content") or {}).get("parts", []):
                 inline = part.get("inlineData") or part.get("inline_data")
                 if inline and inline.get("data"):
-                    return base64.b64decode(inline["data"])
+                    audio_bytes = base64.b64decode(inline["data"])
+                    break
 
-            log(f"    TTS chunk returned no audio data (attempt {attempt + 1}/{tries}); retrying...")
+            if audio_bytes is not None and finish_reason in (None, "STOP"):
+                return audio_bytes
+
+            if audio_bytes is not None:
+                log(f"    TTS chunk truncated (finishReason={finish_reason}, "
+                    f"attempt {attempt + 1}/{tries}); discarding partial audio and retrying...")
+                if attempt == tries - 1:
+                    raise TTSTruncatedError(
+                        f"Gemini TTS kept truncating this chunk (finishReason={finish_reason}) "
+                        f"after {tries} attempts."
+                    )
+            else:
+                log(f"    TTS chunk returned no audio data (attempt {attempt + 1}/{tries}); retrying...")
         except urllib.error.HTTPError as e:
             log(f"    TTS HTTP {e.code} (attempt {attempt + 1}/{tries})")
             if e.code not in (429, 500, 502, 503, 504) or attempt == tries - 1:
                 raise
+        except TTSTruncatedError:
+            raise
         except Exception as e:
             log(f"    TTS error (attempt {attempt + 1}/{tries}): {e}")
             if attempt == tries - 1:
@@ -355,10 +384,31 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
     log(f"synthesizing audio via Gemini TTS in {len(chunks)} batched chunks...")
     USAGE_LOG["tts_chunks"] = len(chunks)
 
+    def synthesize_with_split(chunk_text: str, label: str) -> bytes:
+        # A chunk that keeps hitting the model's output ceiling (see
+        # TTSTruncatedError) won't magically fit on a plain retry -- the
+        # text is the same length every time. Halving it along turn
+        # boundaries and synthesizing each half separately is what actually
+        # gets under the ceiling; recursion handles a half that's still too
+        # long. A single turn can't be split without cutting a sentence
+        # mid-word, so that's the base case where we give up loudly instead
+        # of shipping broken audio.
+        try:
+            return gemini_tts_chunk(chunk_text)
+        except TTSTruncatedError:
+            turns = chunk_text.split("\n")
+            if len(turns) <= 1:
+                raise
+            mid = len(turns) // 2
+            log(f"    {label} kept truncating; splitting into two and retrying each half...")
+            first = synthesize_with_split("\n".join(turns[:mid]), f"{label}a")
+            second = synthesize_with_split("\n".join(turns[mid:]), f"{label}b")
+            return first + second
+
     pcm = bytearray()
     for idx, chunk_text in enumerate(chunks, 1):
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
-        audio_bytes = gemini_tts_chunk(chunk_text)
+        audio_bytes = synthesize_with_split(chunk_text, f"chunk {idx}")
         pcm += audio_bytes
         time.sleep(25)
 
@@ -500,7 +550,13 @@ def main() -> int:
         STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
         return 0
 
-    today = dt.date.today().isoformat() + "-v2"
+    # NOT "+ '-v2'": that suffix was a one-off manual fix (see CHANGELOG,
+    # 2026-09-02 guid incident) for republishing an ALREADY-LIVE date under
+    # a fresh RSS guid. Baking it into every run here would permanently
+    # name every future episode "-v2" -- build_feed()'s regex-based date
+    # parsing (also from that incident) supports any suffix or none, so a
+    # plain date is exactly what a normal, first-time weekly run needs.
+    today = dt.date.today().isoformat()
 
     # Recent-episode context for the script prompt. Reads memory.json
     # directly (no LLM call), so this costs nothing and cannot itself fail
