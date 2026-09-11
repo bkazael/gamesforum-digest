@@ -57,9 +57,10 @@ try:
     import discovery as D
     import sources as S
     import memory as M
-    check("gamesforum_pipeline, discovery, sources, memory all import together", True)
+    import source_health as SH
+    check("gamesforum_pipeline, discovery, sources, memory, source_health all import together", True)
 except Exception as e:
-    check("gamesforum_pipeline, discovery, sources, memory all import together",
+    check("gamesforum_pipeline, discovery, sources, memory, source_health all import together",
           False, f"{type(e).__name__}: {e}")
     print("\nFAILED: " + str(["module import"]))
     sys.exit(1)   # nothing else below can run without this
@@ -110,7 +111,10 @@ FIXTURE_CANDIDATES = [
 ]
 
 def fake_collect(sources, max_age_days):
-    return list(FIXTURE_CANDIDATES), set()
+    counts = {c["source"]: 0 for c in FIXTURE_CANDIDATES}
+    for c in FIXTURE_CANDIDATES:
+        counts[c["source"]] += 1
+    return list(FIXTURE_CANDIDATES), set(), counts
 
 def fake_fetch_article(url):
     cand = next(c for c in FIXTURE_CANDIDATES if c["url"] == url)
@@ -129,12 +133,15 @@ with tempfile.TemporaryDirectory() as tmp:
     tmp_path = pathlib.Path(tmp)
 
     # Redirect discovery's state/ledger at scratch paths so this run can
-    # never touch the real state.json or write into ledger/. profile.toml
-    # itself is read for real -- that's a feature here, since it also
-    # proves the checked-in config is valid TOML with the sections
-    # select() expects.
+    # never touch the real state.json or write into ledger/. Same reasoning
+    # for source_health.HEALTH_FILE: select() calls source_health.record()
+    # for real, and a test run has no business mutating the repo's actual
+    # source-health history. profile.toml itself is read for real -- that's
+    # a feature here, since it also proves the checked-in config is valid
+    # TOML with the sections select() expects.
     D.STATE_FILE = tmp_path / "state.json"
     D.LEDGER = tmp_path / "ledger"
+    SH.HEALTH_FILE = tmp_path / "source_health.json"
     D.collect = fake_collect
     D.fetch_article = fake_fetch_article
     D.gemini_json = fake_gemini_json_score

@@ -47,3 +47,22 @@ jobs:
             git commit -m "digest: $(date -u +%Y-%m-%d)"
             git push
           fi
+
+      # Deliberately the LAST step. source_health.json (written during
+      # the pipeline run above) was just committed by the step before this
+      # one, so the episode is already published no matter what happens
+      # here. This step failing turns the whole run red and GitHub emails
+      # the repo owner by default -- the point is a source that's been
+      # silent for source_health.FAILURE_THRESHOLD consecutive weeks can't
+      # go unnoticed, without ever blocking that week's episode on it.
+      - name: Check source health
+        run: |
+          python3 -c "
+          import source_health, sys
+          alerts = source_health.pending_alerts()
+          if alerts:
+              print('::error::Source(s) producing nothing for '
+                    f'{source_health.FAILURE_THRESHOLD}+ consecutive weekly runs: '
+                    + ', '.join(alerts))
+              sys.exit(1)
+          "

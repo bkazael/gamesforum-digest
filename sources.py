@@ -186,15 +186,19 @@ def harvest_roundups(items: list[dict], source: dict) -> tuple[list[dict], set[s
     return keep, boosted
 
 
-def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str]]:
+def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str], dict[str, int]]:
     """Pull every source, drop stale items, de-duplicate across feeds.
 
-    Returns (items, editor_highlighted_urls).
+    Returns (items, editor_highlighted_urls, raw_item_counts). raw_item_counts
+    is {source_name: count} from *before* date filtering or dedup -- it feeds
+    source_health.py, which needs to know whether a source produced anything
+    at all this run, not whether what it produced happened to be new/recent.
     """
     cutoff = dt.date.today() - dt.timedelta(days=max_age_days)
     out: list[dict] = []
     seen: set[str] = set()
     highlighted: set[str] = set()
+    raw_counts: dict[str, int] = {}
 
     for source in sources:
         adapter = ADAPTERS.get(source.get("kind", "rss"))
@@ -202,6 +206,7 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
             log(f"  [{source.get('name')}] unknown kind, skipped")
             continue
         fetched = adapter(source)
+        raw_counts[source["name"]] = len(fetched)
         fetched, boosted = harvest_roundups(fetched, source)
         highlighted |= boosted
         for item in fetched:
@@ -217,4 +222,4 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
 
     log(f"  {len(out)} unique items across {len(sources)} sources "
         f"(last {max_age_days} days)")
-    return out, highlighted
+    return out, highlighted, raw_counts

@@ -34,3 +34,4 @@ jobs:
           python test_memory.py
           python test_discovery.py
           python test_contracts.py
+          python test_source_health.py
