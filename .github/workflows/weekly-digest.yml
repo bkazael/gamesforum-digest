@@ -48,21 +48,21 @@ jobs:
             git push
           fi
 
-      # Deliberately the LAST step. source_health.json (written during
-      # the pipeline run above) was just committed by the step before this
-      # one, so the episode is already published no matter what happens
-      # here. This step failing turns the whole run red and GitHub emails
-      # the repo owner by default -- the point is a source that's been
-      # silent for source_health.FAILURE_THRESHOLD consecutive weeks can't
-      # go unnoticed, without ever blocking that week's episode on it.
+      # Deliberately the LAST step. source_alerts.json (written during the
+      # pipeline run above, from this run's data only -- see
+      # source_health.py) is scratch space for this one job; it is never
+      # committed and carries no history. The episode is already published
+      # by the step before this one no matter what happens here. This step
+      # failing turns the whole run red, which is what makes GitHub send
+      # its own default failure-notification email -- one line per source
+      # that came back empty this run, in plain language, without ever
+      # blocking that week's episode on it.
       - name: Check source health
         run: |
           python3 -c "
           import source_health, sys
           alerts = source_health.pending_alerts()
-          if alerts:
-              print('::error::Source(s) producing nothing for '
-                    f'{source_health.FAILURE_THRESHOLD}+ consecutive weekly runs: '
-                    + ', '.join(alerts))
-              sys.exit(1)
+          for line in alerts:
+              print(f'::error::{line}')
+          sys.exit(1 if alerts else 0)
           "

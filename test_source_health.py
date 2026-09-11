@@ -20,51 +20,66 @@ def check(name, cond, detail=""):
 
 print("\n--- Testing source_health.py ---")
 
+SOURCES = [
+    {"name": "PocketGamer.biz", "kind": "rss"},
+    {"name": "MobileGamer.biz", "kind": "rss"},
+    {"name": "Gamigion (Mobile Gaming Today)", "kind": "rss"},
+    {"name": "Gamesforum", "kind": "html"},
+]
+
+# 1. Everyone producing content: no alerts, first run, no waiting period.
+alerts = SH.check(SOURCES, {"PocketGamer.biz": 5, "MobileGamer.biz": 3,
+                             "Gamigion (Mobile Gaming Today)": 2, "Gamesforum": 4})
+check("a fully healthy run has no alerts", alerts == [])
+
+# 2. One RSS source empty while others are fine -- alerts immediately (no
+# waiting for a second bad week), and blames that source specifically.
+alerts = SH.check(SOURCES, {"PocketGamer.biz": 5, "MobileGamer.biz": 3,
+                             "Gamigion (Mobile Gaming Today)": 0, "Gamesforum": 4})
+check("a single failing RSS source alerts on the very first miss",
+      len(alerts) == 1, f"got {alerts}")
+check("the alert names the specific source and the ones that worked",
+      "Gamigion (Mobile Gaming Today)" in alerts[0]
+      and "PocketGamer.biz" in alerts[0] and "MobileGamer.biz" in alerts[0],
+      alerts[0] if alerts else "no alert")
+
+# 3. Every RSS source fails together -- this is the "it's probably us, not
+# them" case, and the message must say that instead of blaming each site.
+alerts = SH.check(SOURCES, {"PocketGamer.biz": 0, "MobileGamer.biz": 0,
+                             "Gamigion (Mobile Gaming Today)": 0, "Gamesforum": 4})
+check("all RSS sources failing together produces one alert per RSS source",
+      len(alerts) == 3, f"got {len(alerts)}")
+check("the message says this looks systemic, not source-specific",
+      all("EVERY RSS source failed together" in a for a in alerts),
+      alerts)
+
+# 4. An HTML source failing gets its own distinct message pointing at
+# link_pattern, not conflated with the RSS-specific wording.
+alerts = SH.check(SOURCES, {"PocketGamer.biz": 5, "MobileGamer.biz": 3,
+                             "Gamigion (Mobile Gaming Today)": 2, "Gamesforum": 0})
+check("an HTML source failing alone produces exactly one alert",
+      len(alerts) == 1, f"got {alerts}")
+check("the HTML alert points at link_pattern, not the RSS wording",
+      "link_pattern" in alerts[0] and "RSS" not in alerts[0],
+      alerts[0] if alerts else "no alert")
+
+# 5. record()/pending_alerts() round-trip through the scratch file, and a
+# missing/corrupt file behaves like "nothing to report" rather than crashing
+# the workflow step that reads it.
 with tempfile.TemporaryDirectory() as tmp:
-    real_file = SH.HEALTH_FILE
-    SH.HEALTH_FILE = pathlib.Path(tmp) / "source_health.json"
+    real_file = SH.ALERTS_FILE
+    SH.ALERTS_FILE = pathlib.Path(tmp) / "source_alerts.json"
     try:
-        # 1. A source with items every run never alerts.
-        SH.record({"Gamesforum": 5})
-        SH.record({"Gamesforum": 3})
-        check("a consistently-producing source has no pending alerts",
+        check("pending_alerts() is empty before anything is recorded",
               SH.pending_alerts() == [])
-
-        # 2. One quiet week alone is not an alert (a real run can legitimately
-        # have nothing new from a source that week).
-        SH.record({"Gamesforum": 0})
-        check("a single miss does not alert yet",
-              SH.pending_alerts() == [])
-
-        # 3. FAILURE_THRESHOLD consecutive misses (2, by default) does alert --
-        # this is the real incident this module exists to catch: a source
-        # whose page markup changed or feed died silently for weeks.
-        SH.record({"Gamesforum": 0})
-        check(f"{SH.FAILURE_THRESHOLD} consecutive misses trips the alert",
-              SH.pending_alerts() == ["Gamesforum"])
-
-        # 4. Recovery clears it -- the alert must not stick around once the
-        # source is producing again, or every future run stays permanently
-        # red for a problem that's already fixed.
-        SH.record({"Gamesforum": 1})
-        check("a recovered source is no longer in pending_alerts()",
-              SH.pending_alerts() == [])
-
-        # 5. Sources are tracked independently -- one broken source must not
-        # mask or get confused with another that's healthy.
-        SH.record({"SourceA": 0, "SourceB": 5})
-        SH.record({"SourceA": 0, "SourceB": 5})
-        check("only the actually-broken source is reported",
-              SH.pending_alerts() == ["SourceA"])
-
-        # 6. A missing/corrupt health file behaves like "no history yet",
-        # same reasoning as memory.py's corrupt-file handling -- this must
-        # never be able to fail a run by itself.
-        SH.HEALTH_FILE.write_text("not json")
-        check("a corrupt health file is treated as empty, not a crash",
+        SH.record(["X: 0 articles this week."])
+        check("pending_alerts() returns exactly what record() just wrote",
+              SH.pending_alerts() == ["X: 0 articles this week."])
+        SH.ALERTS_FILE.write_text("not json")
+        check("a corrupt alerts file is treated as empty, not a crash",
               SH.pending_alerts() == [])
     finally:
-        SH.HEALTH_FILE = real_file
+        SH.ALERTS_FILE = real_file
 
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

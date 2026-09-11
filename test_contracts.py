@@ -134,14 +134,14 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # Redirect discovery's state/ledger at scratch paths so this run can
     # never touch the real state.json or write into ledger/. Same reasoning
-    # for source_health.HEALTH_FILE: select() calls source_health.record()
-    # for real, and a test run has no business mutating the repo's actual
-    # source-health history. profile.toml itself is read for real -- that's
+    # for source_health.ALERTS_FILE: select() calls source_health.record()
+    # for real, and a test run has no business writing into the repo's
+    # scratch alerts file. profile.toml itself is read for real -- that's
     # a feature here, since it also proves the checked-in config is valid
     # TOML with the sections select() expects.
     D.STATE_FILE = tmp_path / "state.json"
     D.LEDGER = tmp_path / "ledger"
-    SH.HEALTH_FILE = tmp_path / "source_health.json"
+    SH.ALERTS_FILE = tmp_path / "source_alerts.json"
     D.collect = fake_collect
     D.fetch_article = fake_fetch_article
     D.gemini_json = fake_gemini_json_score

@@ -579,7 +579,10 @@ def select(dry_run: bool = False) -> list[dict]:
 
     log("stage 1: collect from sources")
     all_items, highlighted, raw_counts = collect(sources, thr["max_age_days"])
-    source_health.record(raw_counts)
+    alerts = source_health.check(sources, raw_counts)
+    source_health.record(alerts)
+    for line in alerts:
+        log(f"  SOURCE ALERT: {line}")
     found = [i for i in all_items if i["url"] not in done]
     log(f"  {len(found)} unseen candidates")
 

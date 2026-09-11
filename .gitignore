@@ -1,1 +1,6 @@
 __pycache__/
+
+# Scratch space for one CI run, written by source_health.py and read back
+# by weekly-digest.yml's "Check source health" step later in the same
+# job. Carries no history across runs, so it never belongs in the repo.
+source_alerts.json

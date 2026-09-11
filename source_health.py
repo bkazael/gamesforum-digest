@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
 """
-Per-source health tracking.
+Per-run source-alert detection.
 
 sources.py's own adapters already log *why* a fetch produced nothing
 (network error, zero links after a markup change, malformed feed) -- but
 that line only reaches whoever happens to be reading a GitHub Actions run
 log, and nobody does that until an episode already looks thin or wrong.
-This module turns "a source has been silent for FAILURE_THRESHOLD
-consecutive weekly runs" into something that cannot be missed: main() in
-gamesforum_pipeline.py checks pending_alerts() and, if anything is
-returned, the workflow's final step fails on purpose -- *after* the
-episode has already been committed and pushed by the step before it. A
-broken source degrades the show (fewer candidate articles) without ever
-blocking it, but the run still turns red and GitHub emails the repo owner
-about it by default. No new infrastructure, no new secret, no third-party
-notification service -- just reusing what a failed Actions run already
-does on its own.
 
-A single quiet week from a source is not itself suspicious (a source can
-legitimately have nothing new to say); FAILURE_THRESHOLD consecutive
-misses in a row is the line between "quiet week" and "this is actually
-broken." Deliberately dependency-free and side-effect-free beyond its own
-JSON file, same reasoning as memory.py: this must never be able to fail a
-run by itself.
+The key diagnostic idea: every RSS source is fetched the exact same way
+(one HTTP GET, one XML parse), so if SOME RSS sources come back with
+articles and only one doesn't, that is specific to that one feed -- its
+URL likely moved, or it stopped serving RSS. But if EVERY RSS source comes
+back empty in the same run, that is the opposite signal: it's far more
+likely something broke in our own network path or fetch code than that
+every independently-run site failed at the exact same moment. check()
+tells these two cases apart and phrases the alert accordingly, in plain
+language, so whoever reads it doesn't have to work it out themselves.
+
+Alerts fire the first time a source comes back empty -- no waiting for a
+second bad week, on request (a source either failed this run or it
+didn't; there is nothing to gain by staying quiet about it once). The one
+file this module writes (ALERTS_FILE) is scratch space for a single CI
+run: gamesforum_pipeline.py's run writes it, and weekly-digest.yml's
+"Check source health" step -- which runs later in the *same* job, after
+the episode is already committed -- reads it back and fails the job on
+purpose if it's non-empty, which is what makes GitHub send its own
+default failure-notification email. ALERTS_FILE is never committed to the
+repo (see .gitignore) and carries no history across runs; that is exactly
+why it can't grow stale or drift out of sync with reality the way a
+persisted streak counter could.
 """
 
 from __future__ import annotations
@@ -31,52 +37,65 @@ import json
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent
-HEALTH_FILE = ROOT / "source_health.json"
-
-FAILURE_THRESHOLD = 2
+ALERTS_FILE = ROOT / "source_alerts.json"
 
 
-def _load() -> dict:
-    if not HEALTH_FILE.exists():
-        return {}
-    try:
-        data = json.loads(HEALTH_FILE.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        # A corrupt health file should never take the show down with it --
-        # worst case is one run's health tracking resets to zero.
-        return {}
+def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
+    """Return one plain-language alert line per source that got zero raw
+    items this run.
 
-
-def record(raw_item_counts: dict[str, int]) -> None:
-    """Update each source's consecutive-miss streak and persist.
-
-    raw_item_counts: {source_name: how many raw items collect() got from it
-    this run, before date filtering or cross-source dedup}. 0 means this
-    run's fetch produced nothing at all, whatever the underlying reason --
-    sources.py has already logged the specific one.
+    sources: the same list from profile.toml's [[sources]], for each
+    entry's "kind" and "name".
+    raw_item_counts: {source_name: count}, straight from sources.collect().
     """
-    state = _load()
+    rss_names = [s["name"] for s in sources if s.get("kind", "rss") == "rss"]
+    rss_ok = [n for n in rss_names if raw_item_counts.get(n, 0) > 0]
+    rss_failed = [n for n in rss_names if raw_item_counts.get(n, 0) == 0]
+    all_rss_down = bool(rss_names) and not rss_ok
+
+    alerts: list[str] = []
     for name, count in raw_item_counts.items():
-        entry = state.setdefault(name, {"consecutive_misses": 0})
-        entry["consecutive_misses"] = (
-            0 if count > 0 else entry.get("consecutive_misses", 0) + 1
-        )
-    HEALTH_FILE.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+        if count > 0:
+            continue
+        if name in rss_names and all_rss_down:
+            alerts.append(
+                f"{name}: 0 articles this week, and EVERY RSS source failed "
+                f"together ({', '.join(rss_failed)}). That almost never "
+                f"means every independent site went down at the same "
+                f"moment -- check the pipeline's own network access or "
+                f"fetch code before assuming any one feed broke."
+            )
+        elif name in rss_names:
+            alerts.append(
+                f"{name}: 0 articles this week, while other RSS sources "
+                f"({', '.join(rss_ok)}) fetched fine. This looks specific "
+                f"to {name} -- its feed URL may have moved or stopped "
+                f"serving RSS."
+            )
+        else:
+            alerts.append(
+                f"{name}: 0 articles this week from its listing page(s). "
+                f"This is an HTML-scraped source, so the site's markup may "
+                f"have changed -- check link_pattern in profile.toml for "
+                f"{name}."
+            )
+    return alerts
+
+
+def record(alerts: list[str]) -> None:
+    """Persist this run's alerts so the workflow's later step can read them."""
+    ALERTS_FILE.write_text(
+        json.dumps(alerts, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
 
 def pending_alerts() -> list[str]:
-    """Source names currently at or beyond FAILURE_THRESHOLD consecutive
-    misses. Call after record() has run for this week.
-
-    Keeps alerting every run until the source recovers or is removed from
-    profile.toml, on purpose: a broken source should stay impossible to
-    ignore, not fire once and go quiet while still broken.
-    """
-    state = _load()
-    return sorted(
-        name for name, entry in state.items()
-        if entry.get("consecutive_misses", 0) >= FAILURE_THRESHOLD
-    )
+    if not ALERTS_FILE.exists():
+        return []
+    try:
+        data = json.loads(ALERTS_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        # A corrupt/missing alerts file should never take the show down
+        # with it -- worst case this run's health check is silently skipped.
+        return []
