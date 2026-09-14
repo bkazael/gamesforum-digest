@@ -36,7 +36,17 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
+      # A step-level timeout smaller than the job's own (35) matters
+      # specifically because a JOB-level timeout cancels every remaining
+      # step at once -- including "Commit episode" and "Check source
+      # health" -- with no chance for either to run. This one failing (by
+      # timeout or a real crash) instead leaves ~5 minutes of job budget
+      # for "Report pipeline failure" below to still run and turn the job
+      # red on purpose, which is what makes GitHub send its default
+      # failure-notification email. See CHANGELOG, 2026-09-14: that gap is
+      # exactly what left a real run silent with no episode and no alert.
       - name: Run pipeline
+        timeout-minutes: 30
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
@@ -57,15 +67,17 @@ jobs:
             git push
           fi
 
-      # Deliberately the LAST step. source_alerts.json (written during the
-      # pipeline run above, from this run's data only -- see
-      # source_health.py) is scratch space for this one job; it is never
-      # committed and carries no history. The episode is already published
-      # by the step before this one no matter what happens here. This step
-      # failing turns the whole run red, which is what makes GitHub send
-      # its own default failure-notification email -- one line per source
-      # that came back empty this run, in plain language, without ever
-      # blocking that week's episode on it.
+      # Runs only after a successful publish (default `if:` behavior --
+      # no explicit condition needed since a failed "Run pipeline" or
+      # "Commit episode" already skips this the normal way). source_alerts.json
+      # (written during the pipeline run above, from this run's data only
+      # -- see source_health.py) is scratch space for this one job; it is
+      # never committed and carries no history. The episode is already
+      # published by the step before this one no matter what happens here.
+      # This step failing turns the whole run red, which is what makes
+      # GitHub send its own default failure-notification email -- one line
+      # per source that came back empty this run, in plain language,
+      # without ever blocking that week's episode on it.
       - name: Check source health
         run: |
           python3 -c "
@@ -75,3 +87,19 @@ jobs:
               print(f'::error::{line}')
           sys.exit(1 if alerts else 0)
           "
+
+      # Runs ONLY when "Run pipeline" itself failed or timed out -- i.e. no
+      # episode was published at all this week. "Check source health"
+      # above only ever runs after a successful pipeline+commit, so it
+      # can't cover this case; this is the counterpart that does, and it
+      # is what actually closes the reporting gap from 2026-09-14 rather
+      # than just making it less likely to happen. `if: failure()` is true
+      # for a step that failed for any reason, a step-level timeout
+      # included -- unlike `cancelled()`, which is reserved for the whole
+      # RUN being cancelled (e.g. a job-level timeout, which this can't
+      # reach: "Run pipeline"'s own 30-minute timeout fires first).
+      - name: Report pipeline failure
+        if: failure()
+        run: |
+          echo "::error::This week's digest pipeline failed or timed out -- no episode was published. Check the 'Run pipeline' step's log for where it stopped."
+          exit 1
