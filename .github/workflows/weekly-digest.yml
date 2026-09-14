@@ -16,7 +16,16 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Was 20. The 2026-09-14 run got killed by this exact timeout at
+    # 20m13s -- three TTS chunks legitimately took 3-7 minutes *each*
+    # during a slow/flaky spell for Gemini (one chunk also hit a real
+    # HTTP 500 mid-run), on top of ~3 extra minutes of 503 retries during
+    # scoring. None of that was a bug; the API was just slow that day, and
+    # 20 minutes had no real margin for it. The job was 21 seconds into
+    # the final (smallest) TTS chunk when it was cancelled -- both
+    # "Commit episode" and "Check source health" got skipped entirely, so
+    # neither the episode nor even an alert about it went out that week.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 

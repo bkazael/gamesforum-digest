@@ -39,7 +39,15 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = ROOT / "assets"
 
-UA = "Mozilla/5.0 (compatible; bens-digest/6.3)"
+# A browser UA, not a self-identifying bot string: the 2026-09-14 run hit
+# an HTTP 403 fetching Gamigion's Substack feed specifically (every other
+# source, on the same UA, worked fine) -- Substack's front door blocks
+# obvious non-browser clients like the old "compatible; bens-digest/6.3"
+# string. This won't get past real bot-detection (TLS fingerprinting, JS
+# challenges), but it's the standard first fix for a plain UA-based block,
+# and it can only make other sources more compatible, not less.
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
 
