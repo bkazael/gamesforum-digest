@@ -46,6 +46,7 @@ jobs:
       # failure-notification email. See CHANGELOG, 2026-09-14: that gap is
       # exactly what left a real run silent with no episode and no alert.
       - name: Run pipeline
+        id: run_pipeline
         timeout-minutes: 30
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -55,6 +56,7 @@ jobs:
         run: python gamesforum_pipeline.py
 
       - name: Commit episode
+        id: commit_episode
         run: |
           git config user.name  "gamesforum-bot"
           git config user.email "bot@users.noreply.github.com"
@@ -88,18 +90,18 @@ jobs:
           sys.exit(1 if alerts else 0)
           "
 
-      # Runs ONLY when "Run pipeline" itself failed or timed out -- i.e. no
-      # episode was published at all this week. "Check source health"
-      # above only ever runs after a successful pipeline+commit, so it
-      # can't cover this case; this is the counterpart that does, and it
-      # is what actually closes the reporting gap from 2026-09-14 rather
-      # than just making it less likely to happen. `if: failure()` is true
-      # for a step that failed for any reason, a step-level timeout
-      # included -- unlike `cancelled()`, which is reserved for the whole
-      # RUN being cancelled (e.g. a job-level timeout, which this can't
-      # reach: "Run pipeline"'s own 30-minute timeout fires first).
+      # Runs ONLY when "Run pipeline" or "Commit episode" itself failed or
+      # timed out -- i.e. no episode was published at all this week.
+      # Checking those two steps' own outcome (not bare `if: failure()`,
+      # which is true whenever ANY prior step failed) matters because
+      # "Check source health" above is ALSO expected to fail sometimes on
+      # a perfectly successful publish -- that's its whole job. A 2026-09-15
+      # run hit exactly that: pipeline+commit both succeeded, "Check source
+      # health" correctly failed over Gamigion's feed, and this step's old
+      # bare `if: failure()` fired anyway and printed the wrong message
+      # ("no episode was published") on a week that in fact published fine.
       - name: Report pipeline failure
-        if: failure()
+        if: failure() && (steps.run_pipeline.outcome == 'failure' || steps.commit_episode.outcome == 'failure')
         run: |
           echo "::error::This week's digest pipeline failed or timed out -- no episode was published. Check the 'Run pipeline' step's log for where it stopped."
           exit 1
