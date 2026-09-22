@@ -214,5 +214,61 @@ if chosen:
     check("an empty memory_context adds no PREVIOUS EPISODES section",
           "PREVIOUS EPISODES" not in captured_prompt.get("text", ""))
 
+# ---------------------------------------------------------------- 6. resuming must not re-buy anything
+#
+# The expensive half of a run is text generation: discovery's scoring
+# batches, the dedupe confirmations, and the one big script call. When a
+# checkpoint for today exists, main() must reach audio synthesis without
+# touching any of them. Getting this wrong is silent and expensive -- the
+# episode still comes out correct, it just quietly costs a second full set
+# of Gemini calls, which is exactly how 2026-09-14/15 burned a whole day's
+# free-tier allowance producing one episode. So this asserts on the thing
+# that actually matters: that those functions are never called at all.
+
+import checkpoint as CP
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = pathlib.Path(tmp)
+    saved = (CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE,
+             P.synthesize_audio, P.get_duration, P.build_feed, P.gemini_json)
+    CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
+    P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
+    P.STATE_FILE = tmp_path / "state.json"
+    P.ASSETS_DIR = tmp_path / "assets"
+
+    today = __import__("datetime").date.today().isoformat()
+    CP.save_content(today, FIXTURE_CANDIDATES,
+                    {"episode_title": "Resumed", "digest_summary": [],
+                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום"}]})
+
+    def boom(*_a, **_k):
+        raise AssertionError("resumed run made a Gemini text call")
+
+    audio_calls = []
+    P.gemini_json = boom
+    P.synthesize_audio = lambda *a, **k: audio_calls.append(k.get("date"))
+    P.get_duration = lambda *_a, **_k: 600
+    P.build_feed = lambda *_a, **_k: None
+    P.memory.append_entry = lambda *_a, **_k: None
+    import discovery as _D
+    _D.select = boom
+
+    try:
+        rc = P.main()
+        check("main() resumes from a checkpoint without any Gemini text call", rc == 0)
+        check("a resumed run still reaches audio synthesis",
+              audio_calls == [today], f"synthesize_audio called with {audio_calls}")
+        check("a fully successful resumed run clears its checkpoint",
+              CP.load_content(today) is None)
+    except AssertionError as e:
+        check("main() resumes from a checkpoint without any Gemini text call",
+              False, str(e))
+    except Exception as e:
+        check("main() resumes from a checkpoint without raising",
+              False, f"{type(e).__name__}: {e}")
+    finally:
+        (CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE,
+         P.synthesize_audio, P.get_duration, P.build_feed, P.gemini_json) = saved
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

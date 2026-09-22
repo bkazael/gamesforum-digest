@@ -4,3 +4,9 @@ __pycache__/
 # by weekly-digest.yml's "Check source health" step later in the same
 # job. Carries no history across runs, so it never belongs in the repo.
 source_alerts.json
+
+# Scratch state for one episode in flight: the selected articles, the
+# generated script, and any already-synthesized audio chunks. Lets a
+# re-run resume instead of re-paying Gemini for identical work. Deleted
+# automatically once an episode publishes -- never project history.
+.checkpoint/

@@ -35,3 +35,4 @@ jobs:
           python test_discovery.py
           python test_contracts.py
           python test_source_health.py
+          python test_checkpoint.py

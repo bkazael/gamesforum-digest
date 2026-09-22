@@ -91,21 +91,32 @@ urls = ["https://mobilegamer.biz/feed/"]
 weight = 1.0
 max_per_episode = 2
 
-# ניוזלטר שבועי "Mobile Gaming Today" -- שני חלקים: ריכוז חדשות שבועי
-# (חופף חלקית ל-PocketGamer/MobileGamer, ה-dedup הקיים כבר מטפל בזה) וסדרה
-# חודשית ייחודית "Deconstruction" שמנתחת level design של משחק אחד לעומק
-# עם נתונים אמיתיים -- זווית שאין לאף מקור אחר כרגע. אושר ע"י בעל הפרופיל:
-# הפיד כולו רלוונטי חוץ מכנסים/תוכן לא ענייני, שכבר מסונן ע"י [hard_block]
-# הגלובלי; ה-block הבא הוא הגנה נוספת ספציפית לניוזלטר הזה.
-[[sources]]
-name = "Gamigion (Mobile Gaming Today)"
-kind = "rss"
-urls = ["https://gamigion.substack.com/feed"]
-weight = 1.0
-max_per_episode = 2
-block = [
-  "conference", "summit", "webinar", "meetup", "in person event",
-]
+# ===== מושבת זמנית -- ר' CHANGELOG 2026-09-22 =====
+#
+# ניוזלטר שבועי "Mobile Gaming Today". התוכן עצמו עדיין רצוי (במיוחד סדרת
+# "Deconstruction" החודשית, זווית level-design שאין לאף מקור אחר), אבל
+# Cloudflare שמגן על Substack מחזיר 403 לכל בקשה מ-GitHub Actions. אומת
+# פעמיים בפרודקשן (14.9 ו-21.9), ושרד גם את המעבר ל-User-Agent של דפדפן
+# אמיתי -- כלומר זו חסימה ברמת מוניטין IP/טביעת אצבע TLS, לא משהו שאפשר
+# לעקוף מ-CI.
+#
+# למה מושבת ולא נשאר "כושל בקול רם": כל ריצה הפיקה התרעה זהה, כלומר מייל
+# כשלון שבועי קבוע על תקלה ידועה שאי אפשר לפעול לגביה. זה בדיוק מה שמאמן
+# להתעלם מהתרעות -- ואז ההתרעה האמיתית הבאה נבלעת. מקור שבור שידוע כשבור
+# צריך להיות מושבת, לא רועש.
+#
+# איך מחזירים: כשתעבוד קליטת המייל (ר' CHANGELOG), להחליף ל-kind = "email"
+# ולהסיר את ההערה. הקונפיג נשמר כאן שלם בדיוק בשביל זה.
+#
+# [[sources]]
+# name = "Gamigion (Mobile Gaming Today)"
+# kind = "rss"
+# urls = ["https://gamigion.substack.com/feed"]
+# weight = 1.0
+# max_per_episode = 2
+# block = [
+#   "conference", "summit", "webinar", "meetup", "in person event",
+# ]
 
 # ---------------------------------------------------------------- טעם
 

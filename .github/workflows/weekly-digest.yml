@@ -36,6 +36,23 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
+      - name: Episode date
+        id: ep
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      # Every run gets a clean runner, so checkpoint.py's .checkpoint/ dir
+      # would vanish between attempts without this -- and the whole point
+      # of it is to survive a failed attempt. restore-keys does prefix
+      # matching, so today's second attempt picks up today's first attempt
+      # (cache keys are immutable, hence run_id in the key and a prefix to
+      # find it again). A new date simply finds nothing and starts fresh.
+      - name: Restore episode checkpoint
+        uses: actions/cache/restore@v4
+        with:
+          path: .checkpoint
+          key: checkpoint-${{ steps.ep.outputs.date }}-${{ github.run_id }}
+          restore-keys: checkpoint-${{ steps.ep.outputs.date }}-
+
       # A step-level timeout smaller than the job's own (35) matters
       # specifically because a JOB-level timeout cancels every remaining
       # step at once -- including "Commit episode" and "Check source
@@ -54,6 +71,19 @@ jobs:
           DIGEST_LANG: he
           TTS_MODEL: gemini-2.5-flash-preview-tts
         run: python gamesforum_pipeline.py
+
+      # `if: always()` is the whole trick: actions/cache's default
+      # save-on-success would throw away the checkpoint in exactly the
+      # case it exists for -- a run that died partway with finished work
+      # worth keeping. A clean run deletes .checkpoint/ itself
+      # (checkpoint.clear), so success caches an empty dir and the next
+      # episode starts fresh regardless.
+      - name: Save episode checkpoint
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .checkpoint
+          key: checkpoint-${{ steps.ep.outputs.date }}-${{ github.run_id }}
 
       - name: Commit episode
         id: commit_episode

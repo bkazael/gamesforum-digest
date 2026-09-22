@@ -21,6 +21,7 @@ import wave
 from email.utils import format_datetime
 from xml.sax.saxutils import escape as xml_escape
 
+import checkpoint
 import memory
 
 # ---------------------------------------------------------------- config
@@ -48,8 +49,22 @@ ASSETS_DIR = ROOT / "assets"
 # and it can only make other sources more compatible, not less.
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+# These three have to nest, innermost first, or the whole retry design is
+# theatre. The 2026-09-21 run proved it: RUN_DEADLINE_SEC was 2400s (40
+# min) while weekly-digest.yml's "Run pipeline" step times out at 30, so
+# _check_deadline() could never fire first -- the step was always killed
+# mid-flight instead of exiting cleanly, losing everything it had already
+# built. The budget now reads: one attempt (TTS_TIMEOUT) < the whole run
+# (RUN_DEADLINE_SEC = 25 min) < the step (30 min) < the job (35 min).
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
-RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2400"))
+
+# TTS gets its own, shorter per-attempt ceiling. Real successful chunks in
+# production have taken 1-4 minutes; the calls that hang never come back at
+# all and just burn the full HTTP_TIMEOUT. 270s keeps the slowest observed
+# *successful* call comfortably inside the window while capping a hung one.
+TTS_TIMEOUT = int(os.environ.get("TTS_TIMEOUT_SEC", "270"))
+
+RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "1500"))
 
 # One source of truth for the TTS chunk split, so test_episode.py's chunking
 # test can import this instead of hand-copying the number -- a copy is
@@ -87,8 +102,18 @@ def log(*a):
     print("[pipeline]", *a, flush=True)
 
 def _check_deadline():
-    if time.monotonic() - _run_started > RUN_DEADLINE_SEC:
-        raise RuntimeError("Run exceeded deadline; aborting.")
+    elapsed = time.monotonic() - _run_started
+    if elapsed > RUN_DEADLINE_SEC:
+        # Deliberately loud and specific: this is the *graceful* exit, and
+        # it needs to be distinguishable at a glance from the ungraceful
+        # one (the Actions step timeout killing us mid-call). If you are
+        # reading this in a log, the run stopped itself on purpose, and any
+        # checkpoint written so far is intact for the next attempt.
+        raise RuntimeError(
+            f"Run exceeded its {RUN_DEADLINE_SEC}s deadline after "
+            f"{elapsed:.0f}s; aborting before the CI step gets killed. "
+            "Progress so far is checkpointed -- re-running resumes from it."
+        )
 
 def http_get(url: str, tries: int = 3) -> str:
     for attempt in range(tries):
@@ -293,7 +318,14 @@ SOURCE ARTICLES:
 class TTSTruncatedError(RuntimeError):
     pass
 
-def gemini_tts_chunk(script_chunk_text: str, tries: int = 8) -> bytes:
+# 8 was never a survivable number: at HTTP_TIMEOUT (300s) per hung attempt
+# plus sleeps escalating to 175s, one chunk could legitimately spend ~52
+# minutes before giving up -- longer than the entire job budget, for one
+# quarter of one episode's audio. 2026-09-21 spent 20 minutes on chunk 1
+# alone that way and died on chunk 3. _check_deadline() at the top of each
+# attempt is the real bound now; this just stops the loop from being
+# absurd on its own terms.
+def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
 
@@ -335,7 +367,7 @@ TRANSCRIPT:
             headers={"Content-Type": "application/json"}
         )
         try:
-            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+            with urllib.request.urlopen(req, timeout=TTS_TIMEOUT) as r:
                 data = json.loads(r.read())
 
             cand = (data.get("candidates") or [{}])[0]
@@ -371,11 +403,23 @@ TRANSCRIPT:
             if attempt == tries - 1:
                 raise
 
-        time.sleep(25 * (attempt + 1))
+        # Capped, not unbounded: the old 25*(attempt+1) reached 175s by the
+        # last try, spending more of the run's budget waiting than working.
+        time.sleep(min(25 * (attempt + 1), 60))
 
     raise RuntimeError("Gemini TTS returned no audio payload after retries.")
 
-def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path: pathlib.Path):
+def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
+                     mp3_path: pathlib.Path, date: str | None = None):
+    """Synthesize the script and mux it with the jingle.
+
+    `date` enables per-chunk checkpointing: each chunk is saved the moment
+    it comes back, and a later run for the same date reuses what's already
+    on disk instead of paying for it again. TTS is by far the slowest and
+    most failure-prone stage, and it is the one where losing work hurts
+    most -- see checkpoint.py for the incident this came from. Passing None
+    keeps the old stateless behaviour, which is what the tests want.
+    """
     lines = [f"{turn['speaker']}: {turn['text']}" for turn in script_turns]
 
     # Chunk size set to restrict total chunks to ~2-3
@@ -415,8 +459,20 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path, mp3_path:
 
     pcm = bytearray()
     for idx, chunk_text in enumerate(chunks, 1):
+        cached = checkpoint.load_chunk(date, idx) if date else None
+        if cached is not None:
+            log(f"  TTS chunk {idx}/{len(chunks)}: reusing checkpoint "
+                f"({len(cached)} bytes) -- no API call")
+            pcm += cached
+            continue
+
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
         audio_bytes = synthesize_with_split(chunk_text, f"chunk {idx}")
+        if date:
+            # Save before the inter-chunk sleep, not after the loop: the
+            # whole point is that a chunk survives whatever kills the run
+            # next. 2026-09-21 finished two chunks and kept neither.
+            checkpoint.save_chunk(date, idx, audio_bytes)
         pcm += audio_bytes
         time.sleep(25)
 
@@ -550,14 +606,6 @@ def main() -> int:
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
     done: set[str] = set(state.get("processed", []))
 
-    from discovery import select
-    articles = select()
-    if not articles:
-        log("No articles cleared relevance threshold. Exiting clean.")
-        state["last_run"] = dt.date.today().isoformat()
-        STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
-        return 0
-
     # NOT "+ '-v2'": that suffix was a one-off manual fix (see CHANGELOG,
     # 2026-09-02 guid incident) for republishing an ALREADY-LIVE date under
     # a fresh RSS guid. Baking it into every run here would permanently
@@ -566,13 +614,37 @@ def main() -> int:
     # plain date is exactly what a normal, first-time weekly run needs.
     today = dt.date.today().isoformat()
 
-    # Recent-episode context for the script prompt. Reads memory.json
-    # directly (no LLM call), so this costs nothing and cannot itself fail
-    # the run -- see memory.py for why.
-    memory_context = memory.load_recent_context()
+    # Resume first, before spending anything. If an earlier attempt today
+    # already got as far as a finished script, every Gemini *text* call for
+    # this episode (scoring batches, dedupe checks, script generation) is
+    # already paid for -- redoing them costs real free-tier quota for an
+    # identical result, which is precisely what exhausted the daily
+    # allowance on 2026-09-14/15. See checkpoint.py.
+    resumed = checkpoint.load_content(today)
+    if resumed:
+        articles, data = resumed
+        log(f"resuming from checkpoint: {len(articles)} articles, "
+            f"{len(data.get('script', []))} script turns already generated")
+    else:
+        from discovery import select
+        articles = select()
+        if not articles:
+            log("No articles cleared relevance threshold. Exiting clean.")
+            state["last_run"] = today
+            STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
+            return 0
 
-    # 1. Gemini Single-Pass Text & Script Generation
-    data = generate_podcast_content(articles, today, memory_context)
+    # 1. Gemini Single-Pass Text & Script Generation -- skipped entirely
+    # when resuming, since `data` came back from the checkpoint above.
+    if not resumed:
+        # Recent-episode context for the script prompt. Reads memory.json
+        # directly (no LLM call), so this costs nothing and cannot itself
+        # fail the run -- see memory.py for why.
+        memory_context = memory.load_recent_context()
+        data = generate_podcast_content(articles, today, memory_context)
+        # Checkpoint the moment the last text call is paid for, so a
+        # failure anywhere below (TTS, ffmpeg, feed) never buys it twice.
+        checkpoint.save_content(today, articles, data)
 
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
     full_title = f"{episode_title} | Ben's Weekly Digest"
@@ -585,7 +657,7 @@ def main() -> int:
     # 3. Audio Synthesis via Gemini TTS + Ducking Jingle Assembly
     wav_path = EPISODES / f"{today}.wav"
     mp3_path = EPISODES / f"{today}.mp3"
-    synthesize_audio(data["script"], wav_path, mp3_path)
+    synthesize_audio(data["script"], wav_path, mp3_path, date=today)
     duration = get_duration(mp3_path)
 
     # 4. Save Metadata & Update RSS
@@ -613,6 +685,11 @@ def main() -> int:
     # Written only after everything above succeeded, so a failed run never
     # leaves a phantom episode in the show's memory.
     memory.append_entry(memory.build_entry(full_title, data.get("digest_summary", [])))
+
+    # Last thing, deliberately: while any of the above can still fail, the
+    # checkpoint is the thing that makes the retry cheap. Only a fully
+    # published episode has earned the right to delete it.
+    checkpoint.clear(today)
 
     log("Finished run cleanly using Gemini API.")
     return 0

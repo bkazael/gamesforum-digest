@@ -55,6 +55,19 @@ python discovery.py               # דירוג מלא, כותב ledger
   ffmpeg.
 - `feed.xml` נבנה מחדש מכל הפרקים ב-`episodes/`.
 
+## `checkpoint.py` — ריצה שנכשלת לא מתחילה מאפס
+
+TTS הוא השלב האיטי והשביר ביותר, והוא גם זה שהכי כואב לאבד. לכן כל שלב
+יקר נשמר לדיסק ברגע שהוא מצליח, במפתח לפי תאריך הפרק: הכתבות הנבחרות
+והתסריט (כלומר **כל** קריאות הטקסט ל-Gemini) מיד אחרי יצירת התסריט, וכל
+chunk אודיו ברגע שהוא חוזר. ריצה חוזרת לאותו תאריך ממשיכה ממה שכבר קיים
+ומסנתזת רק את מה שחסר — בלי לשלם שוב על כלום. ריצה שמסתיימת בהצלחה
+מוחקת את ה-checkpoint.
+
+ב-CI כל ריצה מקבלת runner נקי, אז `weekly-digest.yml` שומר את התיקייה
+ב-`actions/cache` עם `if: always()` — ברירת המחדל של cache היא לשמור רק
+בהצלחה, שזה בדיוק ההפך ממה שצריך כאן: הערך כולו הוא במה ששורד כישלון.
+
 ## זיכרון פרקים (`memory.py`)
 
 כדי שהפודקאסט יישמע כמו תוכנית מתמשכת ולא שישה פרקים חד-פעמיים:
@@ -80,14 +93,18 @@ python discovery.py               # דירוג מלא, כותב ledger
 | `TTS_MODEL` | `gemini-2.5-flash-preview-tts` | מודל הקול |
 | `PODCAST_BASE_URL` | (ריק) | בסיס ה-URL של הפודקאסט ב-`feed.xml` — **חובה** בפרודקשן, אחרת ה-enclosure יוצא יחסי ולא ייקרא ע"י אף פלייר |
 | `DIGEST_LANG` | `he` | שפת הפרק |
-| `API_TIMEOUT_SEC` | `300` | timeout לכל קריאת Gemini בודדת |
-| `RUN_DEADLINE_SEC` | `2400` | תקרת זמן כוללת לריצה |
+| `API_TIMEOUT_SEC` | `300` | timeout לקריאת טקסט בודדת ל-Gemini |
+| `TTS_TIMEOUT_SEC` | `270` | timeout לקריאת TTS בודדת (קצר יותר: קריאה תקינה לוקחת 1-4 דקות, תקועה לא חוזרת לעולם) |
+| `RUN_DEADLINE_SEC` | `1500` | תקרת זמן כוללת לריצה — **חייב להישאר קטן מה-timeout של השלב ב-CI (30 דקות)**, אחרת הריצה נהרגת מבחוץ במקום לעצור את עצמה בחן |
+
+שלושת אלה חייבים לקנן: נסיון בודד < הריצה כולה < השלב ב-CI < ה-job.
+כשזה לא היה נכון (21.9), מנגנון העצירה העצמית מעולם לא הספיק לרוץ.
 
 ## בדיקות — שלוש רמות
 
 | רמה | קובץ | עלות | מתי רץ |
 |---|---|---|---|
-| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
+| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py`, `test_checkpoint.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
 | 2 — smoke אמיתי | `live_smoke.py` | טוקנים אמיתיים, מינימלי | ידני בלבד (`manual_test.yaml`) |
 | 3 — הריצה האמיתית | `gamesforum_pipeline.py` | מלא | שבועי, מתוזמן (`weekly-digest.yml`) |
 
@@ -99,5 +116,5 @@ python discovery.py               # דירוג מלא, כותב ledger
 
 הרצה מקומית של הכל, בלי מפתח API אמיתי ובלי עלות:
 ```
-python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py
+python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py && python test_checkpoint.py
 ```

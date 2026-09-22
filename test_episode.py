@@ -135,5 +135,71 @@ with patch("time.sleep"):
             check("gemini_tts_chunk() raises instead of returning truncated audio", False,
                   f"wrong exception type: {type(e).__name__}: {e}")
 
+# 6. synthesize_audio() must actually REUSE checkpointed chunks rather
+# than re-synthesizing them. This is the whole point of checkpoint.py and
+# the failure mode would be silent: a resumed run that quietly pays for
+# every chunk again still produces a correct episode, so only a test that
+# counts API calls can tell the difference. Written after 2026-09-21,
+# where a run finished 2 of 4 chunks, died on the third, and kept nothing.
+import checkpoint as CP
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = pathlib.Path(tmp)
+    real_ckpt, real_sleep = CP.CHECKPOINT_DIR, P.time.sleep
+    real_tts, real_run = P.gemini_tts_chunk, P.subprocess.run
+    CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
+    P.time.sleep = lambda *_a, **_k: None          # no 25s waits in tests
+    # fake_run below stands in for ffmpeg so the suite needs no audio tools
+
+    calls = []
+    def fake_tts(text, *_a, **_k):
+        calls.append(text)
+        return b"NEW" + bytes([len(calls)])
+    P.gemini_tts_chunk = fake_tts
+
+    # Stand in for ffmpeg: capture the wav it would read (synthesize_audio
+    # deletes it straight after) and produce the mp3 it would write, so the
+    # function can finish and we can still assert on the audio it built.
+    produced = {}
+    def fake_run(cmd, *_a, **_k):
+        for i, arg in enumerate(cmd):
+            if arg == "-i" and str(cmd[i + 1]).endswith(".wav"):
+                produced["pcm"] = pathlib.Path(cmd[i + 1]).read_bytes()
+        pathlib.Path(cmd[-1]).write_bytes(b"fake mp3")
+    P.subprocess.run = fake_run
+
+    try:
+        # One turn per chunk: long enough that each exceeds the limit on
+        # its own, so the chunker can't merge them and indices are stable.
+        turns = [{"speaker": P.SPEAKER_A, "text": "x" * (P.TTS_CHUNK_CHAR_LIMIT + 10)},
+                 {"speaker": P.SPEAKER_B, "text": "y" * (P.TTS_CHUNK_CHAR_LIMIT + 10)}]
+
+        # Pretend a previous attempt finished chunk 1 only.
+        CP.save_chunk("2026-09-22", 1, b"CACHED")
+
+        wav, mp3 = tmp_path / "a.wav", tmp_path / "a.mp3"
+        P.synthesize_audio(turns, wav, mp3, date="2026-09-22")
+
+        check("a checkpointed chunk is not re-synthesized",
+              len(calls) == 1, f"made {len(calls)} TTS call(s), expected 1")
+
+        pcm = produced.get("pcm", b"")
+        check("the reused chunk's audio is actually in the output",
+              b"CACHED" in pcm)
+        check("the newly synthesized chunk is in the output too",
+              b"NEW" in pcm)
+        check("chunk 2 was checkpointed after being synthesized",
+              CP.load_chunk("2026-09-22", 2) is not None)
+
+        # With no date, checkpointing is off entirely -- the stateless
+        # behaviour the older tests and any ad-hoc use rely on.
+        calls.clear()
+        P.synthesize_audio(turns, wav, mp3)
+        check("without a date, nothing is reused and both chunks are synthesized",
+              len(calls) == 2, f"made {len(calls)} TTS call(s), expected 2")
+    finally:
+        CP.CHECKPOINT_DIR = real_ckpt
+        P.time.sleep, P.gemini_tts_chunk, P.subprocess.run = real_sleep, real_tts, real_run
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)
