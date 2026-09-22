@@ -323,5 +323,26 @@ with tempfile.TemporaryDirectory() as tmp:
         os.environ.pop("FORCE_REGENERATE", None)
         (P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR, CP.CHECKPOINT_DIR) = saved
 
+# ---------------------------------------------------------------- 8. the episode title
+#
+# A published item's guid is permanent, so the title is the one part of it
+# still worth getting right after the fact -- and it is what a subscriber
+# actually reads in their player. The 2026-09-15 episode went out as
+# "... | Ben's Weekly Digest | Ben's Weekly Digest" because the suffix was
+# appended unconditionally while the script prompt has the hosts say the
+# show name out loud, so Gemini sometimes folds it into episode_title too.
+
+for src, want in [
+    ("הגיימינג מתפצל", "הגיימינג מתפצל | Ben's Weekly Digest"),
+    ("D2C | Ben's Weekly Digest", "D2C | Ben's Weekly Digest"),
+    ("D2C | Ben's Weekly Digest | Ben's Weekly Digest", "D2C | Ben's Weekly Digest"),
+    ("  spaced  ", "spaced | Ben's Weekly Digest"),
+    ("Ben's Weekly Digest", "Ben's Weekly Digest"),
+    ("", "Ben's Weekly Digest"),
+]:
+    got = P.show_title(src)
+    check(f"show_title({src!r}) appends the show name exactly once",
+          got == want, f"got {got!r}, wanted {want!r}")
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

@@ -598,6 +598,28 @@ def build_feed():
 
 # ---------------------------------------------------------------- main
 
+SHOW_NAME = "Ben's Weekly Digest"
+
+
+def show_title(episode_title: str) -> str:
+    """Episode title with the show name appended exactly once.
+
+    The 2026-09-15 episode shipped to the live feed as "... | Ben's Weekly
+    Digest | Ben's Weekly Digest". The suffix used to be appended
+    unconditionally, and the script prompt has the hosts say the show name
+    out loud, so Gemini sometimes folds it into episode_title as well.
+    Stripping before appending makes this idempotent no matter what the
+    model returns. It matters more than a cosmetic bug normally would: the
+    title is what a subscriber actually reads in their player, and a
+    published item's guid is permanent, so the title is the only part of it
+    still worth getting right afterwards.
+    """
+    title = (episode_title or "").strip()
+    while title.endswith(SHOW_NAME):
+        title = title[: -len(SHOW_NAME)].rstrip().rstrip("|").rstrip()
+    return f"{title} | {SHOW_NAME}" if title else SHOW_NAME
+
+
 def main() -> int:
     EPISODES.mkdir(exist_ok=True)
     DIGESTS.mkdir(exist_ok=True)
@@ -659,7 +681,7 @@ def main() -> int:
         checkpoint.save_content(today, articles, data)
 
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
-    full_title = f"{episode_title} | Ben's Weekly Digest"
+    full_title = show_title(episode_title)
 
     # 2. Save Digest & Script
     (DIGESTS / f"{today}.md").write_text(render_digest_md(data, articles, today, full_title), encoding="utf-8")
