@@ -35,6 +35,7 @@ episodes/ directory and belong in the Tier 2 manual smoke test
 
 from __future__ import annotations
 
+import os
 import pathlib
 import sys
 import tempfile
@@ -269,6 +270,58 @@ with tempfile.TemporaryDirectory() as tmp:
     finally:
         (CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE,
          P.synthesize_audio, P.get_duration, P.build_feed, P.gemini_json) = saved
+
+# ---------------------------------------------------------------- 7. the idempotence guard
+#
+# weekly-digest.yml fires three times on Monday so a transient Gemini
+# failure heals itself. That is only safe if a firing after a successful
+# one is a no-op -- otherwise Monday quietly produces three episodes. But
+# the guard's *other* failure direction is far worse: if it triggers when
+# it shouldn't, no episode is ever published again and everything still
+# reports success. Both directions are checked here.
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = pathlib.Path(tmp)
+    saved = (P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR, CP.CHECKPOINT_DIR)
+    P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
+    P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
+    CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
+    P.EPISODES.mkdir(parents=True, exist_ok=True)
+    today = __import__("datetime").date.today().isoformat()
+
+    import discovery as _D
+    real_select = _D.select
+    select_calls = []
+    _D.select = lambda *a, **k: select_calls.append(1) or []
+
+    try:
+        # Today's episode already on disk -> stop before spending anything.
+        (P.EPISODES / f"{today}.mp3").write_bytes(b"already published")
+        rc = P.main()
+        check("a rerun after a published episode exits 0 without re-running discovery",
+              rc == 0 and not select_calls, f"rc={rc}, select calls={len(select_calls)}")
+
+        # FORCE_REGENERATE must still allow a deliberate rebuild -- that is
+        # how 2026-08-31's bad episode was replaced.
+        select_calls.clear()
+        os.environ["FORCE_REGENERATE"] = "1"
+        P.main()
+        check("FORCE_REGENERATE=1 overrides the guard and runs discovery again",
+              len(select_calls) == 1, f"select calls={len(select_calls)}")
+        os.environ.pop("FORCE_REGENERATE")
+
+        # And with no episode for today, the guard must stay out of the way.
+        select_calls.clear()
+        (P.EPISODES / f"{today}.mp3").unlink()
+        P.main()
+        check("with no episode yet, the guard does not block the run",
+              len(select_calls) == 1, f"select calls={len(select_calls)}")
+    except Exception as e:
+        check("idempotence guard behaves", False, f"{type(e).__name__}: {e}")
+    finally:
+        _D.select = real_select
+        os.environ.pop("FORCE_REGENERATE", None)
+        (P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR, CP.CHECKPOINT_DIR) = saved
 
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

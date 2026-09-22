@@ -4,6 +4,16 @@ on:
   schedule:
     # Monday 06:00 Israel time (03:00 UTC summer / 04:00 UTC winter)
     - cron: "0 3 * * 1"
+    # Two automatic retries, because the two failures in September were
+    # both transient Gemini slowness rather than anything in this repo,
+    # and both needed a human to notice and re-run. These make that
+    # self-healing: main() exits immediately if the episode already
+    # published, and checkpoint.py means a retry after a partial run only
+    # synthesizes the chunks that are still missing -- so a retry costs
+    # minutes and almost no quota. Spaced widely enough that a genuinely
+    # slow API has time to recover between attempts.
+    - cron: "0 6 * * 1"
+    - cron: "0 10 * * 1"
   workflow_dispatch: {}   # Trigger manually from Actions tab
 
 permissions:
@@ -47,6 +57,7 @@ jobs:
       # (cache keys are immutable, hence run_id in the key and a prefix to
       # find it again). A new date simply finds nothing and starts fresh.
       - name: Restore episode checkpoint
+        continue-on-error: true   # no checkpoint just means "start fresh"
         uses: actions/cache/restore@v4
         with:
           path: .checkpoint
@@ -78,8 +89,15 @@ jobs:
       # worth keeping. A clean run deletes .checkpoint/ itself
       # (checkpoint.clear), so success caches an empty dir and the next
       # episode starts fresh regardless.
+      # continue-on-error matters more than it looks: this step sits
+      # between the pipeline and "Commit episode", which has no `if:` and
+      # so runs only when everything before it succeeded. Without this, a
+      # transient cache-service hiccup would skip publishing an episode
+      # that was already fully built. A checkpoint is an optimization; it
+      # must never stand between a finished episode and the feed.
       - name: Save episode checkpoint
         if: always()
+        continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: .checkpoint

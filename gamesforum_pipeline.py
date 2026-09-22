@@ -614,6 +614,18 @@ def main() -> int:
     # plain date is exactly what a normal, first-time weekly run needs.
     today = dt.date.today().isoformat()
 
+    # Idempotence guard, which is what makes an automatic retry safe: the
+    # workflow fires a few times on Monday so a bad Gemini day heals
+    # itself without anyone noticing it, and every firing after a
+    # successful one has to be a cheap no-op rather than a second episode
+    # for the same date. Set FORCE_REGENERATE=1 to rebuild a date on
+    # purpose (as on 2026-08-31, when an episode had to be regenerated
+    # after a selection bug).
+    if (EPISODES / f"{today}.mp3").exists() and not os.environ.get("FORCE_REGENERATE"):
+        log(f"episode for {today} already exists; nothing to do. "
+            "(set FORCE_REGENERATE=1 to rebuild it deliberately)")
+        return 0
+
     # Resume first, before spending anything. If an earlier attempt today
     # already got as far as a finished script, every Gemini *text* call for
     # this episode (scoring batches, dedupe checks, script generation) is
