@@ -195,7 +195,14 @@ BE SCEPTICAL OF
   data is a 3, not an 8.
 - Vendor bylines that are really product marketing. If a named company's
   employee wrote it and the conclusion is "use a tool like ours", drop it a
-  few points, unless the data in it stands on its own.
+  few points, unless the data in it stands on its own. Do NOT let real
+  numbers in the piece excuse this on their own: a 2026-09-22 episode built
+  its entire cold open around a Xsolla executive's column, framing "buy
+  compliance infrastructure like ours" as an industry insight because the
+  column also cited genuine stats. If the piece's own throughline resolves
+  to that company's product being the answer, that is what it is even when
+  the numbers are real -- score the argument, not just whether a number
+  appears somewhere in it.
 - Funding announcements with no operational lesson.
 
 SCALE

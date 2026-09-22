@@ -260,10 +260,25 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
     # rewrite of how the hosts talk.
     memory_block = ""
     if memory_context:
+        # "Mention only when genuinely relevant" alone was not enough: the
+        # 2026-09-15 episode had Yoni cite "Xsolla and ZBD" from a previous
+        # week's summary even though that week's SOURCE ARTICLES below
+        # contained no Xsolla piece at all -- the model treated a company
+        # name appearing in its own memory as license to bring it back up
+        # unprompted. This block is for topical continuity (the D2C shift
+        # we've been tracking, the Apple/DMA saga), not a standing invite to
+        # re-cite a vendor's name or pitch that today's actual reporting
+        # doesn't independently raise.
         memory_block = f"""
-PREVIOUS EPISODES (for natural continuity -- mention only when genuinely
-relevant to today's stories; never force a callback):
+PREVIOUS EPISODES (for natural continuity on ongoing STORYLINES -- mention
+only when genuinely relevant to today's stories; never force a callback):
 {memory_context}
+
+Do not name a specific company, product, or vendor from the block above
+unless a SOURCE ARTICLE below is actually about that company this week. It
+is fine to say "the D2C trend we've been tracking keeps accelerating"; it
+is not fine to say "Xsolla" or "ZBD" again this week just because they came
+up before.
 """
 
     prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast.
@@ -274,7 +289,14 @@ STRUCTURE OF THE SHOW:
 1. FORMAL INTRO & GREETING:
    - Start smoothly as background music fades out.
    - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Ben's Weekly Digest. אני דנה, ואיתי יוני."
-   - {SPEAKER_B} responds naturally: "היי דנה, שבוע מרתק בתעשייה."
+   - {SPEAKER_B} responds with a SPECIFIC, one-sentence reaction to whatever
+     is genuinely the most surprising or consequential thing in THIS week's
+     source articles -- a number, a reversal, a fight, something that
+     actually happened. Never a generic mood-setting line about the week
+     itself ("שבוע מרתק/דרמטי/עמוס בתעשייה" or any equivalent in English) --
+     if every week could open with the same sentence, it is the wrong
+     sentence. If nothing this week is genuinely striking, skip the
+     reaction and go straight to outlining the topics.
    - {SPEAKER_A} outlines the main topics briefly.
 2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns PER ARTICLE):
    - Break down metrics, deals, and strategic implications.
