@@ -81,5 +81,29 @@ with tempfile.TemporaryDirectory() as tmp:
     finally:
         SH.ALERTS_FILE = real_file
 
+
+# 6. An email source (kind = "email") is exempt from the "0 articles" alert
+# entirely -- a newsletter genuinely not publishing this week is normal and
+# indistinguishable from a broken source without more context, and treating
+# it as a fault would recreate the exact cry-wolf pattern that got
+# Gamigion's original RSS attempt disabled (CHANGELOG, 2026-09-22).
+EMAIL_SOURCES = SOURCES + [{"name": "Gamigion (Mobile Gaming Today) email",
+                            "kind": "email"}]
+alerts = SH.check(EMAIL_SOURCES, {"PocketGamer.biz": 5, "MobileGamer.biz": 3,
+                                   "Gamigion (Mobile Gaming Today)": 2, "Gamesforum": 4,
+                                   "Gamigion (Mobile Gaming Today) email": 0})
+check("a quiet week for an email source produces no alert at all",
+      alerts == [], f"got {alerts}")
+
+# 7. -1 (collect() couldn't even run the adapter -- see sources.py) always
+# alerts, for any kind, with wording distinct from "zero results."
+alerts = SH.check(EMAIL_SOURCES, {"PocketGamer.biz": 5, "MobileGamer.biz": 3,
+                                   "Gamigion (Mobile Gaming Today)": 2, "Gamesforum": 4,
+                                   "Gamigion (Mobile Gaming Today) email": -1})
+check("a hard adapter failure (-1) alerts even for an email source",
+      len(alerts) == 1, f"got {alerts}")
+check("the -1 alert says the fetch itself failed, not that it was quiet",
+      "fetch itself failed" in alerts[0], alerts[0] if alerts else "no alert")
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

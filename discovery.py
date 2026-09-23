@@ -635,7 +635,19 @@ def select(dry_run: bool = False) -> list[dict]:
 
     log("stage 3: fetch + substance signals")
     for cand in to_fetch:
-        art = fetch_article(cand["url"])
+        # An email-sourced item (kind = "email" in profile.toml) already
+        # carries its full body -- that's the whole point of reading it from
+        # the newsletter instead of the web: the article text arrives inside
+        # the email itself, so there is nothing left to fetch. Calling
+        # fetch_article(cand["url"]) here anyway would re-hit the publisher's
+        # own site for a body we already have, which for a source added
+        # specifically because its site 403s from CI would just fail again
+        # one stage later. See CHANGELOG for the Gamigion incident this
+        # closes the loop on.
+        if cand.get("text"):
+            art = {"url": cand["url"], "title": cand["title"], "text": cand["text"]}
+        else:
+            art = fetch_article(cand["url"])
         if not art:
             rows.append({
                 "title": cand["title"], "url": cand["url"],

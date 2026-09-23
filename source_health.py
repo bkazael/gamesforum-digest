@@ -47,7 +47,11 @@ def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
     sources: the same list from profile.toml's [[sources]], for each
     entry's "kind" and "name".
     raw_item_counts: {source_name: count}, straight from sources.collect().
+    A count of -1 (see collect()) means the adapter itself raised, not that
+    it fetched cleanly and found nothing -- that always alerts, whatever
+    the kind, with wording that says so plainly.
     """
+    kind_by_name = {s["name"]: s.get("kind", "rss") for s in sources}
     rss_names = [s["name"] for s in sources if s.get("kind", "rss") == "rss"]
     rss_ok = [n for n in rss_names if raw_item_counts.get(n, 0) > 0]
     rss_failed = [n for n in rss_names if raw_item_counts.get(n, 0) == 0]
@@ -55,7 +59,23 @@ def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
 
     alerts: list[str] = []
     for name, count in raw_item_counts.items():
+        if count == -1:
+            alerts.append(
+                f"{name}: the fetch itself failed (an exception, not just "
+                f"zero results) -- check the pipeline log for this source's "
+                f"error. For an email source this usually means the mailbox "
+                f"login or connection failed, not that the newsletter went "
+                f"quiet."
+            )
+            continue
         if count > 0:
+            continue
+        # A newsletter genuinely not publishing that week is normal, not a
+        # fault -- unlike an RSS feed or scraped page, which should always
+        # have *something* if the source is healthy. Alerting on this every
+        # quiet week is exactly the cry-wolf pattern that got Gamigion's old
+        # RSS attempt disabled in the first place (see CHANGELOG, 2026-09-22).
+        if kind_by_name.get(name) == "email":
             continue
         if name in rss_names and all_rss_down:
             alerts.append(

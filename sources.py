@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Source adapters. Two kinds, one interface.
+Source adapters. Three kinds, one interface.
 
   rss   PocketGamer.biz and .com both serve application/rss+xml at
         /index.rss. Verified. This is strictly better than scraping:
@@ -11,15 +11,32 @@ Source adapters. Two kinds, one interface.
         listing pages get scraped. This is the one fragile adapter, and it is
         fragile by necessity rather than by choice.
 
+  email For a source whose site is behind bot protection that blocks every
+        request from a CI runner (Gamigion's Substack -- Cloudflare 403,
+        confirmed twice, survives a real browser User-Agent). A newsletter
+        subscriber's inbox is not a workaround for that block; it's a
+        different path that never touches the protected site at all, since
+        a Substack "new post" email already contains the full article body.
+        See from_email() below.
+
 Every adapter returns the same shape:
 
   {"url", "title", "source", "published" (date|None), "summary"}
+
+...except email, which adds one more key -- "text", the full article body
+already extracted from the email. discovery.py's fetch stage treats that key
+as "already fetched" and skips re-downloading the URL, which is the entire
+point: re-fetching from the URL is exactly the request that gets blocked.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import email as email_lib
+import email.utils
 import html
+import imaplib
+import os
 import re
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -132,7 +149,167 @@ def from_html(source: dict) -> list[dict]:
     return items
 
 
-ADAPTERS = {"rss": from_rss, "html": from_html}
+class EmailFetchError(RuntimeError):
+    """Raised when the mailbox itself couldn't be reached -- login failure,
+    connection refused, IMAP protocol error. collect() catches this
+    specifically and records it as a distinct failure (-1), not as "zero
+    new posts," which is the normal, silent, weekly case for a newsletter.
+    """
+
+
+# Markers that show up in Substack's own transactional email chrome, after
+# the post content and before the footer (unsubscribe link, share buttons,
+# "you're receiving this because..."). Cutting here keeps that boilerplate
+# out of what gets scored and read aloud, mirroring exactly what
+# fetch_article() already does for a normal web page's footer.
+#
+# CAVEAT, in the same spirit as fetch_article()'s own comments: this is
+# built from Substack's publicly documented email template shape, not a
+# real Gamigion specimen -- nobody has been able to fetch one from CI, and
+# the sandbox this was written in cannot reach a live inbox either. The
+# mechanism below (IMAP connect, seen-flagging, text-already-fetched wiring
+# into discovery.py, the source_health silence-is-normal fix) is real and
+# tested against a synthetic fixture. The exact _FOOTER_MARKERS regex is
+# the one piece that will likely need a one-line adjustment once a real
+# email is on hand -- see README for how to recalibrate it.
+_FOOTER_MARKERS = re.compile(
+    r"(?i)unsubscribe|manage (?:your )?subscription|"
+    r"like\s*\W*\s*comment\s*\W*\s*restack|"
+    r"you.re receiving this (?:email|because)|©\s*20\d\d"
+)
+
+
+def from_email(source: dict) -> list[dict]:
+    """Pull unread "new post" emails from a dedicated inbox.
+
+    Every message in this mailbox is assumed to be a subscription email for
+    this one source -- that's why the setup instructions call for a
+    DEDICATED address, not a personal inbox. There is no from-address
+    filtering here on purpose: a dedicated inbox with nothing else in it
+    doesn't need it, and skipping it means one less thing that can silently
+    stop matching if a newsletter platform changes its sending address.
+
+    Only UNSEEN messages are read (via BODY.PEEK[], which does not itself
+    mark a message seen), and a message is only flagged \Seen *after* it
+    parses successfully -- so a message that fails to parse is retried next
+    run instead of being silently lost, the same resilience checkpoint.py
+    gives the rest of the pipeline.
+    """
+    address = os.environ.get("GMAIL_ADDRESS")
+    app_password = os.environ.get("GMAIL_APP_PASSWORD")
+    if not address or not app_password:
+        raise EmailFetchError(
+            "GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set -- required for a "
+            'kind = "email" source'
+        )
+
+    mailbox = source.get("mailbox", "INBOX")
+    # The base domain (e.g. "gamigion.substack.com") is source["urls"][0]
+    # by convention for an email source -- reused only to build the
+    # canonical-link regex below, never fetched over HTTP.
+    base_host = urllib.parse.urlparse(source["urls"][0]).netloc
+    link_re = re.compile(
+        rf'https?://{re.escape(base_host)}/p/[a-z0-9-]+', re.I
+    )
+
+    try:
+        conn = imaplib.IMAP4_SSL("imap.gmail.com")
+        conn.login(address, app_password)
+        conn.select(mailbox)
+        status, data = conn.search(None, "UNSEEN")
+        if status != "OK":
+            raise EmailFetchError(f"IMAP SEARCH failed: {status}")
+    except EmailFetchError:
+        raise
+    except Exception as e:                               # noqa: BLE001
+        raise EmailFetchError(f"could not connect to {mailbox}: {e}") from e
+
+    items: list[dict] = []
+    msg_ids = data[0].split() if data and data[0] else []
+    for msg_id in msg_ids:
+        try:
+            status, msg_data = conn.fetch(msg_id, "(BODY.PEEK[])")
+            if status != "OK" or not msg_data or not msg_data[0]:
+                log(f"  [{source['name']}] could not fetch message {msg_id!r}, skipping")
+                continue
+            raw = msg_data[0][1]
+            msg = email_lib.message_from_bytes(raw)
+
+            body_html = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == "text/html":
+                        charset = part.get_content_charset() or "utf-8"
+                        body_html = part.get_payload(decode=True).decode(charset, "replace")
+                        break
+            elif msg.get_content_type() == "text/html":
+                charset = msg.get_content_charset() or "utf-8"
+                body_html = msg.get_payload(decode=True).decode(charset, "replace")
+
+            if not body_html:
+                log(f"  [{source['name']}] message {msg_id!r} has no HTML part, skipping")
+                continue
+
+            link_match = link_re.search(body_html)
+            if not link_match:
+                log(f"  [{source['name']}] message {msg_id!r}: no {base_host}/p/... "
+                    "link found, skipping (template may have changed -- see README)")
+                continue
+            url = link_match.group(0)
+
+            title = str(email_lib.header.make_header(
+                email_lib.header.decode_header(msg.get("Subject", ""))
+            )) or url.rsplit("/", 1)[-1].replace("-", " ")
+
+            body = body_html
+            h1 = re.search(r"(?is)<h1[^>]*>.*?</h1>", body)
+            if h1:
+                body = body[h1.end():]
+            cut = _FOOTER_MARKERS.search(body)
+            if cut:
+                body = body[: cut.start()]
+            text = strip_tags(body)
+            if len(text) < 400:
+                log(f"  [{source['name']}] message {msg_id!r}: body too short "
+                    f"after extraction ({len(text)} chars), skipping -- "
+                    "footer markers may be cutting too early, see README")
+                continue
+
+            date_hdr = msg.get("Date")
+            published = None
+            if date_hdr:
+                try:
+                    published = email.utils.parsedate_to_datetime(date_hdr).date()
+                except Exception:                        # noqa: BLE001
+                    published = None
+
+            items.append({
+                "url": url,
+                "title": title,
+                "source": source["name"],
+                "published": published,
+                "summary": text[:600],
+                "text": text[:14000],
+            })
+            # Only mark read once everything above succeeded -- a crash or
+            # a "skip" above leaves the message UNSEEN for next run's retry.
+            conn.store(msg_id, "+FLAGS", "\\Seen")
+        except Exception as e:                            # noqa: BLE001
+            log(f"  [{source['name']}] error processing message {msg_id!r}: {e} -- "
+                "leaving it unread for next run")
+            continue
+
+    try:
+        conn.close()
+        conn.logout()
+    except Exception:                                     # noqa: BLE001
+        pass
+
+    log(f"  [{source['name']}] {len(items)} new post(s) from {mailbox}")
+    return items
+
+
+ADAPTERS = {"rss": from_rss, "html": from_html, "email": from_email}
 
 
 def harvest_roundups(items: list[dict], source: dict) -> tuple[list[dict], set[str]]:
@@ -193,6 +370,13 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
     is {source_name: count} from *before* date filtering or dedup -- it feeds
     source_health.py, which needs to know whether a source produced anything
     at all this run, not whether what it produced happened to be new/recent.
+
+    A count of -1 is a distinct signal from 0: it means the adapter itself
+    raised (an IMAP login failure, for example) rather than fetching
+    cleanly and finding nothing. That distinction matters specifically for
+    an email source -- a newsletter going quiet for a week is normal and
+    should never alert, but a mailbox we can no longer log into is a real
+    fault. source_health.check() reads it that way; see its docstring.
     """
     cutoff = dt.date.today() - dt.timedelta(days=max_age_days)
     out: list[dict] = []
@@ -205,7 +389,17 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
         if not adapter:
             log(f"  [{source.get('name')}] unknown kind, skipped")
             continue
-        fetched = adapter(source)
+        # from_rss and from_html already catch their own network errors
+        # internally and return [] -- this except exists for adapters (email,
+        # so far) that can fail before they ever reach a per-item loop to
+        # catch inside, e.g. an IMAP login rejection. One source's adapter
+        # blowing up must not take the whole run down with it.
+        try:
+            fetched = adapter(source)
+        except Exception as e:                          # noqa: BLE001
+            log(f"  [{source['name']}] adapter raised: {e}")
+            raw_counts[source["name"]] = -1
+            continue
         raw_counts[source["name"]] = len(fetched)
         fetched, boosted = harvest_roundups(fetched, source)
         highlighted |= boosted

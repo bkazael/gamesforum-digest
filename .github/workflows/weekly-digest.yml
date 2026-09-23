@@ -81,6 +81,16 @@ jobs:
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
           DIGEST_LANG: he
           TTS_MODEL: gemini-2.5-flash-preview-tts
+          # Only read by sources.py's from_email() adapter, and only if
+          # profile.toml has a source with kind = "email" (Gamigion's is
+          # still commented out -- see its comment there for why and what
+          # activates it). Wired here ahead of that on purpose: adding the
+          # two secrets in GitHub and flipping the profile.toml comment can
+          # then happen as one independent step, with nothing else to touch.
+          # Unset, these are just empty strings that from_email() never
+          # gets called to read.
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python gamesforum_pipeline.py
 
       # `if: always()` is the whole trick: actions/cache's default

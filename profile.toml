@@ -91,27 +91,44 @@ urls = ["https://mobilegamer.biz/feed/"]
 weight = 1.0
 max_per_episode = 2
 
-# ===== מושבת זמנית -- ר' CHANGELOG 2026-09-22 =====
+# ===== מושבת עד שהתשתית מוכנה -- ר' CHANGELOG 2026-09-23 =====
 #
-# ניוזלטר שבועי "Mobile Gaming Today". התוכן עצמו עדיין רצוי (במיוחד סדרת
+# ניוזלטר שבועי "Mobile Gaming Today". התוכן עצמו רצוי (במיוחד סדרת
 # "Deconstruction" החודשית, זווית level-design שאין לאף מקור אחר), אבל
-# Cloudflare שמגן על Substack מחזיר 403 לכל בקשה מ-GitHub Actions. אומת
-# פעמיים בפרודקשן (14.9 ו-21.9), ושרד גם את המעבר ל-User-Agent של דפדפן
-# אמיתי -- כלומר זו חסימה ברמת מוניטין IP/טביעת אצבע TLS, לא משהו שאפשר
-# לעקוף מ-CI.
+# Cloudflare שמגן על Substack מחזיר 403 לכל בקשה מ-GitHub Actions -- גם
+# ל-URL של ה-RSS feed עצמו, לא רק לדף הכתבה. אומת פעמיים בפרודקשן (14.9
+# ו-21.9), ושרד גם את המעבר ל-User-Agent של דפדפן אמיתי -- זו חסימה ברמת
+# מוניטין IP/טביעת אצבע TLS, לא משהו שאפשר לעקוף מ-CI בגישה רגילה.
 #
-# למה מושבת ולא נשאר "כושל בקול רם": כל ריצה הפיקה התרעה זהה, כלומר מייל
-# כשלון שבועי קבוע על תקלה ידועה שאי אפשר לפעול לגביה. זה בדיוק מה שמאמן
-# להתעלם מהתרעות -- ואז ההתרעה האמיתית הבאה נבלעת. מקור שבור שידוע כשבור
-# צריך להיות מושבת, לא רועש.
+# הפתרון: kind = "email" (sources.py: from_email()) קורא את המייל של
+# "פוסט חדש" מתיבת דואר ייעודית -- לא סורק את האתר בכלל. מייל כזה מכיל את
+# גוף הכתבה המלא, אז אין שום קריאת HTTP ל-Substack או ל-Gamigion בכל
+# התהליך; discovery.py כבר מדלג על fetch_article() כשל-candidate יש כבר
+# שדה "text" (ר' discovery.py, שלב 3).
 #
-# איך מחזירים: כשתעבוד קליטת המייל (ר' CHANGELOG), להחליף ל-kind = "email"
-# ולהסיר את ההערה. הקונפיג נשמר כאן שלם בדיוק בשביל זה.
+# להפעיל, שלושה צעדים בלבד:
+#   1. Gmail ייעודי חדש (לא האישי שלך -- App Password נותן גישה לכל
+#      התיבה) ומינוי אותו לניוזלטר ב-gamigion.substack.com.
+#   2. באותו חשבון: הפעלת אימות דו-שלבי, ואז Google Account -> Security ->
+#      App Passwords -> ליצור סיסמה ל-"Mail".
+#   3. שני secrets חדשים ב-repo (Settings -> Secrets and variables ->
+#      Actions): GMAIL_ADDRESS וה-GMAIL_APP_PASSWORD. weekly-digest.yml
+#      כבר מעביר אותם ל-pipeline (ר' env שם) -- לא נדרש שינוי workflow.
+# ואז: להסיר את ה-# משורות ה-[[sources]] למטה. זהו.
+#
+# אימות ה-parsing עצמו (חילוץ הכותרת/קישור/טקסט מתוך HTML של המייל)
+# נבנה נגד תבנית סינתטית שמדמה מייל אמיתי של Substack, לא נגד מייל אמיתי
+# מ-Gamigion -- אין לי דרך לקבל אחד מהסביבה הזו. יכול להיות שיידרש כיוונון
+# קטן ל-_FOOTER_MARKERS ב-sources.py אחרי שהמייל הראשון האמיתי יגיע; אם
+# ריצה מחזירה "message ...: body too short" או "no .../p/... link found"
+# בלוג, זה הסימן. שלח לי את המייל הגולמי (Gmail -> שלוש נקודות -> Show
+# original) ואכוון בדיוק לפי זה.
 #
 # [[sources]]
 # name = "Gamigion (Mobile Gaming Today)"
-# kind = "rss"
-# urls = ["https://gamigion.substack.com/feed"]
+# kind = "email"
+# urls = ["https://gamigion.substack.com/feed"]  # רק לזיהוי הדומיין -- לעולם לא נשלף
+# mailbox = "INBOX"
 # weight = 1.0
 # max_per_episode = 2
 # block = [

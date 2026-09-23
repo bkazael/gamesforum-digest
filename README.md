@@ -18,6 +18,16 @@ sources.py  ──▶  discovery.py  ──▶  gamesforum_pipeline.py  ──�
 (`Gamesforum`, שאין לו feed). גם "כורה" roundups שבועיים של כל אתר —
 הכתבות שהעורכים שם עצמם הדגישו מקבלות בוסט בציון.
 
+מתאם שלישי, `kind = "email"`, קיים למקור שהאתר שלו חסום ל-CI לגמרי
+(Gamigion — Cloudflare מחזיר 403 גם ל-RSS feed שלו, ר' `profile.toml`).
+הוא קורא את מייל "פוסט חדש" מתיבת דואר ייעודית ב-IMAP במקום לגעת באתר —
+המייל כבר מכיל את גוף הכתבה המלא, אז אין שום בקשת HTTP למקור החסום בכלל.
+`discovery.py` מדלג על שליפה חוזרת (`fetch_article()`) כש-candidate כבר
+מגיע עם `text` משלו. מקור מסוג הזה שמחזיר 0 באותו שבוע נחשב שקט ותקין,
+לא כשל — ניוזלטר שלא יצא השבוע הוא נורמלי; רק כשל חיבור/כניסה אמיתי
+ל-IMAP מתריע. פרטי ההפעלה (Gmail ייעודי, App Password, שני secrets)
+בהערה מעל הקונפיג המושבת של Gamigion ב-`profile.toml`.
+
 ### 2. `discovery.py` — הצינור, מהזול ליקר
 ארבעה שלבים, כל אחד יקר יותר מקודמו, כך שכסף (טוקנים) מוציאים רק על מי
 ששרד את השלבים הקודמים:
@@ -115,7 +125,7 @@ chunk אודיו ברגע שהוא חוזר. ריצה חוזרת לאותו תא
 
 | רמה | קובץ | עלות | מתי רץ |
 |---|---|---|---|
-| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py`, `test_checkpoint.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
+| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py`, `test_checkpoint.py`, `test_email_source.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
 | 2 — smoke אמיתי | `live_smoke.py` | טוקנים אמיתיים, מינימלי | ידני בלבד (`manual_test.yaml`) |
 | 3 — הריצה האמיתית | `gamesforum_pipeline.py` | מלא | שבועי, מתוזמן (`weekly-digest.yml`) |
 
@@ -127,5 +137,5 @@ chunk אודיו ברגע שהוא חוזר. ריצה חוזרת לאותו תא
 
 הרצה מקומית של הכל, בלי מפתח API אמיתי ובלי עלות:
 ```
-python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py && python test_checkpoint.py
+python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py && python test_checkpoint.py && python test_email_source.py
 ```

@@ -109,6 +109,18 @@ FIXTURE_CANDIDATES = [
      "source": "FixtureWire", "published": None, "summary": "5% core commission"},
     {"url": "https://example.test/mobile-iap-q3", "title": "Mobile IAP revenue hits new high in Q3",
      "source": "FixtureWire", "published": None, "summary": "$40bn quarterly IAP"},
+    # Stands in for an email-sourced candidate (sources.from_email(), kind =
+    # "email" in profile.toml): it already carries "text", exactly the shape
+    # that lets select()'s fetch stage skip fetch_article() entirely. That
+    # skip is the whole point of reading a blocked source's newsletter
+    # instead of its site -- re-fetching the URL would just hit the same
+    # block one stage later. fake_fetch_article below raises if this
+    # candidate's URL is ever passed to it, so a regression that starts
+    # re-fetching an already-fetched item fails loudly here instead of
+    # quietly 403ing in production.
+    {"url": "https://gamigion.substack.com/p/fixture-issue",
+     "title": "Deconstruction: a fixture issue", "source": "FixtureMail",
+     "published": None, "summary": FIXTURE_TEXT[:200], "text": FIXTURE_TEXT},
 ]
 
 def fake_collect(sources, max_age_days):
@@ -118,6 +130,11 @@ def fake_collect(sources, max_age_days):
     return list(FIXTURE_CANDIDATES), set(), counts
 
 def fake_fetch_article(url):
+    if url == "https://gamigion.substack.com/p/fixture-issue":
+        raise AssertionError(
+            "fetch_article() was called for a candidate that already had "
+            "text -- select()'s stage 3 should have skipped the re-fetch"
+        )
     cand = next(c for c in FIXTURE_CANDIDATES if c["url"] == url)
     return {"url": url, "title": cand["title"], "text": FIXTURE_TEXT}
 
@@ -161,6 +178,11 @@ if chosen:
     missing = [REQUIRED_KEYS - set(a) for a in chosen]
     check("every article select() returns has the keys generate_podcast_content() needs",
           all(not m for m in missing), f"missing: {missing}")
+
+email_survivor = next((a for a in chosen if a["url"].startswith("https://gamigion.substack.com")), None)
+check("the already-fetched (email) candidate survived stage 3 without a re-fetch",
+      email_survivor is not None and email_survivor["text"] == FIXTURE_TEXT,
+      f"got {email_survivor}")
 
 # ---------------------------------------------------------------- 4. select() -> generate_podcast_content()
 
