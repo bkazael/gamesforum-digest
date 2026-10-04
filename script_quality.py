@@ -146,6 +146,34 @@ def repair_script(script: list[dict]) -> tuple[list[dict], list[str]]:
     return out, notes
 
 
+def count_words(script: list[dict]) -> int:
+    return sum(len((t.get("text") or "").split()) for t in script)
+
+
+# Hype vocabulary the script prompt now bans, and the agreement words it
+# limits to two openers. Measured, not enforced: a retry costs a full
+# Gemini request against a small daily quota, so these are numbers in the
+# log to watch (09-28 measured 0.92 hype words per 100, vs 0.30 on 09-22,
+# and 8 of 29 turns opening with an agreement word).
+HYPE_STEMS = ("עצום", "מטורף", "מהפכ", "דרמט", "וואו", "מדהים", "מטאור", "game changer")
+AGREEMENT_OPENERS = ("בדיוק", "לגמרי", "בהחלט", "נכון", "אכן")
+
+
+def style_report(script: list[dict]) -> list[str]:
+    """A few lines of numbers describing how the script sounds."""
+    words = max(count_words(script), 1)
+    text = " ".join((t.get("text") or "") for t in script).lower()
+    hype = sum(text.count(s) for s in HYPE_STEMS)
+    openers = sum(1 for t in script
+                  if (t.get("text") or "").strip().startswith(AGREEMENT_OPENERS))
+    questions = sum(1 for t in script if (t.get("text") or "").rstrip().endswith("?"))
+    return [
+        f"{hype} hype words ({100 * hype / words:.2f} per 100 words; 09-22 was 0.30, 09-28 was 0.92)",
+        f"{openers} of {len(script)} turns open with an agreement word (limit: 2)",
+        f"{questions} question turns",
+    ]
+
+
 def close_remaining(script: list[dict]) -> tuple[list[dict], int]:
     """Last resort after retries: end any still-unterminated turn with a
     full stop so TTS closes the sentence instead of hanging on a fragment.

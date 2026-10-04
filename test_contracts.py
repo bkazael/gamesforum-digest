@@ -186,7 +186,7 @@ check("the already-fetched (email) candidate survived stage 3 without a re-fetch
 
 # ---------------------------------------------------------------- 4. select() -> generate_podcast_content()
 
-def fake_gemini_json_script(prompt, schema=None):
+def fake_gemini_json_script(prompt, schema=None, **kw):
     return {
         "episode_title": "Fixture Episode",
         "digest_summary": [
@@ -196,9 +196,15 @@ def fake_gemini_json_script(prompt, schema=None):
         # Properly terminated, like real healthy output: a turn that stopped
         # on a bare Hebrew letter is exactly what script_quality.py flags as
         # a cut-off fragment and spends a retry on (see section 4b).
+        #
+        # Long enough to clear generate_podcast_content()'s word floor too
+        # (1,250): 4 turns x 330 words. A short fixture would spend the
+        # one retry on "too short" and blur what each test below is about.
+        # Each turn stays well under the TTS chunk limit (3,800 chars).
         "script": [
-            {"speaker": P.SPEAKER_A, "text": ("פתיחה " * 40).strip() + "."},
-            {"speaker": P.SPEAKER_B, "text": ("תגובה " * 40).strip() + "."},
+            {"speaker": P.SPEAKER_A if i % 2 == 0 else P.SPEAKER_B,
+             "text": (("פתיחה " if i % 2 == 0 else "תגובה ") * 330).strip() + "."}
+            for i in range(4)
         ],
     }
 
@@ -235,13 +241,18 @@ def _scripted(responses):
     """gemini_json stand-in that returns each response in turn and records
     every prompt it was called with."""
     calls = []
-    def fn(prompt, schema=None):
+    def fn(prompt, schema=None, **kw):
         calls.append(prompt)
         return responses[min(len(calls), len(responses)) - 1]
     return fn, calls
 
-def _resp(script):
-    return {"episode_title": "T", "digest_summary": [], "script": script}
+# A body long enough to clear the word floor, so a test about a cut-off turn
+# isn't also (silently) a test about length.
+PAD = {"speaker": P.SPEAKER_A, "text": ("מילה " * 1300).strip() + "."}
+
+def _resp(script, pad=True):
+    return {"episode_title": "T", "digest_summary": [],
+            "script": script + ([PAD] if pad else [])}
 
 GOOD = {"speaker": P.SPEAKER_B, "text": "זה נתון חשוב."}
 
@@ -284,7 +295,7 @@ if chosen:
 
 if chosen:
     captured_prompt = {}
-    def capture_prompt(prompt, schema=None):
+    def capture_prompt(prompt, schema=None, **kw):
         captured_prompt["text"] = prompt
         return fake_gemini_json_script(prompt, schema)
     P.gemini_json = capture_prompt

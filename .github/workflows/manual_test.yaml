@@ -17,7 +17,11 @@ on:
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Was 5, when this was three calls. It is five now (score, prep, script,
+    # intro, TTS), and a single slow Gemini call can legitimately take a few
+    # minutes -- a smoke test that times out on a slow day just teaches
+    # people to ignore it.
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
