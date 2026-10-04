@@ -568,7 +568,7 @@ def write_intro(data: dict, prep: dict | None) -> tuple[list[dict], str]:
 
     if LANG == "he":
         lang_inst = ("Spoken Hebrew, as Israeli industry people talk. English terms "
-                     "(UA, CPI, LTV, IAP, ROAS) and all company and product names stay in English.")
+                     "(UA, CPI, LTV, IAP, ROAS, web shop, webstore) and all company and product names stay in English.")
     else:
         lang_inst = "Natural spoken English."
 
@@ -674,7 +674,7 @@ def add_intro(data: dict) -> dict:
 
 def generate_podcast_content(articles: list[dict], today_date: str, memory_context: str = "",
                               target_words: int | None = None, prep: dict | None = None) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
+    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP, web shop, webstore in English (never translate them literally)." if LANG == "he" else "Write in natural spoken English."
 
     # target_words exists only for live_smoke.py (Tier 2): production
     # (main(), below) never passes it, so this branch never runs for a real
