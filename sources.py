@@ -190,7 +190,7 @@ def from_email(source: dict) -> list[dict]:
     stop matching if a newsletter platform changes its sending address.
 
     Only UNSEEN messages are read (via BODY.PEEK[], which does not itself
-    mark a message seen), and a message is only flagged \Seen *after* it
+    mark a message seen), and a message is only flagged \\Seen *after* it
     parses successfully -- so a message that fails to parse is retried next
     run instead of being silently lost, the same resilience checkpoint.py
     gives the rest of the pipeline.

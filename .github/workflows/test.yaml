@@ -36,3 +36,11 @@ jobs:
           python test_contracts.py
           python test_source_health.py
           python test_checkpoint.py
+          # These two were missing from this list when they were written
+          # (test_email_source.py shipped a day earlier and only ever ran on
+          # a laptop). A test file that CI does not run is documentation, not
+          # a test -- test_ci_coverage.py below fails if this happens again.
+          python test_email_source.py
+          python test_script_quality.py
+          python test_generation.py
+          python test_ci_coverage.py

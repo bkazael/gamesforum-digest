@@ -186,16 +186,25 @@ check("the already-fetched (email) candidate survived stage 3 without a re-fetch
 
 # ---------------------------------------------------------------- 4. select() -> generate_podcast_content()
 
-def fake_gemini_json_script(prompt, schema=None):
+def fake_gemini_json_script(prompt, schema=None, **kw):
     return {
         "episode_title": "Fixture Episode",
         "digest_summary": [
             {"title": c["title"], "key_takeaway": c["summary"], "metrics_mentioned": []}
             for c in FIXTURE_CANDIDATES
         ],
+        # Properly terminated, like real healthy output: a turn that stopped
+        # on a bare Hebrew letter is exactly what script_quality.py flags as
+        # a cut-off fragment and spends a retry on (see section 4b).
+        #
+        # Long enough to clear generate_podcast_content()'s word floor too
+        # (1,250): 4 turns x 330 words. A short fixture would spend the
+        # one retry on "too short" and blur what each test below is about.
+        # Each turn stays well under the TTS chunk limit (3,800 chars).
         "script": [
-            {"speaker": P.SPEAKER_A, "text": "פתיחה " * 40},
-            {"speaker": P.SPEAKER_B, "text": "תגובה " * 40},
+            {"speaker": P.SPEAKER_A if i % 2 == 0 else P.SPEAKER_B,
+             "text": (("פתיחה " if i % 2 == 0 else "תגובה ") * 330).strip() + "."}
+            for i in range(4)
         ],
     }
 
@@ -220,11 +229,73 @@ if chosen:
         check("generate_podcast_content() + render_digest_md() run on select()'s output",
               False, f"{type(e).__name__}: {e}")
 
+# ---------------------------------------------------------------- 4b. a cut-off turn (Hebrew acronym quote bug)
+#
+# script_quality.py explains the bug: 13 turns across 6 of 11 real episodes
+# stop mid-word at ארה"ב / מנכ"ל. Three behaviours matter, and each costs
+# real money if wrong: a repairable cut must cost NO extra Gemini request, an
+# unrecognisable one must cost exactly ONE retry, and if the retry is also
+# broken the run must still produce a script instead of failing.
+
+def _scripted(responses):
+    """gemini_json stand-in that returns each response in turn and records
+    every prompt it was called with."""
+    calls = []
+    def fn(prompt, schema=None, **kw):
+        calls.append(prompt)
+        return responses[min(len(calls), len(responses)) - 1]
+    return fn, calls
+
+# A body long enough to clear the word floor, so a test about a cut-off turn
+# isn't also (silently) a test about length.
+PAD = {"speaker": P.SPEAKER_A, "text": ("מילה " * 1300).strip() + "."}
+
+def _resp(script, pad=True):
+    return {"episode_title": "T", "digest_summary": [],
+            "script": script + ([PAD] if pad else [])}
+
+GOOD = {"speaker": P.SPEAKER_B, "text": "זה נתון חשוב."}
+
+if chosen:
+    # (a) repairable: restored locally, one request.
+    fn, calls = _scripted([_resp([
+        {"speaker": P.SPEAKER_A, "text": "ההוצאות ירדו בארה"},
+        GOOD,
+    ])])
+    P.gemini_json = fn
+    d = P.generate_podcast_content(chosen, "2026-10-05-test")
+    check("a repairable cut-off acronym costs no retry", len(calls) == 1, f"{len(calls)} calls")
+    check("...and the acronym is restored in the output",
+          d["script"][0]["text"] == "ההוצאות ירדו בארה״ב.", d["script"][0]["text"])
+
+    # (b) unrecognisable on attempt 1, clean on attempt 2: exactly one retry,
+    # and the retry prompt says why.
+    fn, calls = _scripted([
+        _resp([{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות עם חברת פלונ"}, GOOD]),
+        _resp([{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות."}, GOOD]),
+    ])
+    P.gemini_json = fn
+    d = P.generate_podcast_content(chosen, "2026-10-05-test")
+    check("an unrecognised cut-off turn costs exactly one retry", len(calls) == 2, f"{len(calls)} calls")
+    check("the retry prompt names what was wrong", "REJECTED because" in calls[1])
+    check("the first attempt's prompt has no rejection note", "REJECTED because" not in calls[0])
+    check("the clean second attempt is what is returned",
+          d["script"][0]["text"] == "הם הכריזו על שותפות.")
+
+    # (c) broken both times: never a third request, never an exception.
+    broken = _resp([{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות עם חברת פלונ"}, GOOD])
+    fn, calls = _scripted([broken, broken])
+    P.gemini_json = fn
+    d = P.generate_podcast_content(chosen, "2026-10-05-test")
+    check("a script that stays broken is capped at two requests", len(calls) == 2, f"{len(calls)} calls")
+    check("...and still ships, with the fragment closed instead of left hanging",
+          d["script"][0]["text"].endswith("."), d["script"][0]["text"])
+
 # ---------------------------------------------------------------- 5. memory_context actually reaches the prompt
 
 if chosen:
     captured_prompt = {}
-    def capture_prompt(prompt, schema=None):
+    def capture_prompt(prompt, schema=None, **kw):
         captured_prompt["text"] = prompt
         return fake_gemini_json_script(prompt, schema)
     P.gemini_json = capture_prompt

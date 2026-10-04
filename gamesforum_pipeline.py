@@ -23,6 +23,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 import checkpoint
 import memory
+import script_quality
 
 # ---------------------------------------------------------------- config
 
@@ -160,9 +161,20 @@ def fetch_article(url: str) -> dict | None:
 
 # ---------------------------------------------------------------- Gemini Text API
 
-def gemini_json(prompt: str, schema: dict | None = None) -> dict:
+def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
+                timeout: int | None = None) -> dict:
+    """One schema-constrained Gemini call, retried on failure.
+
+    `tries` and `timeout` exist for the OPTIONAL stages (editorial prep, the
+    intro): at the default 6 x 300s a hung call can spend half an hour, which
+    is fine to say about a stage that must succeed but is exactly the trap
+    that burned the 2026-09-21 run on TTS. A stage whose failure just means
+    "fall back to the old behaviour" gets 2 short attempts, not a whole
+    run's budget.
+    """
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required.")
+    attempt_timeout = timeout or HTTP_TIMEOUT
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_TEXT_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
@@ -176,7 +188,7 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
     }
 
     body = json.dumps(payload).encode()
-    for attempt in range(6):
+    for attempt in range(tries):
         _check_deadline()
         req = urllib.request.Request(
             url, data=body,
@@ -184,7 +196,7 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
         )
         started = time.monotonic()
         try:
-            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+            with urllib.request.urlopen(req, timeout=attempt_timeout) as r:
                 data = json.loads(r.read())
             cand = (data.get("candidates") or [{}])[0]
             text = (cand.get("content") or {}).get("parts", [{}])[0].get("text", "")
@@ -192,13 +204,13 @@ def gemini_json(prompt: str, schema: dict | None = None) -> dict:
             return json.loads(text)
         except urllib.error.HTTPError as e:
             err_body = e.read().decode("utf-8", "replace")
-            log(f"    Gemini API attempt {attempt + 1}/6 failed: HTTP {e.code} - {err_body}")
-            if attempt == 5:
+            log(f"    Gemini API attempt {attempt + 1}/{tries} failed: HTTP {e.code} - {err_body}")
+            if attempt == tries - 1:
                 raise
             time.sleep(10 * (attempt + 1))
         except Exception as e:
-            log(f"    Gemini API attempt {attempt + 1}/6 failed: {e}")
-            if attempt == 5:
+            log(f"    Gemini API attempt {attempt + 1}/{tries} failed: {e}")
+            if attempt == tries - 1:
                 raise
             time.sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")
@@ -239,18 +251,461 @@ PODCAST_SCHEMA = {
     "required": ["episode_title", "digest_summary", "script"]
 }
 
+# ---------------------------------------------------------------- editorial prep, and the intro written last
+#
+# The episode used to be one call: read everything, write intro + stories +
+# outro in a single pass. Two things went wrong with that. The intro was
+# written before the model had decided what the episode contained, so it
+# could only be generic (every week opened "a fascinating week in the
+# industry"). And the "debate" was fake: the analyst raised open questions
+# that the anchor never answered, because nothing had worked out the answers
+# before the dialogue started. So the work is now ordered the way a producer
+# would do it:
+#
+#   1. prepare_episode(): read ALL the articles, pull the concrete points from
+#      each, judge how far each source can be trusted, then write the
+#      questions worth debating and answer them from the material (this
+#      week's articles, or earlier episodes) -- or say plainly that nothing
+#      answers them.
+#   2. generate_podcast_content(prep=...): the stories and outro, working from
+#      those notes. No greeting -- there is no intro yet.
+#   3. write_intro(): only now, with the finished episode in hand, the
+#      welcome, a moment of host banter, and a preview of what is actually in
+#      it.
+#
+# Both new stages degrade to the old behaviour instead of failing the run:
+# no prep -> the script is written from the articles alone; no intro -> a
+# plain welcome plus a one-line list of the stories.
+
+STANCES = ["NEUTRAL_REPORTING", "COMPANY_CLAIMS", "VENDOR_MARKETING"]
+
+PREP_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "articles": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "id": {"type": "INTEGER",
+                           "description": "The article's number, as in 'ARTICLE 3'."},
+                    "stance": {"type": "STRING", "enum": STANCES},
+                    "key_points": {"type": "ARRAY", "items": {"type": "STRING"}},
+                    "caution": {"type": "STRING"},
+                    "takeaway": {"type": "STRING"},
+                },
+                "required": ["id", "stance", "key_points", "caution", "takeaway"],
+            },
+        },
+        "questions": {
+            "type": "ARRAY",
+            "items": {
+                "type": "OBJECT",
+                "properties": {
+                    "question": {"type": "STRING"},
+                    "about": {"type": "ARRAY", "items": {"type": "INTEGER"}},
+                    "answer_basis": {"type": "STRING",
+                                     "enum": ["ARTICLE", "PREVIOUS_EPISODE", "OPEN"]},
+                    "answer": {"type": "STRING"},
+                },
+                "required": ["question", "about", "answer_basis", "answer"],
+            },
+        },
+        "through_line": {"type": "STRING"},
+    },
+    "required": ["articles", "questions", "through_line"],
+}
+
+INTRO_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "turns": {
+            "type": "ARRAY",
+            "items": PODCAST_SCHEMA["properties"]["script"]["items"],
+        },
+    },
+    "required": ["turns"],
+}
+
+MAX_QUESTIONS = 6
+MAX_OPEN_QUESTIONS = 2
+
+# Stories + outro only; the intro adds ~200 words on top, which keeps the
+# finished episode in the show's long-standing 1,500-1,900 range.
+SCRIPT_TARGET_WORDS = (1400, 1800)
+SCRIPT_FLOOR_WORDS = 1250
+
+
+def _clean_prep(prep: dict, n_articles: int) -> dict:
+    """Make a model response safe to build prompts from.
+
+    Everything here is defensive: the schema guarantees the shape, not that
+    the model numbered articles sensibly or kept its promise to leave an
+    unanswerable question OPEN. A prep that is wrong in a small way should
+    be repaired or trimmed, not trusted and not thrown away whole.
+    """
+    articles, seen = [], set()
+    for a in prep.get("articles", []) or []:
+        try:
+            aid = int(a.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if not 1 <= aid <= n_articles or aid in seen:
+            continue
+        seen.add(aid)
+        points = [str(p).strip() for p in (a.get("key_points") or []) if str(p).strip()]
+        articles.append({
+            "id": aid,
+            "stance": a.get("stance") if a.get("stance") in STANCES else "NEUTRAL_REPORTING",
+            "key_points": points[:6],
+            "caution": str(a.get("caution") or "").strip(),
+            "takeaway": str(a.get("takeaway") or "").strip(),
+        })
+    articles.sort(key=lambda a: a["id"])
+
+    questions, opens = [], 0
+    for q in prep.get("questions", []) or []:
+        text = str(q.get("question") or "").strip()
+        if not text:
+            continue
+        basis = q.get("answer_basis")
+        answer = str(q.get("answer") or "").strip()
+        # An "answer" with no text is no answer; and a question can only be
+        # called answered if it says where the answer came from.
+        if basis not in ("ARTICLE", "PREVIOUS_EPISODE") or not answer:
+            basis, answer = "OPEN", ""
+        if basis == "OPEN":
+            if opens >= MAX_OPEN_QUESTIONS:
+                continue
+            opens += 1
+        about = [i for i in (q.get("about") or []) if isinstance(i, int) and 1 <= i <= n_articles]
+        questions.append({"question": text, "about": about,
+                          "answer_basis": basis, "answer": answer})
+        if len(questions) >= MAX_QUESTIONS:
+            break
+    return {"articles": articles, "questions": questions,
+            "through_line": str(prep.get("through_line") or "").strip()}
+
+
+def prepare_episode(articles: list[dict], memory_context: str = "") -> dict | None:
+    """Editorial prep: points per article, source stance, and answered
+    questions. Returns None on any failure -- the caller then writes the
+    script from the articles alone, exactly as before this stage existed.
+    """
+    corpus = "\n\n".join(
+        f"ARTICLE {i + 1}: {a['title']}\nSOURCE: {a.get('source', '')}\n\n{a['text']}"
+        for i, a in enumerate(articles)
+    )
+    history = ""
+    if memory_context:
+        history = (
+            "\nPREVIOUS EPISODES (an answer may come from here, with basis "
+            "PREVIOUS_EPISODE; it must not name a company or vendor that none "
+            "of today's articles is about):\n" + memory_context + "\n"
+        )
+    prompt = f"""You are the producer preparing one episode of a two-host
+podcast for a mobile-games company owner whose portfolio is casual/puzzle,
+hybrid-casual, and real-money skill games. The hosts have not written
+anything yet. Read ALL the articles below, then produce the notes they will
+work from. Write the notes in English.
+
+FOR EACH ARTICLE
+- stance: NEUTRAL_REPORTING (a publication reporting facts or data);
+  COMPANY_CLAIMS (a company's own announcement, or an executive's byline:
+  claims without independent evidence); VENDOR_MARKETING (a vendor promoting
+  its own product, even when it cites real numbers).
+- key_points: 2-5 specific, checkable points. Figures WITH what they compare
+  to (period, base, whose data); named parties; and status/timeline (a
+  proposal or a ruling? in force from when?). Use only what the article text
+  says. No generalities.
+- caution: what the article does NOT show, or what must not be overstated
+  (a vendor's own data, a small sample, a proposal not a law, totals that
+  differ from another source). Empty only if there is truly nothing.
+- takeaway: the one concrete thing an operator in these genres should check,
+  test or watch because of this article. Specific -- never "stay informed".
+
+THEN {MAX_QUESTIONS} QUESTIONS AT MOST (3-6 is right): what a sharp operator
+would ask that connects stories or probes a weak point. Answer each ONLY from
+the articles below or from PREVIOUS EPISODES, and set answer_basis to say
+which. If the material does not answer it, answer_basis is OPEN and answer is
+"" -- never invent an answer. At most {MAX_OPEN_QUESTIONS} OPEN questions;
+prefer ones the material can answer. If two articles give different figures
+for the same thing, that is itself a question.
+
+through_line: one sentence naming a theme that genuinely ties several of the
+stories together, or "" if there is none. Do not force one.
+{history}
+ARTICLES:
+{corpus}
+"""
+    log("editorial prep: points, source stance, and answered questions...")
+    try:
+        raw = gemini_json(prompt, PREP_SCHEMA, tries=2, timeout=240)
+        prep = _clean_prep(raw, len(articles))
+    except Exception as e:                                  # noqa: BLE001
+        log(f"  editorial prep failed ({type(e).__name__}: {e}); "
+            "the script will be written from the articles alone")
+        return None
+    if not prep["articles"]:
+        log("  editorial prep came back with no usable articles; ignoring it")
+        return None
+    answered = sum(1 for q in prep["questions"] if q["answer_basis"] != "OPEN")
+    log(f"  prep: {len(prep['articles'])} articles, {len(prep['questions'])} questions "
+        f"({answered} answered from the material, "
+        f"{len(prep['questions']) - answered} open)")
+    return prep
+
+
+def _format_prep(prep: dict, articles: list[dict]) -> str:
+    """The prep as a briefing block inside the script prompt."""
+    lines = []
+    by_id = {a["id"]: a for a in prep["articles"]}
+    for i, art in enumerate(articles, 1):
+        a = by_id.get(i)
+        if not a:
+            continue
+        lines.append(f"ARTICLE {i} -- {art['title'][:80]}  [stance: {a['stance']}]")
+        for p in a["key_points"]:
+            lines.append(f"  - {p}")
+        if a["caution"]:
+            lines.append(f"  careful: {a['caution']}")
+        if a["takeaway"]:
+            lines.append(f"  takeaway: {a['takeaway']}")
+    if prep["questions"]:
+        lines.append("\nQUESTIONS TO DEBATE")
+        for n, q in enumerate(prep["questions"], 1):
+            arts = ",".join(str(i) for i in q["about"]) or "-"
+            lines.append(f"Q{n} (articles {arts}): {q['question']}")
+            if q["answer_basis"] == "OPEN":
+                lines.append("   no answer in the material -- OPEN")
+            else:
+                lines.append(f"   answer [{q['answer_basis']}]: {q['answer']}")
+    if prep["through_line"]:
+        lines.append(f"\nTHROUGH-LINE: {prep['through_line']}")
+    return "\n".join(lines)
+
+
+def welcome_turn() -> dict:
+    """The one fixed line of the show. Written in code, not asked of the
+    model, because it is the brand and must be identical every week."""
+    if LANG == "he":
+        return {"speaker": SPEAKER_A,
+                "text": "ברוכים הבאים ל-Ben's Weekly Digest. אני דנה, ואיתי יוני."}
+    return {"speaker": SPEAKER_A,
+            "text": "Welcome to Ben's Weekly Digest. I'm Dana, and with me is Yoni."}
+
+
+INTRO_MIN_TURNS, INTRO_MAX_TURNS = 3, 12
+INTRO_MIN_WORDS, INTRO_MAX_WORDS = 60, 320
+STYLE = "style: "
+
+
+def intro_problems(turns: list[dict]) -> list[str]:
+    problems = []
+    if not INTRO_MIN_TURNS <= len(turns) <= INTRO_MAX_TURNS:
+        problems.append(f"{len(turns)} turns (want {INTRO_MIN_TURNS}-{INTRO_MAX_TURNS})")
+    if turns and turns[0].get("speaker") != SPEAKER_B:
+        problems.append(f"first turn must be {SPEAKER_B}'s reply to the welcome, "
+                        f"not {turns[0].get('speaker')}'s")
+    words = sum(len((t.get("text") or "").split()) for t in turns)
+    if not INTRO_MIN_WORDS <= words <= INTRO_MAX_WORDS:
+        problems.append(f"{words} words (want {INTRO_MIN_WORDS}-{INTRO_MAX_WORDS})")
+    if any("ברוכים הבאים" in (t.get("text") or "") or "welcome to" in (t.get("text") or "").lower()
+           for t in turns):
+        problems.append("it repeats the welcome line")
+    problems += script_quality.script_problems(turns)
+
+    # Style rules. Prefixed STYLE so write_intro() can tell them apart from
+    # structural faults: a structural fault means the intro is unusable, a
+    # style fault earns one retry but is accepted if it persists -- a
+    # slightly hyped intro still beats the plain fallback. The first live
+    # run (2026-10-04) produced exactly these, despite the prompt asking
+    # otherwise: a generic "a week where..." opener with the word מטורפים,
+    # two turns opening with an agreement word, and three Dana turns in a row.
+    text = " ".join((t.get("text") or "") for t in turns).lower()
+    hype = [s for s in script_quality.HYPE_STEMS if s in text]
+    if hype:
+        problems.append(f"{STYLE}hype wording ({', '.join(hype)})")
+    agree = sum(1 for t in turns
+                if (t.get("text") or "").strip().startswith(script_quality.AGREEMENT_OPENERS))
+    if agree:
+        problems.append(f"{STYLE}{agree} turn(s) open with an agreement word")
+    if turns and turns[0].get("speaker") == SPEAKER_B:
+        first = (turns[0].get("text") or "")
+        if "שבוע" in first or "week" in first.lower():
+            problems.append(f"{STYLE}the first reply is about the week itself, "
+                            "not about one specific thing from the episode")
+    run = 1
+    for prev, cur in zip(turns, turns[1:]):
+        run = run + 1 if cur.get("speaker") == prev.get("speaker") else 1
+        if run > 2:
+            problems.append(f"{STYLE}{cur.get('speaker')} has more than two turns in a row")
+            break
+    return problems
+
+
+def write_intro(data: dict, prep: dict | None) -> tuple[list[dict], str]:
+    """The intro: the welcome, a beat of host banter, and a preview of the
+    episode that was actually written. Returns (turns, source) where source
+    is "model" or "fallback". Never raises -- an intro is not worth a run.
+    """
+    welcome = welcome_turn()
+    stories = "\n".join(
+        f"{n}. {s.get('title', '')} -- {s.get('key_takeaway', '')}"
+        for n, s in enumerate(data.get("digest_summary", []), 1)
+    )
+    facts = ""
+    questions = ""
+    if prep:
+        pts = [p for a in prep["articles"][:3] for p in a["key_points"][:2]]
+        facts = "\n".join(f"- {p}" for p in pts)
+        questions = "\n".join(
+            f"- {q['question']}" + ("" if q["answer_basis"] != "OPEN" else "  (left open)")
+            for q in prep["questions"]
+        )
+        if prep["through_line"]:
+            facts += f"\n- Through-line: {prep['through_line']}"
+
+    if LANG == "he":
+        lang_inst = ("Spoken Hebrew, as Israeli industry people talk. English terms "
+                     "(UA, CPI, LTV, IAP, ROAS, web shop, webstore) and all company and product names stay in English.")
+    else:
+        lang_inst = "Natural spoken English."
+
+    prompt = f"""You write the INTRO of a weekly mobile-games podcast, AFTER the
+rest of the episode already exists, so that it can preview what is really in it.
+
+HOSTS: {SPEAKER_A} (the anchor) and {SPEAKER_B} (the analyst). {SPEAKER_A} has
+just said the welcome line: "{welcome['text']}"
+
+EPISODE TITLE: {data.get('episode_title', '')}
+
+WHAT THE EPISODE CONTAINS, in running order:
+{stories}
+
+THE MOST STRIKING FACTS (from the editorial notes):
+{facts or '(none)'}
+
+QUESTIONS THE EPISODE TAKES ON:
+{questions or '(none)'}
+
+Write the turns that come right after the welcome line:
+1. {SPEAKER_B} replies in one short, natural line that reacts to ONE specific
+   thing from the facts above -- a figure, a ruling, a reversal. It is NOT
+   about the week as a whole: no "what a week", no "a week in which...", no
+   "שבוע ..." -- a sentence that could open any episode is the wrong sentence.
+2. A quick bit of easy banter, 2-3 short turns in all, between people who
+   work together and like it: a tease, a small reaction, a half-joke about
+   the work itself. Avoid stock lines like "only you could make sense of this
+   mess". Do NOT invent personal anecdotes presented as fact, and no weather
+   or holiday small talk.
+3. {SPEAKER_A} then previews the episode as a TEASER, not a table of
+   contents: lead with the single most interesting thing, name 3-4 stories in
+   the order they will be told, include at least one concrete number from the
+   facts above, and pose ONE of the questions -- one the episode actually
+   answers, never one marked "left open" -- without giving its answer away.
+   Split the teaser across two turns with a short interjection from
+   {SPEAKER_B} if it runs long.
+4. The last turn hands over to the first story with one short line that
+   names it.
+
+Tone: calm, like colleagues, not radio hosts. No hype words (avoid עצום,
+מטורף, מהפכה, דרמטי, וואו, מדהים, "game changer") and no exclamations. No turn
+opens with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן). Nobody speaks
+more than two turns in a row.
+
+Total length: {INTRO_MIN_WORDS + 70}-{INTRO_MAX_WORDS - 90} words across all
+turns. {lang_inst}
+Never use the ASCII double-quote character (") in the text: write Hebrew
+acronyms with the gershayim ״ (ארה״ב, מנכ״ל) or spell them out. Every turn
+ends with full punctuation. Do not repeat the welcome and do not introduce the
+hosts again.
+"""
+    attempt_prompt = prompt
+    turns: list[dict] = []
+    for attempt in (1, 2):
+        try:
+            raw = gemini_json(attempt_prompt, INTRO_SCHEMA, tries=2, timeout=150)
+        except Exception as e:                              # noqa: BLE001
+            log(f"  intro attempt {attempt} failed ({type(e).__name__}: {e})")
+            break
+        turns, repairs = script_quality.repair_script(raw.get("turns", []))
+        for note in repairs:
+            log(f"  intro repair: {note}")
+        problems = intro_problems(turns)
+        if not problems:
+            log(f"  intro: {len(turns)} turns written after the episode")
+            return [welcome] + turns, "model"
+        for p in problems:
+            log(f"  intro problem (attempt {attempt}): {p}")
+        # On the last attempt, style faults alone are not worth throwing the
+        # whole intro away for: a slightly hyped, real intro is better for the
+        # listener than the plain fallback.
+        if attempt == 2 and turns and all(p.startswith(STYLE) for p in problems):
+            log("  intro: accepting it despite style faults (the fallback would be worse)")
+            return [welcome] + turns, "model"
+        attempt_prompt = prompt + (
+            "\n\nA PREVIOUS ATTEMPT WAS REJECTED because: " + "; ".join(problems[:3])
+            + ". Write it again so it satisfies every rule above."
+        )
+
+    # Fallback: the old shape, minimally -- a welcome and a one-line preview.
+    titles = [s.get("title", "") for s in data.get("digest_summary", [])[:3] if s.get("title")]
+    if titles:
+        if LANG == "he":
+            preview = "בפרק הזה: " + ", ".join(titles) + ". נתחיל."
+        else:
+            preview = "In this episode: " + ", ".join(titles) + ". Let's start."
+        log("  intro: using the plain fallback (welcome + story list)")
+        return [welcome, {"speaker": SPEAKER_A, "text": preview}], "fallback"
+    log("  intro: using the welcome line alone")
+    return [welcome], "fallback"
+
+
+def add_intro(data: dict) -> dict:
+    """Prepend the intro to the finished script. Marks the data so a resumed
+    run never adds a second one."""
+    intro, source = write_intro(data, data.get("prep"))
+    data["script"] = intro + data["script"]
+    data["intro_done"] = True
+    data["intro_source"] = source
+    return data
+
+
 def generate_podcast_content(articles: list[dict], today_date: str, memory_context: str = "",
-                              target_words: int | None = None) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP in English." if LANG == "he" else "Write in natural spoken English."
-    corpus = "\n\n".join(f"ARTICLE {i+1}: {a['title']}\nURL: {a['url']}\n\n{a['text']}" for i, a in enumerate(articles))
+                              target_words: int | None = None, prep: dict | None = None) -> dict:
+    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP, web shop, webstore in English (never translate them literally)." if LANG == "he" else "Write in natural spoken English."
 
     # target_words exists only for live_smoke.py (Tier 2): production
     # (main(), below) never passes it, so this branch never runs for a real
     # episode and the show's target length is untouched.
     if target_words:
         length_inst = f"Target Script Length: about {target_words} words. This is a short smoke-test run -- keep it brief."
+        budget_words = target_words
     else:
-        length_inst = "Target Script Length: 1,500 to 1,900 words. Keep it detailed, engaging, and professional."
+        # Stories + outro only: the intro is written separately afterwards
+        # and adds roughly 200 words, so the finished episode still lands in
+        # the old 1,500-1,900 range. SCRIPT_FLOOR_WORDS is where a short
+        # script earns a retry (2026-09-28 came out at 1,301 words total).
+        length_inst = (f"Target Script Length: {SCRIPT_TARGET_WORDS[0]:,} to "
+                       f"{SCRIPT_TARGET_WORDS[1]:,} words for the stories and outro "
+                       "(the intro is recorded separately). Keep it detailed, "
+                       "engaging, and professional.")
+        budget_words = sum(SCRIPT_TARGET_WORDS) // 2
+
+    # Airtime was computed by discovery.assign_airtime() and printed in the
+    # ledger ("40% זמן אוויר") but never reached this prompt -- which said
+    # "3-5 turns PER ARTICLE" for all of them alike, so the lead story and a
+    # one-line item got the same weight. Each article now carries its share.
+    def _header(i: int, a: dict) -> str:
+        share = a.get("_airtime")
+        note = ""
+        if share:
+            note = f"  [airtime: ~{int(share * 100)}% of the episode, about {int(share * budget_words)} words]"
+        return f"ARTICLE {i + 1}: {a['title']}{note}"
+
+    corpus = "\n\n".join(f"{_header(i, a)}\nURL: {a['url']}\n\n{a['text']}"
+                         for i, a in enumerate(articles))
 
     # Continuity is opt-in in the prompt itself: the section only exists when
     # there is real history to draw on, and the instruction is explicit about
@@ -277,49 +732,126 @@ only when genuinely relevant to today's stories; never force a callback):
 Do not name a specific company, product, or vendor from the block above
 unless a SOURCE ARTICLE below is actually about that company this week. It
 is fine to say "the D2C trend we've been tracking keeps accelerating"; it
-is not fine to say "Xsolla" or "ZBD" again this week just because they came
-up before.
+is not fine to name a vendor again this week just because it came up before.
+"""
+
+    prep_block = ""
+    prep_rules = ""
+    if prep:
+        prep_block = (
+            "\nEDITORIAL PREP -- your briefing notes, worked out BEFORE the "
+            "dialogue is written. Every number and fact in it comes from the "
+            "articles below:\n" + _format_prep(prep, articles) + "\n"
+        )
+        prep_rules = """   - Work from the EDITORIAL PREP above: use its points, in your own words.
+   - A source marked COMPANY_CLAIMS or VENDOR_MARKETING is ATTRIBUTED, never
+     endorsed ("according to the company", "by their own numbers"). Do not
+     present its claim as established fact, and never repeat a company's
+     slogan as if it were an insight. Its airtime follows the evidence, not
+     the enthusiasm.
+   - Raise every QUESTION TO DEBATE where its stories come up. An answered
+     question is answered on air from the supplied answer, in your words. An
+     OPEN question is said plainly to be open ("we don't know yet", "one to
+     watch") -- never answered with something invented.
+   - Respect each "careful" note: do not overstate what it warns about.
 """
 
     prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast.
 
 Your goal is an in-depth, highly structured episode covering key developments.
-{memory_block}
+{memory_block}{prep_block}
 STRUCTURE OF THE SHOW:
-1. FORMAL INTRO & GREETING:
-   - Start smoothly as background music fades out.
-   - {SPEAKER_A} opens warmly: "ברוכים הבאים ל-Ben's Weekly Digest. אני דנה, ואיתי יוני."
-   - {SPEAKER_B} responds with a SPECIFIC, one-sentence reaction to whatever
-     is genuinely the most surprising or consequential thing in THIS week's
-     source articles -- a number, a reversal, a fight, something that
-     actually happened. Never a generic mood-setting line about the week
-     itself ("שבוע מרתק/דרמטי/עמוס בתעשייה" or any equivalent in English) --
-     if every week could open with the same sentence, it is the wrong
-     sentence. If nothing this week is genuinely striking, skip the
-     reaction and go straight to outlining the topics.
-   - {SPEAKER_A} outlines the main topics briefly.
-2. DEEP DIVE SEGMENTS (Spend 3-5 dialogue turns PER ARTICLE):
-   - Break down metrics, deals, and strategic implications.
-   - Debate mechanics and UA/LTV impact.
-3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
+1. NO INTRO. The welcome, a moment of host banter and a preview of the
+   episode are recorded separately, AFTER this script is finished, so that
+   they can preview what is actually said. Do not greet, do not introduce the
+   show or the hosts, do not outline the topics. {SPEAKER_A}'s first turn
+   opens the first story directly, in one natural sentence a listener who has
+   just heard the preview can follow.
+2. DEEP DIVE SEGMENTS, in the order of the articles, each given the airtime
+   marked on it (the lead story gets the longest treatment; the last may get
+   only a few sentences):
+   - Say what happened and give the numbers WITH what they compare to.
+   - Then a real exchange. One host raises a doubt or a question and the OTHER
+     ANSWERS it with specifics in the next turn -- a question is never left
+     hanging. When the hosts agree, the second must add something the first
+     did not say. Where the evidence supports it, they disagree or point out
+     a caveat.
+   - Close each story with one concrete takeaway an operator in casual,
+     puzzle, hybrid-casual or real-money skill games could check, test or
+     watch.
+{prep_rules}3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
 4. EPISODE METADATA: Generate a highly engaging, catchy episode title based on the stories covered.
 
 CHARACTER DYNAMICS:
-- {SPEAKER_A} (Dana - Female Anchor): Leads strategy, numbers, and overarching market trends.
+- {SPEAKER_A} (Dana - Female Anchor): Leads strategy, numbers, and overarching market trends, and answers {SPEAKER_B}'s questions with specifics.
 - {SPEAKER_B} (Yoni - Male Analyst): Analytical, questions assumptions, probes UA/LTV realities.
 
 SPEECH NATURALISM:
 - {lang_inst}
 - {length_inst}
+- Calm and precise, like two colleagues -- not radio hosts. No stacked
+  intensifiers or hype: avoid words like עצום, מטורף, מהפכה, מהפכני, דרמטי,
+  וואו, מדהים, "game changer" and their English equivalents; at most one
+  strong adjective per story, and only when the number justifies it. No
+  exclamations of surprise.
+- Do not begin more than two turns in the whole episode with an agreement
+  word (בדיוק, לגמרי, בהחלט, נכון, אכן). Respond to what was just said by
+  adding to it or questioning it.
+- Never read a URL aloud; attribute by outlet name.
+- Never use the ASCII double-quote character (") anywhere in the spoken text.
+  Write Hebrew acronyms with the Hebrew gershayim ״ (ארה״ב, מנכ״ל, צה״ל,
+  בע״מ) or spell them out, and quote a phrase with single quotes ' or leave
+  it unquoted. Every turn must end with complete punctuation (. ? ! …).
 
 SOURCE ARTICLES:
 {corpus}
 """
     log("generating podcast content via Gemini text call...")
-    data = gemini_json(prompt, PODCAST_SCHEMA)
+    # Up to two attempts. script_quality.py explains the bug this guards
+    # against (a Hebrew acronym's ASCII quote ending the JSON string and
+    # taking the rest of the sentence with it). Deterministic repair runs
+    # first and usually fully fixes it for free; a retry is only spent when
+    # something is still malformed afterwards, and only once, because every
+    # attempt is a full-script Gemini request against a small daily quota.
+    # A script under the word floor counts as a problem too (2026-09-28 came
+    # out at 1,301 words against a 1,500-1,900 target), but shares the same
+    # single retry rather than adding a second one.
+    attempt_prompt = prompt
+    for attempt in (1, 2):
+        data = gemini_json(attempt_prompt, PODCAST_SCHEMA, tries=4)
+        data["script"], repairs = script_quality.repair_script(data.get("script", []))
+        for note in repairs:
+            log(f"  script repair: {note}")
+        problems = script_quality.script_problems(data["script"])
+        words = script_quality.count_words(data["script"])
+        short = (not target_words) and words < SCRIPT_FLOOR_WORDS
+        if short:
+            problems.append(
+                f"the script is only {words} words; the target is "
+                f"{SCRIPT_TARGET_WORDS[0]:,}-{SCRIPT_TARGET_WORDS[1]:,}"
+            )
+        if not problems:
+            break
+        for p in problems:
+            log(f"  script problem (attempt {attempt}): {p}")
+        if attempt == 1:
+            attempt_prompt = prompt + (
+                "\n\nA PREVIOUS ATTEMPT AT THIS SCRIPT WAS REJECTED because: "
+                + "; ".join(problems[:3])
+                + ". Regenerate the whole script with every turn ending in "
+                "complete punctuation and no ASCII double quotes anywhere."
+                + (" Go deeper on the highest-airtime stories -- more specifics, "
+                   "and every question answered in full; do not pad." if short else "")
+            )
+    else:
+        data["script"], closed = script_quality.close_remaining(data["script"])
+        log(f"  script still had problems after a retry; closed {closed} "
+            "turn(s) with a full stop rather than ship a cut-off fragment")
 
-    total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
+    total_words = script_quality.count_words(data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
+    for line in script_quality.style_report(data.get("script", [])):
+        log(f"  style: {line}")
 
     if total_words < 600:
         log(f"Warning: Script is short ({total_words} words), but proceeding.")
@@ -558,6 +1090,19 @@ def render_digest_md(data: dict, articles: list[dict], today: str, episode_title
         if item.get("metrics_mentioned"):
             md.append("**Metrics:** " + ", ".join(item["metrics_mentioned"]))
         md.append("")
+    # The editorial prep's questions, so the show's reasoning is visible in
+    # the repo next to the episode it produced: what was asked, whether the
+    # material answered it, and which questions were honestly left open.
+    prep = data.get("prep")
+    if prep and prep.get("questions"):
+        md.append("## Discussion questions (editorial prep)")
+        for q in prep["questions"]:
+            md.append(f"- **{q['question']}**")
+            if q["answer_basis"] == "OPEN":
+                md.append("  - _Open: nothing in the material answers this._")
+            else:
+                md.append(f"  - [{q['answer_basis']}] {q['answer']}")
+        md.append("")
     md.append("## Sources")
     for a in articles:
         md.append(f"- [{a['title']}]({a['url']}) ({a.get('source', '')})")
@@ -697,9 +1242,24 @@ def main() -> int:
         # directly (no LLM call), so this costs nothing and cannot itself
         # fail the run -- see memory.py for why.
         memory_context = memory.load_recent_context()
-        data = generate_podcast_content(articles, today, memory_context)
-        # Checkpoint the moment the last text call is paid for, so a
-        # failure anywhere below (TTS, ffmpeg, feed) never buys it twice.
+        # Editorial prep first (None on any failure: the script is then
+        # written from the articles alone, as it was before this stage).
+        prep = prepare_episode(articles, memory_context)
+        data = generate_podcast_content(articles, today, memory_context, prep=prep)
+        data["prep"] = prep
+        # Explicitly False, so a resumed run knows the intro is still owed
+        # (see below) and a legacy checkpoint without the key is never given
+        # a second greeting.
+        data["intro_done"] = False
+        # Checkpoint the moment the script is paid for -- the intro below is
+        # a separate call, and a hard kill between the two must not cost the
+        # script.
+        checkpoint.save_content(today, articles, data)
+
+    # The intro is written LAST, once the episode it previews exists. Never
+    # raises (it falls back to a plain welcome), so this cannot fail a run.
+    if data.get("intro_done") is False:
+        data = add_intro(data)
         checkpoint.save_content(today, articles, data)
 
     episode_title = data.get("episode_title", "Weekly Gaming Digest")

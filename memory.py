@@ -30,10 +30,15 @@ MEMORY_FILE = ROOT / "memory.json"
 PROFILE_FILE = ROOT / "profile.toml"
 
 DEFAULT_LOOKBACK = 3
+# Scoring looks further back than the script does: the script only needs
+# recent storylines for continuity, but "have we already told the listener
+# this?" has to cover about a month. 09-28 re-covered August's market data
+# 13 days after 09-15 did -- two episodes back, with different totals.
+DEFAULT_SCORING_LOOKBACK = 4
 
 
-def _lookback_episodes() -> int:
-    """[memory].lookback_episodes from profile.toml, defaulting to 3.
+def _lookback_episodes(key: str = "lookback_episodes", default: int = DEFAULT_LOOKBACK) -> int:
+    """[memory].<key> from profile.toml, falling back to `default`.
 
     Reads the file directly rather than taking a parameter, so the caller in
     gamesforum_pipeline.py doesn't need to know this config exists -- the
@@ -44,12 +49,12 @@ def _lookback_episodes() -> int:
             import tomllib
             with PROFILE_FILE.open("rb") as f:
                 cfg = tomllib.load(f).get("memory", {})
-                n = cfg.get("lookback_episodes")
+                n = cfg.get(key)
                 if isinstance(n, int) and n > 0:
                     return n
         except Exception:
             pass
-    return DEFAULT_LOOKBACK
+    return default
 
 
 def _load_all() -> list[dict]:
@@ -84,6 +89,30 @@ def load_recent_context(limit: int | None = None) -> str:
         for ep in recent
     ]
     return "\n".join(lines)
+
+
+def load_recent_topics(limit: int | None = None) -> list[str]:
+    """One "date: topic" line per story from the last N episodes, for the
+    SCORING prompt (discovery.py), so a story the listener already heard can
+    be recognised as a repeat before it earns a slot.
+
+    Titles only, not the takeaways load_recent_context() carries into the
+    script prompt: scoring needs to match an article against "what was
+    covered", and a title is enough for that at a fraction of the tokens --
+    which matters because this rides along on every scoring batch.
+    Returns [] when there is no history, and the caller then adds nothing.
+    """
+    episodes = _load_all()
+    if not episodes:
+        return []
+    n = limit if limit is not None else _lookback_episodes(
+        "scoring_lookback_episodes", DEFAULT_SCORING_LOOKBACK)
+    lines = []
+    for ep in episodes[-n:]:
+        for topic in ep.get("topics_covered", []):
+            if topic:
+                lines.append(f"{ep.get('date', '?')}: {topic}")
+    return lines
 
 
 def build_entry(episode_title: str, digest_summary: list[dict],

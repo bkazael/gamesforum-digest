@@ -48,6 +48,17 @@ roundup_patterns = [
   "weekly roundup", "this week's biggest stories", "week in views",
 ]
 roundup_boost = 1.6
+# Gamesforum also publishes members' press releases as news ("Tyrads & Nordeus
+# Announce Exclusive Partnership to Drive Player-First Engagement" took 3
+# turns of the 2026-09-28 episode with not one result in it). These patterns
+# catch only the most formulaic headline shapes, and only on this source, so a
+# real partnership story from a trade outlet is never touched by them. The
+# listing gives no title, so the matcher sees the URL slug (hyphens read as
+# spaces). Everything subtler is left to the scoring rubric.
+block = [
+  "announce[sd]? .*partnership", "exclusive partnership",
+  "strategic partnership", "partners? with .* to (drive|boost|enhance|deliver|power|unlock)",
+]
 
 [[sources]]
 name = "PocketGamer.biz"
@@ -183,12 +194,34 @@ max_age_days = 7        # שבועי, קבוע. הניסיון החד-פעמי �
 # "SKIPPED" מופיע ב-ledger.
 max_candidates_to_fetch = 150
 
+# תקרות המקור (max_per_episode) הן "רכות", בשני צעדים תחומים. ב-28.9 היה
+# מקום ל-8 כתבות ונבחרו 7, ובכל זאת נזרקו כתבות בציון 9 (Newzoo עם נתוני
+# CPI והורדות, ChillBase, Jest) בגלל תקרות, בזמן ש-PR והודעת סיכום בציון 7
+# נשארו. תקרה נועדה למנוע ממקור פורה להשתלט, לא להעדיף 7 על פני 9.
+#   cap_overflow            כמה כתבות מעבר לתקרה מותר למקור אחד (0 = תקרה קשיחה)
+#   cap_overflow_min_score  ציון מינימלי כדי לנצל מקום פנוי מעבר לתקרה
+#   swap_margin             בכמה נקודות כתבה "חתוכה" צריכה לנצח את החלשה
+#                           שנבחרה כדי להחליף אותה
+#   max_swaps               מקסימום החלפות כאלה בפרק (אף פעם לא מוציאים את
+#                           הנציג היחיד של מקור)
+cap_overflow = 1
+cap_overflow_min_score = 8.0
+swap_margin = 2.0
+max_swaps = 2
+
 # ---------------------------------------------------------------- זיכרון
 
 [memory]
 # כמה פרקים אחרונים נכנסים כהקשר לתסריט של הפרק הבא (ראה memory.py).
 # מספר גדול יותר = יותר רצף נרטיבי, אבל גם יותר טוקנים בכל קריאה לתסריט.
 lookback_episodes = 3
+
+# כמה פרקים אחורה נבדק ב-*דירוג* אם כתבה היא חזרה על משהו שכבר שודר. רחב
+# מהחלון של התסריט בכוונה: תסריט צריך רק רצף של סיפורים שוטפים, אבל "כבר
+# סיפרנו את זה למאזין?" צריך לכסות בערך חודש. ב-28.9 נתוני השוק של אוגוסט
+# סוקרו שוב 13 יום אחרי 15.9, מכתבה אחרת ועם סכומים שונים (4.2 מיליארד
+# הורדות ירידה של 7% מול 3.76 מיליארד עלייה של 1%).
+scoring_lookback_episodes = 4
 
 # ---------------------------------------------------------------- קולות
 

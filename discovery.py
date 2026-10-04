@@ -47,6 +47,7 @@ from gamesforum_pipeline import (          # noqa: E402
     fetch_article, gemini_json, log,
 )
 from sources import collect                # noqa: E402
+import memory                              # noqa: E402
 import source_health                       # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -95,6 +96,21 @@ PROMO_BODY = [
     "join us at", "buy tickets", "limited spaces",
 ]
 
+# Phrases a company puts in its own press release. One of these in a real
+# news story is noise (an exec gets quoted); several, in a piece with almost
+# no figures, is the signature of the thing itself. The count is shown to the
+# scorer next to the figures count rather than turned into a deterministic
+# penalty, because the call needs judgement -- a funding round is also
+# announced by the company, and that is news.
+PR_PHRASES = [
+    "is excited to", "are excited to", "is pleased to announce",
+    "we are pleased", "proud to announce", "delighted to", "thrilled to",
+    "exclusive partnership", "strategic partnership", "strategic collaboration",
+    "player-first", "sustainable growth", "cutting-edge", "best-in-class",
+    "industry-leading", "leading provider", "global leader", "seamless",
+    "for more information", "media contact", "press contact", "press release",
+]
+
 
 def substance_signals(text: str) -> dict:
     """Cheap proxies for 'is there anything here'.
@@ -107,6 +123,7 @@ def substance_signals(text: str) -> dict:
     quotes = len(QUOTE_RE.findall(text))
     low = text.lower()
     promo_hits = sum(1 for p in PROMO_BODY if p in low)
+    pr_hits = sum(1 for p in PR_PHRASES if p in low)
 
     return {
         "words": words,
@@ -114,6 +131,7 @@ def substance_signals(text: str) -> dict:
         "figures_per_100w": round(100 * figures / words, 2),
         "quotes": quotes,
         "promo_markers": promo_hits,
+        "pr_phrases": pr_hits,
     }
 
 
@@ -123,6 +141,8 @@ def substance_note(sig: dict) -> str:
         bits.append(f"{sig['quotes']} quotes")
     if sig["promo_markers"]:
         bits.append(f"{sig['promo_markers']} promo markers")
+    if sig.get("pr_phrases"):
+        bits.append(f"{sig['pr_phrases']} press-release phrases")
     return ", ".join(bits)
 
 
@@ -148,6 +168,23 @@ def build_scoring_prompt(profile: dict, candidates: list[dict]) -> str:
         )
     blob = "\n\n---\n\n".join(items)
 
+    # Set by select() from memory.json. Absent (first run, tests, --dry-run)
+    # means no section at all rather than a sentence about an empty past.
+    recent = profile.get("_recent_topics") or []
+    covered_block = ""
+    if recent:
+        covered_block = (
+            "\nALREADY COVERED IN RECENT EPISODES (the listener has heard these):\n"
+            + "\n".join(f"- {t}" for t in recent)
+            + "\n\nAn article about the SAME underlying event, report or dataset as "
+            "something above cannot score above 4 -- another outlet's write-up of "
+            "the same monthly market figures counts, even from a different data "
+            "provider. The exception is an article that carries a materially new "
+            "fact: a new figure, a ruling, a reversal, a named outcome. Say what "
+            "is new in \"why\". A genuine follow-up development on an ongoing "
+            "storyline is welcome and is scored on its own merits.\n"
+        )
+
     return f"""You are this person's research analyst. Decide what earns a
 place in his weekly briefing.
 
@@ -162,7 +199,7 @@ SUBJECTS THAT CONCERN HIM:
 
 RARELY WORTH HIS TIME:
 {deprio}
-
+{covered_block}
 HOW TO THINK ABOUT EACH ARTICLE
 
 Do not pattern-match on topic. "Mentions monetization" is not relevance.
@@ -204,6 +241,15 @@ BE SCEPTICAL OF
   the numbers are real -- score the argument, not just whether a number
   appears somewhere in it.
 - Funding announcements with no operational lesson.
+- Company announcements of intent. A partnership, integration or product
+  launch that states goals ("will boost retention", "to drive player-first
+  engagement") but reports no measured result -- no figure for what a named
+  studio actually saw -- is a claim, not evidence. It cannot score above 4
+  on COMPETITIVE or DECISION, however well-known the studio's name is.
+  Watch the SIGNALS line: several press-release phrases with almost no
+  figures is the usual shape. A completed acquisition, funding round or
+  deal with stated amounts is different -- that is a fact, and it is
+  judged as MARKET news on its merits.
 
 SCALE
   9-10  he would be worse off not knowing this
@@ -521,7 +567,23 @@ def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[d
     caps = {s["name"]: s.get("max_per_episode", 99) for s in sources}
     used: dict[str, int] = {}
     chosen: list[dict] = []
+    capped: list[dict] = []     # rejected ONLY because their source's cap was full
 
+    def is_duplicate(art: dict, pool: list[dict]) -> bool:
+        clash = _heuristic_clash(art, pool)
+        if clash and confirm_same_story(art, clash):
+            art["_reject"] = f"אותו סיפור כמו \"{clash['title'][:40]}\" (מאושר ע\"י Gemini)"
+            art["_dup"] = True
+            log(f"  duplicate story dropped: {art['title'][:56]}")
+            # Keep the link, so the show notes still credit both outlets.
+            clash.setdefault("_also", []).append(
+                {"title": art["title"], "url": art["url"],
+                 "source": art.get("source", "")}
+            )
+            return True
+        return False
+
+    # Pass 1: the original strict pass, caps respected.
     for art in sorted(scored, key=lambda a: a["_score"], reverse=True):
         if art["_score"] < thr["min_score"]:
             art["_reject"] = "מתחת לסף"
@@ -529,27 +591,88 @@ def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[d
         src = art.get("source", "?")
         if used.get(src, 0) >= caps.get(src, 99):
             art["_reject"] = f"תקרת {src} ({caps.get(src)}) מלאה"
+            capped.append(art)
             continue
         if len(chosen) >= thr["max_articles"]:
             art["_reject"] = f"מחוץ ל-top {thr['max_articles']}"
             continue
-
-        clash = _heuristic_clash(art, chosen)
-        if clash and confirm_same_story(art, clash):
-            art["_reject"] = f"אותו סיפור כמו \"{clash['title'][:40]}\" (מאושר ע\"י Gemini)"
-            log(f"  duplicate story dropped: {art['title'][:56]}")
-            # Keep the link, so the show notes still credit both outlets.
-            clash.setdefault("_also", []).append(
-                {"title": art["title"], "url": art["url"],
-                 "source": art.get("source", "")}
-            )
+        if is_duplicate(art, chosen):
             continue
 
         used[src] = used.get(src, 0) + 1
         chosen.append(art)
 
+    # A cap is there so one prolific outlet can't take over the episode. It
+    # was never meant to keep a 9 out in favour of a 7. On 2026-09-28 the
+    # episode had room for 8 and took 7, while Newzoo's CPI/downloads
+    # benchmarks (9.0), a web-store tactic (9.0) and a $1m-run-rate case
+    # study (8.0) were all dropped for caps -- and a vendor press release
+    # and a roundup, both 7.0, stayed in. So the caps are now soft, in two
+    # bounded steps. "Bounded" is what keeps this from quietly undoing the
+    # cap: nobody ends up more than `cap_overflow` over it, and both steps
+    # need a clear score advantage, not a tie.
+    overflow = int(thr.get("cap_overflow", 1))
+    overflow_min = float(thr.get("cap_overflow_min_score", 8.0))
+    margin = float(thr.get("swap_margin", 2.0))
+    max_swaps = int(thr.get("max_swaps", 2))
+
+    def room(src: str) -> bool:
+        return used.get(src, 0) < caps.get(src, 99) + overflow
+
+    # Pass 2: if the episode isn't full, let a strong capped candidate fill
+    # the free slot (best score first -- `capped` is already in that order).
+    for art in list(capped):
+        if len(chosen) >= thr["max_articles"]:
+            break
+        src = art.get("source", "?")
+        if art["_score"] < overflow_min or not room(src) or is_duplicate(art, chosen):
+            continue
+        art.pop("_reject", None)
+        art["_note"] = f"נכנס מעל תקרת {src} ({caps.get(src)}): ציון גבוה והיה מקום פנוי"
+        used[src] = used.get(src, 0) + 1
+        chosen.append(art)
+        capped.remove(art)
+        log(f"  cap overflow: took {art['title'][:56]} ({art['_score']})")
+
+    # Pass 3: if it IS full, a capped candidate that beats the weakest pick
+    # by `swap_margin` or more replaces it. The sole representative of a
+    # source is never the one swapped out, so this can't zero a source.
+    swaps = 0
+    for art in list(capped):
+        if swaps >= max_swaps:
+            break
+        src = art.get("source", "?")
+        if art.get("_dup") or not room(src):
+            continue
+        eligible = [c for c in chosen if used.get(c.get("source", "?"), 0) > 1]
+        if not eligible:
+            break
+        weakest = min(eligible, key=lambda a: a["_score"])
+        if art["_score"] - weakest["_score"] < margin:
+            continue
+        if is_duplicate(art, [c for c in chosen if c is not weakest]):
+            continue
+        weakest["_reject"] = (
+            f"הוחלף ב-\"{art['title'][:40]}\" ({art['_score']} מול {weakest['_score']}): "
+            f"תקרות המקור לא אמורות להחזיק כתבה חלשה יותר"
+        )
+        used[weakest.get("source", "?")] -= 1
+        chosen.remove(weakest)
+        art.pop("_reject", None)
+        art["_note"] = f"החליף את \"{weakest['title'][:40]}\" ({weakest['_score']}): ציון גבוה בלפחות {margin:g}"
+        used[src] = used.get(src, 0) + 1
+        chosen.append(art)
+        capped.remove(art)
+        swaps += 1
+        log(f"  cap swap: {art['title'][:44]} ({art['_score']}) replaces "
+            f"{weakest['title'][:44]} ({weakest['_score']})")
+
+    # assign_airtime() gives the lead share to chosen[0], so the order has to
+    # be strongest-first even after passes 2 and 3 appended out of order.
+    chosen.sort(key=lambda a: a["_score"], reverse=True)
+
     if used:
-        log("  per-source mix: " + ", ".join(f"{k} {v}" for k, v in used.items()))
+        log("  per-source mix: " + ", ".join(f"{k} {v}" for k, v in used.items() if v))
     return chosen
 
 
@@ -682,6 +805,13 @@ def select(dry_run: bool = False) -> list[dict]:
         return []
 
     log("stage 4: relevance scoring")
+    # What the listener has already heard, so a repeat of it has to prove it
+    # adds something. memory.py can't fail a run (it returns [] on any
+    # problem), and this rides inside prompts that are being sent anyway.
+    profile["_recent_topics"] = memory.load_recent_topics()
+    if profile["_recent_topics"]:
+        log(f"  {len(profile['_recent_topics'])} recently-covered topics "
+            "added to the scoring prompt")
     for i, art in enumerate(survivors):
         art["_idx"] = i
     scores = score_all(profile, survivors) if survivors else {}
@@ -741,6 +871,8 @@ def select(dry_run: bool = False) -> list[dict]:
         why = art["_why"]
         if in_:
             why = f"**{int(art['_airtime'] * 100)}% זמן אוויר** · {why}"
+            if art.get("_note"):
+                why += f" · {art['_note']}"
         elif art.get("_reject"):
             why += f" · {art['_reject']}"
         rows.append({
