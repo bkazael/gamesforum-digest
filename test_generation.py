@@ -258,6 +258,46 @@ check("a bloated intro is a problem",
       any("words" in p for p in P.intro_problems(
           [dict(t, text=words(120)) for t in GOOD_INTRO["turns"]])))
 
+# style rules -- the first live run (2026-10-04) broke all of these despite
+# the prompt asking otherwise: a generic "a week where..." opener with a hype
+# word, two turns opening with an agreement word, three Dana turns in a row.
+def _variant(i, **over):
+    t = [dict(x) for x in GOOD_INTRO["turns"]]
+    t[i].update(over)
+    return t
+
+check("a hype word in the intro is flagged as a style problem",
+      any(p.startswith(P.STYLE) and "hype" in p
+          for p in P.intro_problems(_variant(2, text="הסכומים מטורפים, ובכל זאת אף אחד לא שם לב."))))
+check("an intro turn opening with an agreement word is flagged",
+      any("agreement" in p for p in P.intro_problems(_variant(1, text="בדיוק, ידעתי שתתחיל משם."))))
+check("a first reply about 'the week' is flagged -- the exact line the user complained about",
+      any("about the week itself" in p for p in P.intro_problems(
+          _variant(0, text="שבוע שבו המובייל ממשיך לגלגל סכומים."))))
+three_dana = [GOOD_INTRO["turns"][0]] + [dict(GOOD_INTRO["turns"][1]) for _ in range(3)] + [GOOD_INTRO["turns"][4]]
+check("three turns in a row by one host is flagged",
+      any("more than two turns in a row" in p for p in P.intro_problems(three_dana)))
+check("the live-run intro (week opener + hype + 2 agreement openers + 3 Dana in a row) trips every rule",
+      len([p for p in P.intro_problems([
+          {"speaker": B, "text": "אכן, דנה. שבוע שבו המובייל ממשיך לגלגל סכומים מטורפים, ואיפה הוא דורך."},
+          {"speaker": A, "text": "בדיוק. ועם כל הכסף הזה שמסתובב, יש מי שרוצה נתח וגם מי שרוצה לווסת."},
+          {"speaker": B, "text": "כמו תמיד, רק את יכולה לסדר את כל הבלגן הזה לסיפור קוהרנטי, ודאי."},
+          {"speaker": A, "text": "ננסה, ננסה. בטח כשמדובר על מיליארדים של דולרים בשוק הזה כולו."},
+          {"speaker": A, "text": "אז מה מחכה לנו השבוע? " + words(30)},
+          {"speaker": A, "text": "נתחיל, כמובן, עם עדכון ההכנסות ועם כל מה שקשור בחנויות."},
+      ] ) if p.startswith(P.STYLE)]) == 4)
+check("the intro prompt carries the tone rules (hype ban, agreement limit, not-about-the-week)",
+      "No turn" in ip and "agreement word" in ip and "NOT" in ip and "about the week as a whole" in ip)
+
+# style faults earn a retry, but are accepted if they persist (the fallback is worse)
+hyped = {"turns": _variant(2, text="הסכומים מטורפים, ובכל זאת אף אחד לא שם לב לזה.")}
+n_calls = []
+P.gemini_json = lambda *a, **k: (n_calls.append(1) or hyped)
+turns, source = P.write_intro(DATA, prep)
+check("an intro that stays slightly hyped is still used after two attempts, not discarded",
+      source == "model" and len(n_calls) == 2 and len(turns) == len(hyped["turns"]) + 1,
+      f"source={source}, calls={len(n_calls)}")
+
 # retry once, then fall back
 attempts = []
 def flaky(prompt, schema=None, **kw):

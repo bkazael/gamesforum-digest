@@ -497,6 +497,7 @@ def welcome_turn() -> dict:
 
 INTRO_MIN_TURNS, INTRO_MAX_TURNS = 3, 12
 INTRO_MIN_WORDS, INTRO_MAX_WORDS = 60, 320
+STYLE = "style: "
 
 
 def intro_problems(turns: list[dict]) -> list[str]:
@@ -513,6 +514,33 @@ def intro_problems(turns: list[dict]) -> list[str]:
            for t in turns):
         problems.append("it repeats the welcome line")
     problems += script_quality.script_problems(turns)
+
+    # Style rules. Prefixed STYLE so write_intro() can tell them apart from
+    # structural faults: a structural fault means the intro is unusable, a
+    # style fault earns one retry but is accepted if it persists -- a
+    # slightly hyped intro still beats the plain fallback. The first live
+    # run (2026-10-04) produced exactly these, despite the prompt asking
+    # otherwise: a generic "a week where..." opener with the word מטורפים,
+    # two turns opening with an agreement word, and three Dana turns in a row.
+    text = " ".join((t.get("text") or "") for t in turns).lower()
+    hype = [s for s in script_quality.HYPE_STEMS if s in text]
+    if hype:
+        problems.append(f"{STYLE}hype wording ({', '.join(hype)})")
+    agree = sum(1 for t in turns
+                if (t.get("text") or "").strip().startswith(script_quality.AGREEMENT_OPENERS))
+    if agree:
+        problems.append(f"{STYLE}{agree} turn(s) open with an agreement word")
+    if turns and turns[0].get("speaker") == SPEAKER_B:
+        first = (turns[0].get("text") or "")
+        if "שבוע" in first or "week" in first.lower():
+            problems.append(f"{STYLE}the first reply is about the week itself, "
+                            "not about one specific thing from the episode")
+    run = 1
+    for prev, cur in zip(turns, turns[1:]):
+        run = run + 1 if cur.get("speaker") == prev.get("speaker") else 1
+        if run > 2:
+            problems.append(f"{STYLE}{cur.get('speaker')} has more than two turns in a row")
+            break
     return problems
 
 
@@ -562,21 +590,29 @@ QUESTIONS THE EPISODE TAKES ON:
 {questions or '(none)'}
 
 Write the turns that come right after the welcome line:
-1. {SPEAKER_B} replies in one short, natural line -- a human beat between
-   colleagues, not a slogan about how the week was. Light, warm, a little
-   dry is fine. It may react to one real thing from the facts above.
-2. A quick bit of easy banter, 2-3 short turns in all: people who work
-   together and are glad to be doing this -- a tease, a small reaction, a
-   half-joke about the work. Do NOT invent personal anecdotes presented as
-   fact, no weather or holiday small talk, and no hype adjectives or
-   exclamations.
+1. {SPEAKER_B} replies in one short, natural line that reacts to ONE specific
+   thing from the facts above -- a figure, a ruling, a reversal. It is NOT
+   about the week as a whole: no "what a week", no "a week in which...", no
+   "שבוע ..." -- a sentence that could open any episode is the wrong sentence.
+2. A quick bit of easy banter, 2-3 short turns in all, between people who
+   work together and like it: a tease, a small reaction, a half-joke about
+   the work itself. Avoid stock lines like "only you could make sense of this
+   mess". Do NOT invent personal anecdotes presented as fact, and no weather
+   or holiday small talk.
 3. {SPEAKER_A} then previews the episode as a TEASER, not a table of
    contents: lead with the single most interesting thing, name 3-4 stories in
    the order they will be told, include at least one concrete number from the
    facts above, and pose ONE of the questions -- one the episode actually
    answers, never one marked "left open" -- without giving its answer away.
+   Split the teaser across two turns with a short interjection from
+   {SPEAKER_B} if it runs long.
 4. The last turn hands over to the first story with one short line that
    names it.
+
+Tone: calm, like colleagues, not radio hosts. No hype words (avoid עצום,
+מטורף, מהפכה, דרמטי, וואו, מדהים, "game changer") and no exclamations. No turn
+opens with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן). Nobody speaks
+more than two turns in a row.
 
 Total length: {INTRO_MIN_WORDS + 70}-{INTRO_MAX_WORDS - 90} words across all
 turns. {lang_inst}
@@ -602,6 +638,12 @@ hosts again.
             return [welcome] + turns, "model"
         for p in problems:
             log(f"  intro problem (attempt {attempt}): {p}")
+        # On the last attempt, style faults alone are not worth throwing the
+        # whole intro away for: a slightly hyped, real intro is better for the
+        # listener than the plain fallback.
+        if attempt == 2 and turns and all(p.startswith(STYLE) for p in problems):
+            log("  intro: accepting it despite style faults (the fallback would be worse)")
+            return [welcome] + turns, "model"
         attempt_prompt = prompt + (
             "\n\nA PREVIOUS ATTEMPT WAS REJECTED because: " + "; ".join(problems[:3])
             + ". Write it again so it satisfies every rule above."

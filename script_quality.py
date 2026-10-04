@@ -153,9 +153,16 @@ def count_words(script: list[dict]) -> int:
 # Hype vocabulary the script prompt now bans, and the agreement words it
 # limits to two openers. Measured, not enforced: a retry costs a full
 # Gemini request against a small daily quota, so these are numbers in the
-# log to watch (09-28 measured 0.92 hype words per 100, vs 0.30 on 09-22,
-# and 8 of 29 turns opening with an agreement word).
-HYPE_STEMS = ("עצום", "מטורף", "מהפכ", "דרמט", "וואו", "מדהים", "מטאור", "game changer")
+# log to watch (measured on past episodes: 09-22 had 0.25 hype words per
+# 100, 09-28 had 0.71, and 09-15 had 13 of 35 turns opening with an agreement
+# word).
+# Both spellings of each stem that ends in a final-form letter: Hebrew
+# switches ף/ם to פ/מ the moment a suffix is added, so "מטורף" never matches
+# "מטורפים" and "עצום" never matches "עצומה". The first live intro
+# (2026-10-04) said "סכומים מטורפים" and slipped straight past a stem list
+# that only had the final form.
+HYPE_STEMS = ("עצום", "עצומ", "מטורף", "מטורפ", "מהפכ", "דרמט", "וואו",
+              "מדהים", "מדהימ", "מטאור", "game changer")
 AGREEMENT_OPENERS = ("בדיוק", "לגמרי", "בהחלט", "נכון", "אכן")
 
 
@@ -168,7 +175,7 @@ def style_report(script: list[dict]) -> list[str]:
                   if (t.get("text") or "").strip().startswith(AGREEMENT_OPENERS))
     questions = sum(1 for t in script if (t.get("text") or "").rstrip().endswith("?"))
     return [
-        f"{hype} hype words ({100 * hype / words:.2f} per 100 words; 09-22 was 0.30, 09-28 was 0.92)",
+        f"{hype} hype words ({100 * hype / words:.2f} per 100 words; past episodes ran 0.25-0.71)",
         f"{openers} of {len(script)} turns open with an agreement word (limit: 2)",
         f"{questions} question turns",
     ]

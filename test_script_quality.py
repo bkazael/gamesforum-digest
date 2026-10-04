@@ -105,6 +105,23 @@ check("close_remaining ends a leftover fragment with a full stop",
       n == 1 and closed[0]["text"].endswith("."), str(closed))
 check("close_remaining leaves healthy turns alone", Q.close_remaining(healthy)[1] == 0)
 
+# ---------------------------------------------------------------- 6b. hype detection survives Hebrew final letters
+#
+# Hebrew swaps ף/ם for פ/מ when a suffix is added, so a stem written in its
+# final form ("מטורף") silently misses "מטורפים". The first live intro said
+# "סכומים מטורפים" and sailed past exactly that.
+
+def _hype(text):
+    return Q.style_report([{"speaker": "Dana", "text": text}])[0].split()[0]
+
+for word in ("מטורף", "מטורפים", "עצום", "עצומה", "עצומים", "מדהים", "מדהימה", "מהפכה", "דרמטי"):
+    check(f"hype word detected in every form: {word}", _hype(f"זה {word} באמת.") == "1")
+check("a similar-looking ordinary word is not hype (עצור = stop)", _hype("עצור רגע.") == "0")
+check("style_report counts agreement openers",
+      "2 of 3 turns" in Q.style_report([
+          {"speaker": "Dana", "text": "בדיוק, כן."}, {"speaker": "Yoni", "text": "לגמרי."},
+          {"speaker": "Dana", "text": "מה דעתך?"}])[1])
+
 # ---------------------------------------------------------------- 6. empty turns
 
 check("an empty turn is reported",

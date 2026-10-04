@@ -39,5 +39,25 @@ if stale:
 else:
     print("PASS  test.yaml references no missing files")
 
+# A SyntaxWarning (e.g. "invalid escape sequence '\S'") is a future
+# SyntaxError. The first live smoke run showed one in sources.py's docstring,
+# buried in the Actions log where nobody reads. Compiling every module with
+# warnings promoted to errors makes it a red test instead.
+import warnings
+
+bad = []
+for path in sorted(ROOT.glob("*.py")):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        try:
+            compile(path.read_text(encoding="utf-8"), str(path), "exec")
+        except (SyntaxWarning, SyntaxError) as e:
+            bad.append(f"{path.name}: {e}")
+if bad:
+    ok = False
+    print(f"FAIL  modules that compile with warnings: {bad}")
+else:
+    print("PASS  every module compiles without a SyntaxWarning")
+
 print("\n" + ("ALL PASS" if ok else "FAILED"))
 sys.exit(0 if ok else 1)
