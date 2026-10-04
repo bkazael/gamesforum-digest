@@ -48,6 +48,24 @@ def _chunk_path(date: str, index: int) -> pathlib.Path:
     return CHECKPOINT_DIR / f"{date}-chunk-{index:02d}.pcm"
 
 
+def _json_default(obj):
+    """Serialize what json can't: every article carries `published` as a
+    datetime.date (sources.py parses it), and json.dumps raised on it --
+    "Object of type date is not JSON serializable" -- so save_content()
+    failed, silently by design, on EVERY real run. The checkpoint, and with
+    it the cheap-retry design the 06:00 and 10:00 reruns depend on, had
+    never actually saved anything in production. Only the first real
+    end-to-end run (2026-10-04) showed it: the test fixtures all had
+    published=None. A date comes back as an ISO string, which nothing after
+    selection reads as a date.
+    """
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    if isinstance(obj, (set, frozenset)):
+        return sorted(obj)
+    return str(obj)
+
+
 def save_content(date: str, articles: list[dict], data: dict) -> None:
     """Store the selected articles + generated script for `date`.
 
@@ -60,13 +78,13 @@ def save_content(date: str, articles: list[dict], data: dict) -> None:
         CHECKPOINT_DIR.mkdir(exist_ok=True)
         _content_path(date).write_text(
             json.dumps({"articles": articles, "data": data},
-                       ensure_ascii=False, indent=2),
+                       ensure_ascii=False, indent=2, default=_json_default),
             encoding="utf-8",
         )
     except Exception as e:                              # noqa: BLE001
         # Failing to *save* a checkpoint must never fail the run that
         # produced the thing worth saving.
-        print(f"[pipeline]   checkpoint: could not save content ({e})", flush=True)
+        print(f"::warning::checkpoint: could not save content ({e}) -- a failed run will restart from scratch", flush=True)
 
 
 def load_content(date: str) -> tuple[list[dict], dict] | None:
@@ -93,7 +111,7 @@ def save_chunk(date: str, index: int, pcm: bytes) -> None:
         CHECKPOINT_DIR.mkdir(exist_ok=True)
         _chunk_path(date, index).write_bytes(pcm)
     except Exception as e:                              # noqa: BLE001
-        print(f"[pipeline]   checkpoint: could not save chunk {index} ({e})", flush=True)
+        print(f"::warning::checkpoint: could not save audio chunk {index} ({e}) -- a failed run will re-synthesize it", flush=True)
 
 
 def load_chunk(date: str, index: int) -> bytes | None:

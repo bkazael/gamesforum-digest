@@ -122,6 +122,39 @@ check("style_report counts agreement openers",
           {"speaker": "Dana", "text": "בדיוק, כן."}, {"speaker": "Yoni", "text": "לגמרי."},
           {"speaker": "Dana", "text": "מה דעתך?"}])[1])
 
+# ---------------------------------------------------------------- 6c. the agreement-opener trim
+#
+# The six real openers from the 2026-10-04 episode.
+REAL = [
+    "נכון, ו-AppLovin דחו את ההשוואה, וציינו ש-Ad Review שלהם משמש למיתון מודעות בלבד.",
+    "בהחלט. נכון לעכשיו, זו סוגיה משפטית מתמשכת עם טענות וטענות נגד, ועדיין אין פסיקה.",
+    "בהחלט. NetEase תטמיע את שיטות התשלום הללו בתחילה בכותרים כמו Where Winds Meet.",
+    "בדיוק. למרות שעדיין אין הפרות חוק ספציפיות שאותרו, אי התייחסות עלולה להוביל לאכיפה.",
+    "בדיוק. ולגבי משחקי IP גדולים כמו זה, יש לנו מקרה מבחן מהעבר הקרוב.",
+    "בדיוק. המודעות הללו חייבות לספק את חווית הליבה של המשחק במהירות ובאופן אותנטי.",
+]
+out, n = Q.trim_agreement_openers([{"speaker": "Dana", "text": t} for t in REAL])
+check("the first two agreement openers are kept, the other four stripped", n == 4, f"changed {n}")
+check("the first two turns are untouched", out[0]["text"] == REAL[0] and out[1]["text"] == REAL[1])
+check("a stripped turn reads as a normal sentence",
+      out[2]["text"].startswith("NetEase תטמיע") and out[4]["text"].startswith("ולגבי משחקי IP"))
+check("after trimming, no more than two turns open with an agreement word",
+      sum(1 for t in out if t["text"].startswith(Q.AGREEMENT_OPENERS)) == 2)
+
+out, n = Q.trim_agreement_openers([{"speaker": "Dana", "text": "בהחלט."}] * 4, keep=0)
+check("a bare one-word answer is never stripped to nothing", n == 0 and out[0]["text"] == "בהחלט.")
+out, n = Q.trim_agreement_openers([{"speaker": "Dana", "text": "בדיוק כמו שאמרנו קודם על כל העניין הזה."}], keep=0)
+check("an opener that is part of the sentence (no punctuation after it) is left alone", n == 0)
+out, n = Q.trim_agreement_openers([{"speaker": "Dana", "text": "נכון, זה גדול."}], keep=0)
+check("a short remainder (under six words) is left alone", n == 0)
+check("keep=0 strips even the first", Q.trim_agreement_openers(
+    [{"speaker": "Dana", "text": "בדיוק. " + "מילה " * 8}], keep=0)[1] == 1)
+
+# "דרמת ענק" (a huge drama) was in the 2026-10-04 intro and slipped past: the
+# stem 'דרמט' needs a ט, and 'דרמת' has a ת.
+for word in ("דרמה", "דרמת ענק", "דרמטי", "דרמטית"):
+    check(f"hype detected: {word}", _hype(f"זו {word} באמת.") == "1")
+
 # ---------------------------------------------------------------- 6. empty turns
 
 check("an empty turn is reported",

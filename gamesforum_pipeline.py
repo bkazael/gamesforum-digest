@@ -609,6 +609,9 @@ Write the turns that come right after the welcome line:
 4. The last turn hands over to the first story with one short line that
    names it.
 
+Company and product names stay in English even here -- write AppLovin and
+Unity, never אפלובין or יוניטי. Name at most 4 stories in the teaser.
+
 Tone: calm, like colleagues, not radio hosts. No hype words (avoid עצום,
 מטורף, מהפכה, דרמטי, וואו, מדהים, "game changer") and no exclamations. No turn
 opens with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן). Nobody speaks
@@ -632,6 +635,7 @@ hosts again.
         turns, repairs = script_quality.repair_script(raw.get("turns", []))
         for note in repairs:
             log(f"  intro repair: {note}")
+        turns, _ = script_quality.trim_agreement_openers(turns, keep=0)
         problems = intro_problems(turns)
         if not problems:
             log(f"  intro: {len(turns)} turns written after the episode")
@@ -735,6 +739,17 @@ is fine to say "the D2C trend we've been tracking keeps accelerating"; it
 is not fine to name a vendor again this week just because it came up before.
 """
 
+    # The first full real episode (2026-10-04) had a host say "as we remember
+    # from previous episodes" about something no earlier episode covered. With
+    # history, callbacks are allowed only for what the PREVIOUS EPISODES block
+    # actually contains; with none, there is nothing to call back to.
+    if memory_context:
+        callback_rule = ("- Say a topic came up in an earlier episode ONLY if it appears in the\n"
+                         "  PREVIOUS EPISODES block above. Never say \"as we remember from previous\n"
+                         "  episodes\" about anything else.")
+    else:
+        callback_rule = ("- Do not refer to earlier episodes at all: there is no history to call back to.")
+
     prep_block = ""
     prep_rules = ""
     if prep:
@@ -797,6 +812,15 @@ SPEECH NATURALISM:
 - Do not begin more than two turns in the whole episode with an agreement
   word (בדיוק, לגמרי, בהחלט, נכון, אכן). Respond to what was just said by
   adding to it or questioning it.
+- Keep it conversational. No turn longer than about 80 words: split a long
+  explanation into a back-and-forth instead of two hosts trading essays.
+- Ask questions the way a person would: short, plain, one clause. Never a
+  compound interview question ("given that X and Y, what is the single most
+  critical factor for...").
+- Weave each story's takeaway into the conversation in your own words. Do not
+  close every story with the same formula ("developers should ..."); at most
+  two stories may end on an explicit "developers should" line.
+{callback_rule}
 - Never read a URL aloud; attribute by outlet name.
 - Never use the ASCII double-quote character (") anywhere in the spoken text.
   Write Hebrew acronyms with the Hebrew gershayim ״ (ארה״ב, מנכ״ל, צה״ל,
@@ -822,6 +846,10 @@ SOURCE ARTICLES:
         data["script"], repairs = script_quality.repair_script(data.get("script", []))
         for note in repairs:
             log(f"  script repair: {note}")
+        data["script"], trimmed = script_quality.trim_agreement_openers(data["script"])
+        if trimmed:
+            log(f"  trimmed the leading agreement word from {trimmed} turn(s) "
+                "(limit: two turns open with one)")
         problems = script_quality.script_problems(data["script"])
         words = script_quality.count_words(data["script"])
         short = (not target_words) and words < SCRIPT_FLOOR_WORDS
