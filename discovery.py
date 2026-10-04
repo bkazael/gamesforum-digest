@@ -95,6 +95,21 @@ PROMO_BODY = [
     "join us at", "buy tickets", "limited spaces",
 ]
 
+# Phrases a company puts in its own press release. One of these in a real
+# news story is noise (an exec gets quoted); several, in a piece with almost
+# no figures, is the signature of the thing itself. The count is shown to the
+# scorer next to the figures count rather than turned into a deterministic
+# penalty, because the call needs judgement -- a funding round is also
+# announced by the company, and that is news.
+PR_PHRASES = [
+    "is excited to", "are excited to", "is pleased to announce",
+    "we are pleased", "proud to announce", "delighted to", "thrilled to",
+    "exclusive partnership", "strategic partnership", "strategic collaboration",
+    "player-first", "sustainable growth", "cutting-edge", "best-in-class",
+    "industry-leading", "leading provider", "global leader", "seamless",
+    "for more information", "media contact", "press contact", "press release",
+]
+
 
 def substance_signals(text: str) -> dict:
     """Cheap proxies for 'is there anything here'.
@@ -107,6 +122,7 @@ def substance_signals(text: str) -> dict:
     quotes = len(QUOTE_RE.findall(text))
     low = text.lower()
     promo_hits = sum(1 for p in PROMO_BODY if p in low)
+    pr_hits = sum(1 for p in PR_PHRASES if p in low)
 
     return {
         "words": words,
@@ -114,6 +130,7 @@ def substance_signals(text: str) -> dict:
         "figures_per_100w": round(100 * figures / words, 2),
         "quotes": quotes,
         "promo_markers": promo_hits,
+        "pr_phrases": pr_hits,
     }
 
 
@@ -123,6 +140,8 @@ def substance_note(sig: dict) -> str:
         bits.append(f"{sig['quotes']} quotes")
     if sig["promo_markers"]:
         bits.append(f"{sig['promo_markers']} promo markers")
+    if sig.get("pr_phrases"):
+        bits.append(f"{sig['pr_phrases']} press-release phrases")
     return ", ".join(bits)
 
 
@@ -204,6 +223,15 @@ BE SCEPTICAL OF
   the numbers are real -- score the argument, not just whether a number
   appears somewhere in it.
 - Funding announcements with no operational lesson.
+- Company announcements of intent. A partnership, integration or product
+  launch that states goals ("will boost retention", "to drive player-first
+  engagement") but reports no measured result -- no figure for what a named
+  studio actually saw -- is a claim, not evidence. It cannot score above 4
+  on COMPETITIVE or DECISION, however well-known the studio's name is.
+  Watch the SIGNALS line: several press-release phrases with almost no
+  figures is the usual shape. A completed acquisition, funding round or
+  deal with stated amounts is different -- that is a fact, and it is
+  judged as MARKET news on its merits.
 
 SCALE
   9-10  he would be worse off not knowing this

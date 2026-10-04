@@ -231,5 +231,69 @@ check("the sole representative of a source is never swapped out",
       any(a["source"] == "X" for a in result) and len(result) == 2,
       str([(a["title"][:10], a["source"]) for a in result]))
 
+# ---------------------------------------------------------------- 7. press-release filtering
+#
+# 2026-09-28 gave 3 turns to "Tyrads & Nordeus Announce Exclusive
+# Partnership to Drive Player-First Engagement" -- no figures, the company's
+# own slogan quoted back as insight. The same article had scored 3.0 and
+# 2.0 in the 08-03 and 08-13 ledgers and 7.0 on 09-28, so the model's score
+# alone was never going to hold the line; the headline pattern is the
+# deterministic backstop.
+
+import tomllib  # noqa: E402
+
+with (pathlib.Path(__file__).resolve().parent / "profile.toml").open("rb") as _f:
+    _profile = tomllib.load(_f)
+_gf = next(s for s in _profile["sources"] if s["name"] == "Gamesforum")
+
+
+def _gf_blocked(slug_title: str):
+    url = "https://www.globalgamesforum.com/news-media/" + slug_title.replace(" ", "-")
+    return D.blocked_by_title(slug_title, url, _gf.get("block", []))
+
+
+check("the TyrAds/Nordeus press-release headline is blocked on Gamesforum",
+      _gf_blocked("tyrads nordeus announce exclusive partnership to drive player first "
+                  "engagement in top eleven") is not None)
+
+# Real Gamesforum headlines from the ledgers that must keep flowing.
+for keep in (
+    "sensor tower acquires appmagic to expand smb gaming intelligence offering",
+    "mistplay mychips acquisition",
+    "why nostalgia is driving mobile gamings biggest success stories",
+    "technology digital policy three stories shaping the future",
+    "the paywall how much is it a marketing problem",
+):
+    check(f"real headline not blocked: {keep[:48]!r}", _gf_blocked(keep) is None)
+
+check("the Gamesforum patterns apply only to Gamesforum (a trade outlet's "
+      "partnership story is untouched)",
+      not any(s.get("block") and any("exclusive partnership" in p for p in s["block"])
+              for s in _profile["sources"] if s["name"] != "Gamesforum"))
+
+PR_TEXT = ("Tyrads is excited to announce an exclusive partnership with Nordeus. "
+           "The strategic partnership brings player-first rewarded engagement and "
+           "sustainable growth. For more information contact our media contact.")
+sig = D.substance_signals(PR_TEXT)
+check("a press-release body registers several PR-style phrases",
+      sig["pr_phrases"] >= 4, f"pr_phrases={sig['pr_phrases']}")
+check("the count reaches the scorer's SIGNALS line",
+      "press-release phrases" in D.substance_note(sig))
+
+NEWS_TEXT = ("Newzoo reports a 25% drop in mobile downloads and a 30% rise in CPI to "
+             "$0.56 across 2025, with the market reaching $121.1bn.")
+check("a plain data story registers no PR-style phrases",
+      D.substance_signals(NEWS_TEXT)["pr_phrases"] == 0)
+check("a plain data story's SIGNALS line does not mention press releases",
+      "press-release" not in D.substance_note(D.substance_signals(NEWS_TEXT)))
+
+_prompt = D.build_scoring_prompt(_profile, [{
+    "_idx": 0, "title": "t", "text": "x " * 50, "signals": D.substance_signals("x " * 50),
+}])
+check("the scoring rubric states that intentions without a measured result cap at 4",
+      "cannot score above 4" in _prompt and "a claim, not evidence" in _prompt)
+check("the rubric keeps completed deals with amounts as valid MARKET news",
+      "judged as MARKET news" in _prompt)
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)
