@@ -57,9 +57,20 @@ python discovery.py               # דירוג מלא, כותב ledger
 אוטומטי, בלי שום שירות או secret נוסף.
 
 ### 3. `gamesforum_pipeline.py` — תסריט, קול, פרסום
-- קריאה אחת ל-Gemini מייצרת את כל הפרק: כותרת, תקציר לפי נושא, ותסריט
-  דו-שיח בין דנה ליוני (schema-constrained, `PODCAST_SCHEMA`).
-- `memory.py` מזין הקשר מהפרקים האחרונים (ראה למטה).
+הפרק נכתב בשלושה שלבים, בסדר שבו מפיק היה עושה את זה:
+1. **הכנה** (`prepare_episode`, `PREP_SCHEMA`): קריאה אחת על כל הכתבות
+   שנבחרו — נקודות קונקרטיות לכל כתבה, מידת האמון במקור (ניטרלי / טענות
+   חברה / שיווק של ספק), ושאלות לדיון שנענות רק מתוך החומר או מפרקים קודמים,
+   או מסומנות כפתוחות.
+2. **התסריט** (`generate_podcast_content`, `PODCAST_SCHEMA`): כותרת, תקציר
+   לפי נושא, ודו-שיח בין דנה ליוני — מתוך ההכנה, בלי פתיחה, עם זמן אוויר
+   לכל כתבה לפי הדירוג.
+3. **הפתיחה, אחרונה** (`write_intro`, `INTRO_SCHEMA`): ברכה קבועה בקוד,
+   רגע של שיחה בין המנחים, ו-teaser של מה שבאמת בפרק.
+
+אם שלב 1 או 3 נכשל, הריצה ממשיכה בלי הכנה / עם פתיחה פשוטה — הם לא יכולים
+להפיל פרק. `script_quality.py` מתקן/מזהה תורות שנחתכו באמצע מילה (ראשי תיבות
+עם גרשיים), `memory.py` מזין הקשר מהפרקים האחרונים (ראה למטה).
 - הטקסט מפוצל ל-chunks (`TTS_CHUNK_CHAR_LIMIT`, כרגע 3800 תווים) ונשלח
   ל-Gemini TTS רב-דובר. ה-audio מעורבב עם ג'ינגל (fade + ducking) דרך
   ffmpeg.
@@ -125,7 +136,7 @@ chunk אודיו ברגע שהוא חוזר. ריצה חוזרת לאותו תא
 
 | רמה | קובץ | עלות | מתי רץ |
 |---|---|---|---|
-| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py`, `test_checkpoint.py`, `test_email_source.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
+| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py`, `test_checkpoint.py`, `test_email_source.py`, `test_script_quality.py`, `test_generation.py`, `test_ci_coverage.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
 | 2 — smoke אמיתי | `live_smoke.py` | טוקנים אמיתיים, מינימלי | ידני בלבד (`manual_test.yaml`) |
 | 3 — הריצה האמיתית | `gamesforum_pipeline.py` | מלא | שבועי, מתוזמן (`weekly-digest.yml`) |
 
@@ -137,5 +148,5 @@ chunk אודיו ברגע שהוא חוזר. ריצה חוזרת לאותו תא
 
 הרצה מקומית של הכל, בלי מפתח API אמיתי ובלי עלות:
 ```
-python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py && python test_checkpoint.py && python test_email_source.py
+python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py && python test_checkpoint.py && python test_email_source.py && python test_script_quality.py && python test_generation.py && python test_ci_coverage.py
 ```
