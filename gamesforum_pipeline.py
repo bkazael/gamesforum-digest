@@ -23,6 +23,7 @@ from xml.sax.saxutils import escape as xml_escape
 
 import checkpoint
 import memory
+import script_quality
 
 # ---------------------------------------------------------------- config
 
@@ -311,12 +312,43 @@ CHARACTER DYNAMICS:
 SPEECH NATURALISM:
 - {lang_inst}
 - {length_inst}
+- Never use the ASCII double-quote character (") anywhere in the spoken text.
+  Write Hebrew acronyms with the Hebrew gershayim ״ (ארה״ב, מנכ״ל, צה״ל,
+  בע״מ) or spell them out, and quote a phrase with single quotes ' or leave
+  it unquoted. Every turn must end with complete punctuation (. ? ! …).
 
 SOURCE ARTICLES:
 {corpus}
 """
     log("generating podcast content via Gemini text call...")
-    data = gemini_json(prompt, PODCAST_SCHEMA)
+    # Up to two attempts. script_quality.py explains the bug this guards
+    # against (a Hebrew acronym's ASCII quote ending the JSON string and
+    # taking the rest of the sentence with it). Deterministic repair runs
+    # first and usually fully fixes it for free; a retry is only spent when
+    # something is still malformed afterwards, and only once, because every
+    # attempt is a full-script Gemini request against a small daily quota.
+    attempt_prompt = prompt
+    for attempt in (1, 2):
+        data = gemini_json(attempt_prompt, PODCAST_SCHEMA)
+        data["script"], repairs = script_quality.repair_script(data.get("script", []))
+        for note in repairs:
+            log(f"  script repair: {note}")
+        problems = script_quality.script_problems(data["script"])
+        if not problems:
+            break
+        for p in problems:
+            log(f"  script problem (attempt {attempt}): {p}")
+        if attempt == 1:
+            attempt_prompt = prompt + (
+                "\n\nA PREVIOUS ATTEMPT AT THIS SCRIPT WAS REJECTED because: "
+                + "; ".join(problems[:3])
+                + ". Regenerate the whole script with every turn ending in "
+                "complete punctuation, and no ASCII double quotes anywhere."
+            )
+    else:
+        data["script"], closed = script_quality.close_remaining(data["script"])
+        log(f"  script still had problems after a retry; closed {closed} "
+            "turn(s) with a full stop rather than ship a cut-off fragment")
 
     total_words = sum(len(turn.get("text", "").split()) for turn in data.get("script", []))
     log(f"generated script: {len(data.get('script', []))} turns, {total_words} words")
