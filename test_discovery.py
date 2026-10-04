@@ -295,5 +295,57 @@ check("the scoring rubric states that intentions without a measured result cap a
 check("the rubric keeps completed deals with amounts as valid MARKET news",
       "judged as MARKET news" in _prompt)
 
+# ---------------------------------------------------------------- 8. repeats of already-covered stories
+#
+# 2026-09-28 re-covered August's market data 13 days after 2026-09-15 did,
+# from a different outlet and with different totals (4.2bn downloads down 7%
+# vs 3.76bn up 1%). Selection can't see that on its own; scoring has to be
+# told what the listener already heard.
+
+import json as _json  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+import memory as _memory  # noqa: E402
+
+_cand = [{"_idx": 0, "title": "t", "text": "x " * 50, "signals": D.substance_signals("x " * 50)}]
+
+_no_hist = D.build_scoring_prompt(_profile, _cand)
+check("no recent topics adds no ALREADY COVERED section",
+      "ALREADY COVERED" not in _no_hist)
+
+_with = D.build_scoring_prompt(dict(_profile, _recent_topics=[
+    "2026-09-15: August 2026 mobile game charts: Fate/Grand Order's big anniversary",
+    "2026-09-22: Google Settles UK App Developer Class-Action for £260M",
+]), _cand)
+check("recent topics reach the scoring prompt, dated",
+      "ALREADY COVERED IN RECENT EPISODES" in _with
+      and "2026-09-15: August 2026 mobile game charts" in _with)
+check("the prompt says a repeat of the same dataset caps at 4 unless it adds a new fact",
+      "cannot score above 4" in _with.split("ALREADY COVERED")[1]
+      and "materially new" in _with)
+check("a genuine follow-up development stays welcome (not a blanket ban on revisits)",
+      "follow-up development" in _with)
+
+# memory.load_recent_topics(): reads real-shaped entries, windowed, dated.
+with _tempfile.TemporaryDirectory() as _tmp:
+    _real = _memory.MEMORY_FILE
+    _memory.MEMORY_FILE = pathlib.Path(_tmp) / "memory.json"
+    try:
+        check("no memory file -> no topics", _memory.load_recent_topics() == [])
+        _memory.MEMORY_FILE.write_text(_json.dumps([
+            {"date": f"2026-0{m}-01", "title": "x", "topics_covered": [f"topic {m}a", f"topic {m}b"]}
+            for m in range(1, 8)
+        ]), encoding="utf-8")
+        _t = _memory.load_recent_topics(limit=2)
+        check("load_recent_topics(limit=2) returns the last two episodes' topics, dated",
+              _t == ["2026-06-01: topic 6a", "2026-06-01: topic 6b",
+                     "2026-07-01: topic 7a", "2026-07-01: topic 7b"], str(_t))
+        check("the default window is 4 episodes (a month), wider than the script's 3",
+              len(_memory.load_recent_topics()) == 8, f"{len(_memory.load_recent_topics())}")
+        _memory.MEMORY_FILE.write_text("not json", encoding="utf-8")
+        check("a corrupt memory file degrades to no topics instead of raising",
+              _memory.load_recent_topics() == [])
+    finally:
+        _memory.MEMORY_FILE = _real
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

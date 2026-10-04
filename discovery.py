@@ -47,6 +47,7 @@ from gamesforum_pipeline import (          # noqa: E402
     fetch_article, gemini_json, log,
 )
 from sources import collect                # noqa: E402
+import memory                              # noqa: E402
 import source_health                       # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -167,6 +168,23 @@ def build_scoring_prompt(profile: dict, candidates: list[dict]) -> str:
         )
     blob = "\n\n---\n\n".join(items)
 
+    # Set by select() from memory.json. Absent (first run, tests, --dry-run)
+    # means no section at all rather than a sentence about an empty past.
+    recent = profile.get("_recent_topics") or []
+    covered_block = ""
+    if recent:
+        covered_block = (
+            "\nALREADY COVERED IN RECENT EPISODES (the listener has heard these):\n"
+            + "\n".join(f"- {t}" for t in recent)
+            + "\n\nAn article about the SAME underlying event, report or dataset as "
+            "something above cannot score above 4 -- another outlet's write-up of "
+            "the same monthly market figures counts, even from a different data "
+            "provider. The exception is an article that carries a materially new "
+            "fact: a new figure, a ruling, a reversal, a named outcome. Say what "
+            "is new in \"why\". A genuine follow-up development on an ongoing "
+            "storyline is welcome and is scored on its own merits.\n"
+        )
+
     return f"""You are this person's research analyst. Decide what earns a
 place in his weekly briefing.
 
@@ -181,7 +199,7 @@ SUBJECTS THAT CONCERN HIM:
 
 RARELY WORTH HIS TIME:
 {deprio}
-
+{covered_block}
 HOW TO THINK ABOUT EACH ARTICLE
 
 Do not pattern-match on topic. "Mentions monetization" is not relevance.
@@ -787,6 +805,13 @@ def select(dry_run: bool = False) -> list[dict]:
         return []
 
     log("stage 4: relevance scoring")
+    # What the listener has already heard, so a repeat of it has to prove it
+    # adds something. memory.py can't fail a run (it returns [] on any
+    # problem), and this rides inside prompts that are being sent anyway.
+    profile["_recent_topics"] = memory.load_recent_topics()
+    if profile["_recent_topics"]:
+        log(f"  {len(profile['_recent_topics'])} recently-covered topics "
+            "added to the scoring prompt")
     for i, art in enumerate(survivors):
         art["_idx"] = i
     scores = score_all(profile, survivors) if survivors else {}
