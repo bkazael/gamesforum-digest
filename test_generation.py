@@ -23,6 +23,7 @@ What has to hold, and why each is worth a test:
 from __future__ import annotations
 
 import copy
+import datetime as dt
 import os
 import pathlib
 import sys
@@ -51,11 +52,11 @@ print("\n--- Testing editorial prep / script / intro-last ---")
 
 ARTICLES = [
     {"url": "https://example.test/eu-kids", "title": "Daily log-in bonuses under threat in EU Kids Act",
-     "source": "PG", "text": "EU Kids Act text. " * 30, "_airtime": 0.40},
+     "source": "PG", "text": "EU Kids Act text. " * 30, "_airtime": 0.40, "published": dt.date(2026, 10, 2)},
     {"url": "https://example.test/youtube", "title": "YouTube rolls out Playables to 50 markets",
-     "source": "MG", "text": "Playables text. " * 30, "_airtime": 0.25},
+     "source": "MG", "text": "Playables text. " * 30, "_airtime": 0.25, "published": dt.date(2026, 10, 2)},
     {"url": "https://example.test/tyrads", "title": "TyrAds and Nordeus partner on rewarded engagement",
-     "source": "GF", "text": "Partnership text. " * 30, "_airtime": 0.35},
+     "source": "GF", "text": "Partnership text. " * 30, "_airtime": 0.35, "published": dt.date(2026, 10, 2)},
 ]
 
 # ---------------------------------------------------------------- 1. _clean_prep
@@ -333,6 +334,47 @@ check("add_intro puts the intro in front of the stories",
 check("add_intro marks the data so a resume never adds a second greeting",
       d["intro_done"] is True and d["intro_source"] == "model")
 
+# ---------------------------------------------------------------- 6b. enforcement the prompt alone could not hold
+#
+# 2026-10-04: six of 36 turns opened with an agreement word against a limit of
+# two (09-15 had thirteen of 35). A retry costs a whole Gemini request, so the
+# limit is enforced deterministically instead.
+
+AGREE = ["בדיוק.", "בהחלט,", "נכון.", "לגמרי,", "אכן.", "בדיוק,"]
+agree_script = dict(script_resp, script=[
+    {"speaker": A if i % 2 == 0 else B,
+     "text": f"{w} כך שהמפתחים צריכים לבדוק את כל הנתונים האלה ואת ההשלכות שלהם. " + words(300)}
+    for i, w in enumerate(AGREE)
+])
+P.gemini_json = lambda *a, **k: copy.deepcopy(agree_script)
+d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+opening = sum(1 for t in d["script"] if t["text"].startswith(P.script_quality.AGREEMENT_OPENERS))
+check("generate_podcast_content enforces the agreement-opener limit (2) without a retry",
+      opening == 2, f"{opening} turns still open with an agreement word")
+
+intro_agree = {"turns": [dict(t, text="בדיוק. " + t["text"]) for t in GOOD_INTRO["turns"]]}
+P.gemini_json = lambda *a, **k: copy.deepcopy(intro_agree)
+turns, source = P.write_intro(DATA, prep)
+check("the intro is trimmed of every agreement opener, so it passes first time",
+      source == "model" and not any(t["text"].startswith(P.script_quality.AGREEMENT_OPENERS) for t in turns[1:]))
+
+# prompt rules added after the first full real episode
+P.gemini_json = fake_script
+prompts.clear()
+P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep, memory_context="- 2026-09-22 (x): earlier")
+sp = prompts[0]
+check("the script prompt forbids claiming an earlier episode covered something it didn't",
+      "ONLY if it appears in the" in sp and "as we remember from previous" in sp)
+prompts.clear()
+P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep, memory_context="")
+check("with no history the prompt says not to refer to earlier episodes at all, "
+      "and never mentions a PREVIOUS EPISODES block that isn't there",
+      "Do not refer to earlier episodes at all" in prompts[0] and "PREVIOUS EPISODES" not in prompts[0])
+check("the script prompt caps turn length and asks for plain questions",
+      "No turn longer than about 80 words" in sp and "compound interview question" in sp)
+check("the script prompt stops every story ending on the same 'developers should' line",
+      "at most\n  two stories may end on an explicit" in sp.replace("  two", "\n  two") or "two stories may end on an explicit" in sp)
+
 # ---------------------------------------------------------------- 7. main(): the order, and when the checkpoint is written
 
 order, saves, synth = [], [], []
@@ -366,8 +408,18 @@ with tempfile.TemporaryDirectory() as tmp:
     P.memory.append_entry = lambda *_a, **_k: None
     P.memory.load_recent_context = lambda *_a, **_k: ""
     real_save = CP.save_content
-    CP.save_content = lambda date, arts, data: (saves.append(data.get("intro_done")),
-                                                real_save(date, arts, data))[1]
+    persisted = []
+
+    def _recording_save(date, arts, data):
+        saves.append(data.get("intro_done"))
+        real_save(date, arts, data)
+        # The 2026-10-04 live run printed "could not save content (Object of
+        # type date is not JSON serializable)" twice and still went green --
+        # a save that fails quietly looks exactly like one that worked unless
+        # the test reads the file back. The articles here carry real dates.
+        persisted.append(CP.load_content(date) is not None)
+
+    CP.save_content = _recording_save
     import discovery as _D
     _real_select = _D.select
     _D.select = lambda *a, **k: [dict(a_) for a_ in ARTICLES]
@@ -383,6 +435,8 @@ with tempfile.TemporaryDirectory() as tmp:
               ARTICLES[0]["title"] in fake_all.intro_prompt)
         check("the checkpoint is saved after the script (intro still owed), then after the intro",
               saves == [False, True], str(saves))
+        check("...and both saves really landed on disk, with real date-bearing articles",
+              persisted == [True, True], str(persisted))
         final = synth[0] if synth else []
         check("the audio script opens with the fixed welcome, then the model's intro, then the stories",
               final and final[0] == P.welcome_turn() and final[1] == GOOD_INTRO["turns"][0]

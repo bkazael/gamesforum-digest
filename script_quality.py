@@ -161,9 +161,43 @@ def count_words(script: list[dict]) -> int:
 # "מטורפים" and "עצום" never matches "עצומה". The first live intro
 # (2026-10-04) said "סכומים מטורפים" and slipped straight past a stem list
 # that only had the final form.
-HYPE_STEMS = ("עצום", "עצומ", "מטורף", "מטורפ", "מהפכ", "דרמט", "וואו",
+HYPE_STEMS = ("עצום", "עצומ", "מטורף", "מטורפ", "מהפכ", "דרמט", "דרמה", "דרמת", "וואו",
               "מדהים", "מדהימ", "מטאור", "game changer")
 AGREEMENT_OPENERS = ("בדיוק", "לגמרי", "בהחלט", "נכון", "אכן")
+
+
+_OPENER_RE = re.compile(
+    r"^(?:" + "|".join(AGREEMENT_OPENERS) + r")\s*[,.!:\u2014-]\s+(?=\S)"
+)
+
+
+def trim_agreement_openers(script: list[dict], keep: int = 2) -> tuple[list[dict], int]:
+    """Drop the leading agreement word from every turn after the first `keep`.
+
+    The script prompt limits turns that open with "בדיוק / לגמרי / בהחלט /
+    נכון / אכן" to two. The first real episode (2026-10-04) had six of 36,
+    despite the rule, and 09-15 had thirteen of 35 -- a prompt rule alone
+    does not hold, and a retry would cost a full Gemini request against a
+    small daily quota. This enforces the limit for free.
+
+    Deliberately narrow, so it can't damage a sentence: it only strips a
+    standalone opener followed by punctuation ("בדיוק. ועם כל..." ->
+    "ועם כל..."), and only when at least six words remain. A bare "בהחלט."
+    answering a question, or "בדיוק כמו ש..." where the word is part of the
+    sentence, is left exactly as it was. Returns (script, turns_changed).
+    """
+    seen, changed, out = 0, 0, []
+    for t in script:
+        text = (t.get("text") or "").strip()
+        m = _OPENER_RE.match(text)
+        if m:
+            seen += 1
+            rest = text[m.end():].lstrip()
+            if seen > keep and len(rest.split()) >= 6:
+                t = dict(t, text=rest)
+                changed += 1
+        out.append(t)
+    return out, changed
 
 
 def style_report(script: list[dict]) -> list[str]:
