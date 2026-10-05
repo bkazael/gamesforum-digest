@@ -1,0 +1,91 @@
+You write the INTRO of a weekly mobile-games podcast, AFTER the
+rest of the episode already exists, so that it can preview what is really in it.
+
+HOSTS: Dana (the anchor) and Yoni (the analyst). Dana has
+just said the welcome line: "ברוכים הבאים ל-Ben's Weekly Digest. אני דנה, ואיתי יוני."
+
+EPISODE TITLE: רגולציה על מטבעות ונתונים, D2C חדש ושיווק יצירתי: מאחורי הקלעים של גיימינג מובייל
+
+WHAT THE EPISODE CONTAINS, in running order:
+1. AppLovin takes legal action against Unity over Ad Quality SDK -- Operators should review their agreements with ad partners like Unity and AppLovin, especially regarding data collection and usage by SDKs, and understand implications for their own data privacy policies and compliance.
+2. NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this y -- Evaluate the adoption of local payment methods and D2C strategies for key emerging markets in LATAM to address unbanked populations and leverage popular local payment options, potentially expanding revenue channels.
+3. Europe's CPC targets King, Supercell, Mojang and others over virtual currencies -- Operators with games in the EU, particularly those with virtual currencies and monetization mechanics for children, must review their in-game commercial practices against the CPC Network's 'Key Principles' and prepare for potential regulatory enforcement or legislative changes.
+4. King’s Minecraft Blast is back in soft launch -- Observe how established IP (Minecraft) and proven casual mechanics (Candy Crush-style match-3, building meta) are iterated and re-tested in soft launch to inform potential future IP licensing, development, or genre expansion strategies.
+5. The Weekly Round-up -- Investigate Unity's new D2C payment options (IAP SDK 5.4) and Google's lowered Play Store commissions to optimize revenue. Also, monitor the development of foldable devices for potential future gaming opportunities and the role of AI in ad tech.
+6. Mario Kart Tour closes after seven years and nearly $270m in revenue -- Analyze the long-term revenue performance of existing live-service games, especially those that have modified core monetization mechanics like gacha, to inform future game design, live ops, and sunsetting strategies.
+7. In-game vs. web store: How to price and package for D2C without breaking your ga -- When implementing D2C, experiment with exclusive entitlements, loyalty programs, and direct checkout flows instead of just discounts, and consider creating web-store exclusive content, while always balancing changes with the game's economy.
+8. Playable Ads in 2027: AI, Creative Strategy & Mobile UA -- For mobile UA, evaluate integrating playable ads as a core strategy, explore AI tools to streamline their production while maintaining creative authenticity, and invest in analytics to iterate on specific 'Lego blocks' of playable design for better user qualification and retention.
+
+FACTS YOU MAY USE (each is only usable with its subject spelled out):
+- AppLovin filed for a temporary restraining order in California against Unity on October 1, 2026, seeking to restrict data collection and use.
+- AppLovin alleges Unity's Ad Quality SDK collected 'Protected Data' including creatives, users, devices, revenue, and engagement related to its ads.
+- NetEase Games Club partnered with EBANX to offer local payment options in Brazil, Mexico, Argentina, Chile, and Peru, including Pix, SPEI, PagoEfectivo, and Mercado Pago.
+- Pix is used by approximately 96% of Brazil's adult population (170 million people); 60 million people in Brazil lack credit cards.
+- Europe's Consumer Protection Cooperation Network (CPC) initiated 'coordinated actions' against major game companies including King, Supercell, and Mojang on September 30, 2026, regarding in-game virtual currency practices.
+- The CPC seeks compliance with 'Key Principles' announced last year, requiring transparent pricing, avoidance of practices hiding costs or forcing purchases, respect for withdrawal rights, and protection of child consumers.
+- Through-line: The mobile game ecosystem is navigating complex challenges and opportunities related to monetization, regulation, and user acquisition, pushing developers towards more diversified strategies and refined creative approaches.
+
+QUESTIONS THE EPISODE TAKES ON:
+- How might AppLovin's lawsuit against Unity's Ad Quality SDK impact the broader mobile advertising ecosystem's data collection practices and vendor trust, especially for smaller developers relying on these tools?  (left open)
+- Given NetEase's projected $8.4 billion in LATAM games revenue for 2026, and Google's recent Play Store commission reduction, how significant is the opportunity for other mobile game operators to boost revenue by adopting D2C payment strategies and local payment methods in emerging markets?
+- The CPC Network considers in-game currencies equivalent to fiat currency, while the industry sees them as digital content. How might this fundamental disagreement influence the viability and long-term enforcement of regulations like the 'Key Principles' and the upcoming Digital Fairness Act for mobile game IAPs?
+- What lessons can be learned from Mario Kart Tour's declining revenue, especially after the removal of gacha mechanics, for casual and puzzle game developers considering their long-term monetization strategies and the potential impact of regulatory changes on IAP?
+- With the dramatic increase in playable ad production and the role of AI in lowering barriers, how can mobile game developers ensure their playable ads remain authentic and truly represent the core gameplay, avoiding churn, especially when only 13-15% of studios currently use playables?
+- Given Unity's move to D2C payments and Google's new foldable-first gaming controls, how might these platform-level enhancements empower developers to diversify distribution and payment methods, particularly for new game experiences like Minecraft Blast?
+
+THE RULE THAT MATTERS MOST: the listener has heard nothing yet. Every
+company, product, system or figure you mention must be explained in the same
+breath, in a few plain words, the first time it appears -- "Pix, מערכת
+התשלומים המיידית של ברזיל", not "Pix". Never refer to "the number", "that
+story", "what we saw" or anything else the listener has not been told. If you
+cannot explain it in one short clause, leave it out. (The previous intro opened
+with the analyst saying a number about Pix in Brazil had surprised him: no
+hello, no idea what Pix is, and the banter that followed was built on it. It
+sounded like someone who forgot to say hello and started in the middle.)
+
+Write the turns that come right after the welcome line, in this order:
+1. Yoni greets back, simply and warmly ("היי דנה", "בוקר טוב, דנה"),
+   with at most one light line of his own that needs no context -- about the
+   work or the mood in the studio, never about this episode's content and
+   never a mood line about the week (no "what a week", no "שבוע ...").
+2. Dana answers in one short, friendly line, then turns to the episode:
+   a TEASER in plain spoken sentences -- 3 or 4 stories in the order they will
+   be told, each in ONE sentence saying what happened and why it matters to
+   someone who runs mobile games. Lead with the most interesting one and give
+   it one concrete number WITH its subject. No question marks in the teaser,
+   except at most one short question (under 12 words) that the episode answers
+   -- never one marked "left open", and never a compound question.
+3. Yoni reacts in one short, human line to something she just said --
+   now that the listener knows what it is. A raised eyebrow, a half-joke, a
+   quick opinion. Not a summary, and not a cliche ("just the tip of the
+   iceberg", "only you could...").
+4. Dana hands over to the first story with one short line that names it.
+Do NOT invent personal anecdotes presented as fact, and no weather or holiday
+small talk. Every turn is short and spoken: nothing over about 60 words except
+the teaser (about 90 at most).
+
+EXAMPLE OF THE SHAPE ONLY -- different stories; never reuse its wording or
+facts:
+Yoni: היי דנה, בוקר טוב.
+Dana: בוקר טוב, יוני. יש לנו היום פרק עם הרבה מספרים. נתחיל בחברת פרסום גדולה שעוברת למודל תמחור חדש, שבו מפתחים משלמים רק על התקנות שעדיין פעילות אחרי שבוע, ויש סטודיו אחד שמדווח שהעלות שלו ירדה בשליש. אחרי זה, חנות אפליקציות שפתחה בשוק גדול אפשרות לתשלום מחוץ לחנות, ומשחק פאזל ותיק שחזר לראש הטבלה אחרי שינוי בקצב העדכונים.
+Yoni: שליש זה לא מעט, אם זה מחזיק.
+Dana: נבדוק אם זה מחזיק. נתחיל בחברת הפרסום.
+
+Company and product names stay in English even here -- write AppLovin and
+Unity, never אפלובין or יוניטי.
+
+Tone: calm, like colleagues, not radio hosts. No hype words (avoid עצום,
+מטורף, מהפכה, דרמה, דרמטי, וואו, מדהים, "game changer") and no exclamations. No
+turn opens with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן). Nobody
+speaks more than two turns in a row.
+
+Total length: 130-230 words across all
+turns. Spoken Hebrew, as Israeli industry people talk. English terms (UA, CPI, LTV, IAP, ROAS, web shop, webstore) and all company and product names stay in English.
+Never use the ASCII double-quote character (") in the text: write Hebrew
+acronyms with the gershayim ״ (ארה״ב, מנכ״ל) or spell them out. Every turn
+ends with full punctuation. Do not repeat the welcome and do not introduce the
+hosts again.
+
+
+---
+OUTPUT FORMAT (for this manual test only): plain text, nothing else. One turn per line, every line starting with `Dana:` or `Yoni:`, in order, starting with Yoni's reply to the welcome line. No JSON, no markdown, no commentary before or after.

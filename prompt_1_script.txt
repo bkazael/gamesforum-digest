@@ -1,0 +1,873 @@
+You are the lead executive producer of a top-tier mobile gaming industry podcast.
+
+Your goal is an in-depth, highly structured episode covering key developments.
+
+EDITORIAL PREP -- your briefing notes, worked out BEFORE the dialogue is written. Every number and fact in it comes from the articles below:
+ARTICLE 1 -- AppLovin takes legal action against Unity over Ad Quality SDK  [stance: NEUTRAL_REPORTING]
+  - AppLovin filed for a temporary restraining order in California against Unity on October 1, 2026, seeking to restrict data collection and use.
+  - AppLovin alleges Unity's Ad Quality SDK collected 'Protected Data' including creatives, users, devices, revenue, and engagement related to its ads.
+  - AppLovin claims Unity used the collected data to train competing advertising models.
+  - Unity disputes AppLovin's claims, stating Ad Quality is 'a small, free product' and not the driver of its improved ad performance.
+  - AppLovin is seeking an order to stop data collection, disable relevant collection within five business days, and modify the Ad Quality SDK within 30 days.
+  careful: This is a legal dispute involving allegations and counter-allegations; no ruling has been made. Unity denies the claims, stating their Ad Quality product is not responsible for improved performance.
+  takeaway: Operators using Unity's Ad Quality SDK should monitor the outcome of this legal action and review their own data privacy practices and vendor agreements related to ad performance data collection.
+ARTICLE 2 -- NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this y  [stance: NEUTRAL_REPORTING]
+  - NetEase Games Club partnered with EBANX to offer local payment options in Brazil, Mexico, Argentina, Chile, and Peru, including Pix, SPEI, PagoEfectivo, and Mercado Pago.
+  - Pix is used by approximately 96% of Brazil's adult population (170 million people); 60 million people in Brazil lack credit cards.
+  - PagoEfectivo reaches 64% of Peru's adult population and SPEI reaches over 50% of adults in Mexico.
+  - EBANX projects these five Latin American markets to generate $8.4 billion in games revenue by the end of 2026, with Brazil contributing $3.8 billion.
+  - The partnership's initial rollout includes multi-platform games like Where Winds Meet and Marvel Rivals, so the projected revenue is not solely from mobile.
+  careful: The $8.4 billion revenue projection is based on Payment and Commerce Market Intelligence data analyzed by EBANX, a vendor, and includes revenue from multi-platform games, not exclusively mobile.
+  takeaway: Operators targeting Latin American markets should evaluate integrating local payment methods like Pix, SPEI, and PagoEfectivo to tap into a significant user base that may lack credit cards and unlock substantial revenue potential.
+ARTICLE 3 -- Europe's CPC targets King, Supercell, Mojang and others over virtual currencies  [stance: NEUTRAL_REPORTING]
+  - Europe's Consumer Protection Cooperation Network (CPC) initiated 'coordinated actions' against major game companies including King, Supercell, and Mojang on September 30, 2026, regarding in-game virtual currency practices.
+  - The CPC seeks compliance with 'Key Principles' announced last year, requiring transparent pricing, avoidance of practices hiding costs or forcing purchases, respect for withdrawal rights, and protection of child consumers.
+  - The CPC considers in-game currencies equivalent to fiat currency, while the games industry argues they are digital content, a core point of disagreement.
+  - Flux Digital Policy director Celia Pontin clarifies that the 'Key Principles' are guidelines, not legislation, and non-compliance is not automatically unlawful.
+  - Failure to address CPC concerns could lead to enforcement measures by national authorities, and the CPC intends for these cases to set precedents, potentially influencing the upcoming Digital Fairness Act.
+  careful: The 'Key Principles' are guidelines, not legally binding legislation, and their enforceability under current EU consumer law is unclear. No specific breaches have been identified yet; the actions are 'further assessments' and requests for changes.
+  takeaway: Operators with games in the EU that use virtual currencies must review their IAP practices for pricing transparency and fairness, especially concerning child consumers and any 'pressuring techniques', aligning with the CPC's 'Key Principles' to mitigate future regulatory risks.
+ARTICLE 4 -- King’s Minecraft Blast is back in soft launch  [stance: NEUTRAL_REPORTING]
+  - King's Minecraft Blast, a Minecraft spin-off, re-entered soft launch in Malaysia on Google Play only as of September 30, 2026.
+  - The game previously soft-launched in Malaysia and Canada on iOS in November 2025 and was removed a month later.
+  - The new version features updated graphics, six new blockers, four new chapters, daily play rewards, a new Raid Tournament, a weekly leaderboard contest, and a customisable companion system.
+  - The game's updated store description and trailer suggest Candy Crush-style map progression and a building-based meta.
+  - Minecraft Blast is developed by King (makers of Candy Crush) and Mojang Studios (makers of Minecraft).
+  careful: This is a soft launch for testing and development; the game's final features, performance, or global release are not guaranteed. It is currently limited to a single country and platform.
+  takeaway: Puzzle game operators should observe Minecraft Blast's re-soft launch, paying attention to its new features like the Raid Tournament, weekly leaderboards, and building meta as potential innovations in the genre.
+ARTICLE 5 -- The Weekly Round-up  [stance: NEUTRAL_REPORTING]
+  - Google is trialing foldable-first gaming controls for Android 17, transforming the lower half of foldable smartphones into customisable virtual game controllers.
+  - AppsFlyer reportedly raised over $1 billion in new funding, valuing the company at approximately $2.7 billion, with rumored backing from Google, Meta, Unity, and Moloco.
+  - Unity released IAP SDK 5.4, introducing direct-to-consumer (D2C) payment support via web-based storefronts, alongside traditional in-app purchases.
+  - Google reduced Play Store commission rates to around 10% for many developer scenarios, including those exceeding certain revenue thresholds and auto-renewing subscriptions.
+  careful: AppsFlyer's funding is 'reportedly' secured and 'rumoured' to have specific backers; these details are not officially confirmed in the article. Google's commission reduction is 'around 10%' and applies to 'many' developer scenarios, not universally.
+  takeaway: Developers should investigate Unity's IAP SDK 5.4 for D2C payment options to diversify monetization, and review Google Play Store's updated commission rates to assess potential improvements in profitability for their titles, especially subscriptions.
+ARTICLE 6 -- Mario Kart Tour closes after seven years and nearly $270m in revenue  [stance: NEUTRAL_REPORTING]
+  - Nintendo shut down Mario Kart Tour on September 29, 2026, after nearly seven years of service since its launch in September 2019.
+  - AppMagic estimates the game accumulated over 276 million downloads and generated $268.5 million in lifetime IAP revenue.
+  - IAP revenue peaked at nearly $22 million in its first month (October 2019) but declined significantly over time, averaging $5-6 million/month in 2020-2021 and $3 million/month in late 2021-2022.
+  - The removal of gacha mechanics in late 2022 hastened the IAP revenue decline, with monthly earnings around $650k when the shutdown was announced in July.
+  - 39% of the game's lifetime IAP revenue came from US players, and 26% from Japan.
+  careful: The downloads and revenue figures are AppMagic 'estimates' and not official Nintendo reported data.
+  takeaway: Operators should critically analyze the long-term sustainability of their monetization models, particularly the impact of gacha mechanics and their removal, on revenue trends and game longevity, even for strong IPs.
+ARTICLE 7 -- In-game vs. web store: How to price and package for D2C without breaking your ga  [stance: VENDOR_MARKETING]
+  - Only 2-3% of players spend money in many mobile games, making the first web store purchase a significant challenge for D2C monetization.
+  - A/B test data suggests offering additional entitlements (more items for the same price) consistently outperforms price discounts for D2C conversion and revenue.
+  - Direct checkout, which streamlines the purchase journey to a single item's web-hosted checkout page, leads to high return purchase rates (around 90% for FastSpring's larger clients).
+  - Publishers can drive D2C behavior without changing prices by implementing content creator programs or loyalty currency systems (redeemable only in the web store).
+  - Product exclusivity, such as a subscription tier, cosmetic item, or content bundle available only on the web store, is an effective tool for driving D2C channel engagement.
+  careful: The article is sponsored content by FastSpring, a D2C payment vendor, and its data (e.g., A/B test results) are from 'one game,' not a 'universal truth.' The fast-moving regulatory environment around 'steering' is also noted as a factor to watch.
+  takeaway: When implementing D2C strategies, operators should prioritize offering exclusive content or additional entitlements over simple price discounts, streamline the checkout process, and consider creator or loyalty programs to encourage web store purchases.
+ARTICLE 8 -- Playable Ads in 2027: AI, Creative Strategy & Mobile UA  [stance: NEUTRAL_REPORTING]
+  - Playable ads have shifted from experimental to core UA strategy; the proportion of new creatives produced as playables rose from 10-15% in Q4 2025 to 30% in six months.
+  - Average playable production per studio increased more than fourfold, from 17 to 71 per quarter.
+  - AI is lowering the barrier to playable production by increasing speed and volume, but creative strategy, game knowledge, and understanding player experience remain crucial.
+  - Playables should deliver the 'core experience' or 'joy' of the product quickly and authentically, rather than recreating the entire game, to qualify users effectively and avoid churn.
+  - Playable analytics are evolving towards a 'Lego block' approach, enabling analysis of individual components (hook, headline, mechanics) to inform rapid iteration and optimization.
+  careful: While playable ad adoption is growing, only 13-15% of gaming studios currently use them, suggesting cost and complexity remain barriers for smaller developers. Insights are primarily from a panel discussion, reflecting expert opinions.
+  takeaway: Operators should explore leveraging AI for scalable playable ad production, focus on delivering authentic core gameplay experiences to qualify users, and adopt a modular design approach for rapid iteration and data-driven optimization of creative elements.
+
+QUESTIONS TO DEBATE
+Q1 (articles 1): How might AppLovin's lawsuit against Unity's Ad Quality SDK impact the broader mobile advertising ecosystem's data collection practices and vendor trust, especially for smaller developers relying on these tools?
+   no answer in the material -- OPEN
+Q2 (articles 2,5,7): Given NetEase's projected $8.4 billion in LATAM games revenue for 2026, and Google's recent Play Store commission reduction, how significant is the opportunity for other mobile game operators to boost revenue by adopting D2C payment strategies and local payment methods in emerging markets?
+   answer [ARTICLE]: NetEase's partnership with EBANX highlights a significant revenue opportunity in LATAM, with an $8.4 billion projection for five markets by end of 2026. This market has high usage of local payment methods like Pix (96% in Brazil) and a large population without credit cards, making D2C strategies with localized payments crucial for access. Google's reduction of Play Store commissions to around 10% improves margins, but D2C offers greater control and potentially higher revenue per transaction through additional entitlements or exclusive content, as FastSpring suggests. Operators can increase their share of this revenue by directly addressing regional payment preferences and leveraging D2C channels.
+Q3 (articles 3): The CPC Network considers in-game currencies equivalent to fiat currency, while the industry sees them as digital content. How might this fundamental disagreement influence the viability and long-term enforcement of regulations like the 'Key Principles' and the upcoming Digital Fairness Act for mobile game IAPs?
+   answer [ARTICLE]: This disagreement is critical because it dictates how in-game currencies are sold and used. If in-game currencies are treated like fiat, it implies stricter regulations on pricing transparency, withdrawal rights, and consumer protection (especially for children). If they are merely digital content, the existing interpretations of consumer law might not apply as directly. The CPC intends to set a precedent with its current actions that could influence the Digital Fairness Act, making the resolution of this definitional conflict crucial for future EU consumer protection legislation impacting IAP practices.
+Q4 (articles 3,6): What lessons can be learned from Mario Kart Tour's declining revenue, especially after the removal of gacha mechanics, for casual and puzzle game developers considering their long-term monetization strategies and the potential impact of regulatory changes on IAP?
+   answer [ARTICLE]: Mario Kart Tour generated $268.5 million over seven years, but its IAP revenue peaked early and steadily declined, with a significant drop after gacha mechanics were removed in late 2022. This suggests that while gacha can drive initial revenue, its removal (possibly due to regulatory pressures or evolving player sentiment, similar to the EU's CPC concerns about consumer protection) can severely impact monetization. Developers should assess how reliant their games are on specific IAP mechanics and plan for diversified, sustainable monetization strategies that can withstand potential regulatory shifts or changes in player preference without destabilizing the game economy, as discussed in Article 3 regarding virtual currencies.
+Q5 (articles 8): With the dramatic increase in playable ad production and the role of AI in lowering barriers, how can mobile game developers ensure their playable ads remain authentic and truly represent the core gameplay, avoiding churn, especially when only 13-15% of studios currently use playables?
+   answer [ARTICLE]: Developers must ensure that playable ads deliver the 'core experience' or 'joy' of the product quickly and authentically. The panel emphasized that 'the promise made in the playable ad must be matched in the product' to avoid churn. While AI can boost production volume, creative strategy and game knowledge are still critical for making better playables, not just more. Adopting a modular approach allows for rapid iteration of elements while maintaining core authenticity. Studios should also analyze what happens inside the playable ('Lego block' approach) to understand what truly resonates with players and continuously refine their creatives.
+Q6 (articles 4,5,7): Given Unity's move to D2C payments and Google's new foldable-first gaming controls, how might these platform-level enhancements empower developers to diversify distribution and payment methods, particularly for new game experiences like Minecraft Blast?
+   answer [ARTICLE]: Unity's IAP SDK 5.4 for D2C payments and Google's lower Play Store commissions offer developers more flexibility and control over monetization and revenue. D2C, as explained by FastSpring, allows for varied pricing, promotions, and customer relationships, and can be optimized through entitlements, exclusive content, and loyalty programs. Google's foldable-first gaming controls for Android 17 represent an investment in unique hardware experiences, potentially creating new engagement models. For games like Minecraft Blast, which is in soft launch and adapting its meta, these platform changes could open avenues for tailored monetization (e.g., D2C for exclusive items) and optimized gameplay experiences on emerging hardware, fostering new distribution and payment strategies beyond traditional app store models.
+
+THROUGH-LINE: The mobile game ecosystem is navigating complex challenges and opportunities related to monetization, regulation, and user acquisition, pushing developers towards more diversified strategies and refined creative approaches.
+
+STRUCTURE OF THE SHOW:
+1. NO INTRO. The welcome, a moment of host banter and a preview of the
+   episode are recorded separately, AFTER this script is finished, so that
+   they can preview what is actually said. Do not greet, do not introduce the
+   show or the hosts, do not outline the topics. Dana's first turn
+   opens the first story directly, in one natural sentence a listener who has
+   just heard the preview can follow.
+2. DEEP DIVE SEGMENTS, in the order of the articles, each given the airtime
+   marked on it (the lead story gets the longest treatment; the last may get
+   only a few sentences):
+   - Say what happened and give the numbers WITH what they compare to.
+   - Then a real exchange. One host raises a doubt or a question and the OTHER
+     ANSWERS it with specifics in the next turn -- a question is never left
+     hanging. When the hosts agree, the second must add something the first
+     did not say. Where the evidence supports it, they disagree or point out
+     a caveat.
+   - Close each story with one concrete takeaway an operator in casual,
+     puzzle, hybrid-casual or real-money skill games could check, test or
+     watch.
+   - Work from the EDITORIAL PREP above: use its points, in your own words.
+   - A source marked COMPANY_CLAIMS or VENDOR_MARKETING is ATTRIBUTED, never
+     endorsed ("according to the company", "by their own numbers"). Do not
+     present its claim as established fact, and never repeat a company's
+     slogan as if it were an insight. Its airtime follows the evidence, not
+     the enthusiasm.
+   - Raise every QUESTION TO DEBATE where its stories come up. An answered
+     question is answered on air from the supplied answer, in your words. An
+     OPEN question is said plainly to be open ("we don't know yet", "one to
+     watch") -- never answered with something invented.
+   - Respect each "careful" note: do not overstate what it warns about.
+3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
+4. EPISODE METADATA: Generate a highly engaging, catchy episode title based on the stories covered.
+
+CHARACTER DYNAMICS:
+- Dana (Dana - Female Anchor): Leads strategy, numbers, and overarching market trends, and answers Yoni's questions with specifics.
+- Yoni (Yoni - Male Analyst): Analytical, questions assumptions, probes UA/LTV realities.
+
+SPEECH NATURALISM:
+- Write in natural Hebrew as spoken by Israeli mobile gaming executives (use Dana [Female Anchor] and Yoni [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP, web shop, webstore in English (never translate them literally).
+- Target Script Length: 1,400 to 1,800 words for the stories and outro (the intro is recorded separately). Keep it detailed, engaging, and professional.
+- Calm and precise, like two colleagues -- not radio hosts. No stacked
+  intensifiers or hype: avoid words like עצום, מטורף, מהפכה, מהפכני, דרמטי,
+  וואו, מדהים, "game changer" and their English equivalents; at most one
+  strong adjective per story, and only when the number justifies it. No
+  exclamations of surprise.
+- Do not begin more than two turns in the whole episode with an agreement
+  word (בדיוק, לגמרי, בהחלט, נכון, אכן). Respond to what was just said by
+  adding to it or questioning it.
+- Keep it conversational. No turn longer than about 80 words: split a long
+  explanation into a back-and-forth instead of two hosts trading essays.
+- Ask questions the way a person would: short, plain, one clause. Never a
+  compound interview question ("given that X and Y, what is the single most
+  critical factor for...").
+- Weave each story's takeaway into the conversation in your own words. Do not
+  close every story with the same formula ("developers should ..."); at most
+  two stories may end on an explicit "developers should" line.
+- Do not refer to earlier episodes at all: there is no history to call back to.
+- Never read a URL aloud; attribute by outlet name.
+- Never use the ASCII double-quote character (") anywhere in the spoken text.
+  Write Hebrew acronyms with the Hebrew gershayim ״ (ארה״ב, מנכ״ל, צה״ל,
+  בע״מ) or spell them out, and quote a phrase with single quotes ' or leave
+  it unquoted. Every turn must end with complete punctuation (. ? ! …).
+
+SOURCE ARTICLES:
+ARTICLE 1: AppLovin takes legal action against Unity over Ad Quality SDK  [airtime: ~40% of the episode, about 640 words]
+URL: https://www.pocketgamer.biz/applovin-takes-legal-action-against-unity-over-ad-quality-sdk/
+
+AppLovin is seeking restrictions on Unity’s collection and use of advertising data
+
+ By Paige Cook 
+
+ October 1, 2026 
+
+ Share:
+
+ Prefer PocketGamer.biz on Google 
+
+ AppLovin alleges Unity’s Ad Quality SDK collected data relating to its ads, including information on creatives, users, devices, revenue and engagement.
+
+ Unity has disputed AppLovin’s claims and argued that its own Ad Quality product is not responsible for its improved advertising performance.
+
+ Stay Informed 
+
+ Get Industry News In Your Inbox…
+
+ Sign Up Today
+
+ AppLovin has taken legal action against Unity over data collected through the latter’s Ad Quality SDK. 
+
+ As first reported by Digiday , AppLovin has applied for a temporary restraining order in California seeking to prevent Unity from collecting and using certain data relating to its advertising business. 
+
+ The company alleges that Unity’s SDK has collected data related to ads won and served by AppLovin, including data on creatives, users, devices, revenue, and engagement. AppLovin also claims that Unity has used the information to help train models that compete with its advertising business. 
+
+ AppLovin is asking the court to stop Unity from collecting or using what it defines as “Protected Data” and to turn off the relevant data collection within five business days. It is also seeking changes to the Ad Quality SDK within 30 days.
+
+ Heated rivalry 
+
+ Unity has pushed back against the action, describing Ad Quality as “a small, free product” that helps prevent inappropriate and harmful ads from appearing in games.
+
+ “AppLovin’s legal filings against us are a classic case of a dominant incumbent resorting to litigation and intimidation to address increased competition and slowing growth,” said a Unity spokesperson. 
+
+ Unity has also argued that AppLovin’s own Ad Review product, formerly known as SafeDK, is “far more intrusive” than Ad Quality.
+
+ AppLovin, however, rejected the comparison, arguing that Ad Review is used for ad moderation and operates only on impressions mediated through its MAX platform, rather than to build user profiles or models. 
+
+ Unity has also rejected the suggestion that Ad Quality is responsible for its improved advertising performance. 
+
+ “In reality, Ad Quality isn’t the driver of our improved performance, so they’ll be frustrated in that attempt regardless of how this suit is adjudicated,” the spokesperson added. 
+
+ AppLovin has started arbitration proceedings against Unity over the wider dispute, including claims of breach of contract, trade-secret misappropriation and unfair competition. 
+
+ Unity said it intends to oppose AppLovin’s application.
+
+ #Advertising 
+
+ #Mobile Advertising 
+
+ #data privacy 
+
+ #legal action 
+
+ Companies
+
+ Related
+
+ The Esports World Cup unpacked and lightning strikes twice for Supercell | Week in Mobile Games podcast 
+
+ 74% of consumers use mobile ads to discover new apps 
+
+ Generation X make more in-app purchases than any other group 
+
+ July 2026's Movers and Shakers: Rollic, Scopely, Nodwin Gaming, Rovio and more 
+
+ Apple and Google continue to lead in mobile game ads, but AppLovin wins over select genres
+
+ARTICLE 2: NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this year  [airtime: ~25% of the episode, about 400 words]
+URL: https://www.pocketgamer.biz/netease-games-club-partners-with-ebanx-projecting-84bn-in-latam-revenue-this-year/
+
+Payment methods introduced through the partnership will include Pix, SPEI, PagoEfectivo and Mercado Pago
+
+ By Aaron Astle 
+
+ October 1, 2026 
+
+ Share:
+
+ Prefer PocketGamer.biz on Google 
+
+ NetEase Games Club has partnered with EBANX to enable local payment options in Brazil, Mexico, Argentina, Chile and Peru.
+
+ Pix is said to be used by around 96% of Brazil’s adult population.
+
+ Stay Informed 
+
+ Get Industry News In Your Inbox…
+
+ Sign Up Today
+
+ NetEase Games Club has partnered with EBANX to introduce a range of local payment methods for players in Brazil, Mexico, Argentina, Chile and Peru.
+
+ The payment options include Pix, SPEI, PagoEfectivo and Mercado Pago.
+
+ The move aims to ease the purchasing process for players in Latin America. Pix is said to be used by around 96% of Brazil’s adult population, for example, equating to 170 million people. Conversely, 60m people in the country don’t have a credit card.
+
+ PagoEfectivo reaches 64% of Peru’s adult population and SPEI reaches more than 50% of adults in Mexico.
+
+ Billions in expectations 
+
+ NetEase Games Club will offer these payment methods in Where Winds Meet, Marvel Rivals and other NetEase titles. The five Latin American countries are part of the "initial rollout".
+
+ Based on Payment and Commerce Market Intelligence data analysed by EBANX, the pair anticipate these five markets will generate $8.4 billion in games revenue by the end of this year. Brazil, the largest of these markets and the country where EBANX was founded, is expected to contribute $3.8bn.
+
+ It's worth noting games like Where Winds Meet are available across platforms, meaning this likely isn't all expected from mobile.
+
+ "The next wave of video game growth is coming from emerging markets, and Latin America is leading it," said EBANX VP of commercial for APAC Sean Yu.
+
+ "By combining cards with the local payment methods players actually use, NetEase Games Club is building a truly localised checkout experience and unlocking access to a much larger share of the region's revenue potential."
+
+ #Partnership 
+
+ #Brazil 
+
+ #LATAM 
+
+ #Alternative Payment Methods 
+
+ Companies
+
+ Related
+
+ Blizzard grants NetEase greater decision-making power over its games in China 
+
+ The M&A roll-up strategy claims another victim, Destiny: Rising comes to mobile, and the Game Freak leak | Week in Views 
+
+ NetEase partners with Bungie for Destiny: Rising mobile game 
+
+ Microsoft saves the day: Activision Blizzard games are set to return to China in new NetEase deal 
+
+ Activision Blizzard kiss and make up with NetEase ahead of China return
+
+ARTICLE 3: Europe's CPC targets King, Supercell, Mojang and others over virtual currencies  [airtime: ~5% of the episode, about 92 words]
+URL: https://www.pocketgamer.biz/europes-cpc-targets-king-supercell-mojang-and-others-over-virtual-currencies/
+
+The Consumer Protection Cooperation Network has called for top publishers to bring their commercial practices in line regarding virtual currencies
+
+ By Craig Chapple 
+
+ September 30, 2026 
+
+ Share:
+
+ Prefer PocketGamer.biz on Google 
+
+ Stay Informed 
+
+ Get Industry News In Your Inbox…
+
+ Sign Up Today
+
+ Europe's Consumer Protection Cooperation Network is taking "coordinated actions" against a string of top games companies as it looks to investigate compliance with 'Key Principles' on in-game virtual currencies announced last year .
+
+ The CPC is a network of national authorities responsible for the enforcement of EU consumer protection laws. It has asked Activision Blizzard, Crytek, InnoGames, King, Mojang, Plarium, PLR Worldwide Sales, Riot Games, Supercell and Ubisoft to bring their commercial practices in line relating to in-game virtual currencies.
+
+ Games being assessed include Hunt: Showdown 1896, Forge of Empires, Candy Crush Saga, Minecraft, Mech Arena, Gardenscapes, Valorant, Clash of Clans, For Honor, Diablo Immortal and Call of Duty Mobile.
+
+ The games were selected for assessment by the CPC Network "in the context of a wide-scale market compliance check due to broad reach, cross-device accessibility, and varied age ratings, all of which amplify the impact of the practices on consumers".
+
+ It's not clear what, if any, 'Key Principles' have not been adhered to prior to the CPC Network opening its investigations.
+
+ The CPC Network said failure to address its concerns raised could lead to enforcement measures by national authorities. It's not clear whether any such action would be enforceable under current EU consumer protection laws.
+
+ Virtual currency rules 
+
+ The move follows the announcement last year of ‘Key Principles’ for virtual currencies in games. This called on publishers to display the real cost of microtransactions. Specifically, publishers were asked to:
+
+ Provide clear and transparent pricing and pre-contractual information;
+
+ Avoid practices hiding the costs of in-game digital content and services, as well as practices forcing consumers to purchase virtual currency;
+
+ Respect consumers’ right of withdrawal;
+
+ Respect consumer vulnerabilities, in particular when it comes to children.
+
+ Following the publication, the CPC Network and European Commission said they invited the games industry to present “concrete actions” to comply with them. Discussions did not result to a satisfactory result, it said, leading to today's announcement.
+
+ It was claimed that a “high number” of games companies have not made any substantive changes to their titles following the publishing of CPC Network’s public guidance or “extensive talks” over recent years.
+
+ Star Stable Entertainment has already faced action over the alleged lack of transparency in Star Stable Online. The CPC claimed the company violated rules by offering direct exhortation to children in advertisements, offering a lack of clear and transparent information, and using pressuring techniques such as time-limited practices to “unduly influence” children to make in-app purchases.
+
+ “The CPC Network will continue to take joint enforcement actions, where appropriate, to address practices that do not comply with EU consumer protection legislation," read a statement.
+
+ "On this basis the CPC Network calls on all companies active in the video gaming sector to review their practices and address any compliance issues, in particular those raised in the existing CPC Network common positions and any subsequent one which will be disclosed in the future."
+
+ What it really means 
+
+ Flux Digital Policy director of policy and public affairs Celia Pontin told PocketGamer.biz the CPC Network's princples on in-game currencies have been contentious from the start. Video Games Europe and the European Games Developer Federation had referred to them as “new legal theories and misguided interpretations of EU consumer law".
+
+ "The main root of this is that the CPC considers in-game currencies to be on a par with fiat currency, whereas the industry points to a long-standing legal view that they are just a kind of digital content – this difference matters when it comes to how in-game currencies are sold and used," explained Pontin.
+
+ "There are also concerns about the viability of the Principles, with some of the requirements being unworkable for some (very legitimate) contexts or creating a risk of making situations less clear for consumers.
+
+ "Importantly, the CPC Principles themselves are not legislation; they are a set of guidelines from the regulatory enforcement network. And that’s in the Principles document itself - on the final page there’s a footnote stating that compliance with the recommendation is not a guarantee of compliance with the law and, crucially, that 'not respecting the recommendations contained in this document cannot be automatically considered unlawful'. That’s why the disagreement about their interpretation of the law is so important."
+
+ Pontin added that, from the press statements given, it's unclear what the CPC is doing.
+
+ "It says that it carried out a market check of compliance with the Principles and identified several games requiring ‘further assessment’, as well as their intention to request changes to commercial practices around in-game currency.
+
+ "Nothing specific has been identified as an issue and no-one has been found to have breached the law. It’s also important to note that any changes a company might make during the course of an investigation does not mean that their original approach was non-compliant.
+
+ "If someone is found to be in breach, the consequences depend on an awful lot of factors – the enforcement framework of the relevant Member State, the specific issue being investigated, whether or not changes are agreed, and others."
+
+ However, Pontin noted that the CPC has stated its intention to set a precedent for the future with these cases.
+
+ "With the Principles being so closely aligned to the expected position of the upcoming Digital Fairness Act, this precedent could go far beyond the Principles and potentially influence the law itself."
+
+ Following today's announcement, Michael McGrath, Commissioner for Democracy, Justice, the Rule of Law and Consumer Protection, said the industry must ensure that its games do not expose players, especially children, to harmful or unfair practicies.
+
+ "The game must be fair, and the rules must be respected. National authorities, with the support of the Commission, will make sure they are enforced."
+
+ You can read the announcement from the European Commission here .
+
+ Regulation and digital policy will be hot topics at our upcoming shows like Pocket Gamer Connects Nordics on October 20th to 21st and PGC London on January 18th and 19th.
+
+ We recently analysed Europe's incoming regulations, like the EU Kids Act and Digital Fairness Act, in our latest newsletter .
+
+ #Regulation 
+
+ #European Union 
+
+ #European Commission 
+
+ Companies
+
+ People
+
+ Related
+
+ July 2026's Movers and Shakers: Rollic, Scopely, Nodwin Gaming, Rovio and more 
+
+ The biggest gaming acquisitions of all time 
+
+ Week in Views - What caught our editorial eyes in the last seven days 
+
+ Top 50 Mobile Game Developers of 2017 
+
+ Top 50 Mobile Game Developers of 2015
+
+ARTICLE 4: King’s Minecraft Blast is back in soft launch  [airtime: ~5% of the episode, about 92 words]
+URL: https://mobilegamer.biz/kings-minecraft-blast-is-back-in-soft-launch/
+
+By 
+ 
+ Neil Long 
+
+ / 30th September 2026 
+
+ King’s Minecraft Blast has returned to soft launch. At the time of writing it is downloadable in Malaysia on Google Play only.
+
+ The game’s store page features new game assets and a new trailer, below. The game’s new store blurb states that the new edition of the Minecraft spin-off has six new blockers, four new chapters, daily play rewards, a new Raid Tournament, a weekly leaderboard contest and a customisable companion system.
+
+ The new trailer also suggests Minecraft Blast will have Candy Crush-style map progression and a building-based meta.
+
+ “Your next Minecraft Blast puzzle adventure starts now! More worlds to explore. More puzzles to blast. More ways to play,” reads the blurb.
+
+ As we reported previously, Minecraft Blast was quietly soft launched in Malaysia and Canada in November 2025 , on iOS only. AppMagic data suggests the game was removed from testing a month later.
+
+ The new store entry shows notably updated graphics from that first edition of the game. The updated store blurb, translated from Malay, reads: “A delightful block-puzzle adventure from the world of Minecraft! Match and build in Minecraft Blast, a brand-new way to experience Minecraft on mobile.”
+
+ “It comes from King (makers of Candy Crush) and Mojang Studios (makers of Minecraft). Blast through fun, challenging matching puzzles to earn rewards and build the world around you in seconds. Creating something amazing has never been easier.”
+
+ The store description goes on to say players can “Design, decorate and expand” their Minecraft Blast world, customise a Buddy character, meet Chickens, Zombies and Creepers along the way and “ Discover exciting locations such as bustling villages, mysterious caves and even pirate ships, all full of Minecraft’s special charm.” 
+
+ Read on 
+
+ Video Games Europe hits back at EU watchdog targeting King, Supercell, Mojang and more over IAP practices 
+
+ AppLovin sues Unity over alleged data collection through its Ad Quality SDK 
+
+ Search for: 
+
+ Search 
+
+ Follow us
+
+ LinkedIn 
+
+ X 
+
+ Apple Podcasts 
+
+ Spotify 
+
+ YouTube 
+
+ Threads 
+
+ Facebook 
+
+ Story archive
+
+ Support this site with a paid newsletter subscription. 
+
+ x 
+
+ Scroll to Top 
+
+ Loading Comments... 
+
+ Write a Comment... 
+
+ Email (Required) 
+
+ Name (Required) 
+
+ Website
+
+ARTICLE 5: The Weekly Round-up  [airtime: ~5% of the episode, about 92 words]
+URL: https://www.globalgamesforum.com/news-media/the-weekly-round-up
+
+By Nicole Lumley 3 July 2026 
+
+ This week saw major changes and developments within the industry. Google has designed a new gaming system for Android 17, there has been important funding news in mobile marketing, new monetisation tools for developers, and another shift in Play Store economics.
+
+ Android 17 Introduces Foldable-First Gaming Controls
+
+ Google is reportedly trialing a new gaming experience, specifically for Android 17 foldable devices. The feature transforms the lower half of a foldable smartphone into a fully customisable virtual game controller, while gameplay runs on the upper display.
+
+ With this new experience, developers and players will be able to customise controller layouts inspired by Xbox and PlayStation controllers, adjust button positioning and sizing and take advantage of haptic feedback for a more console-like user experience. The feature could significantly improve the gaming experience on foldable devices without requiring external accessories.
+
+ If introduced publicly, it would represent one of Google's biggest platform-level gaming enhancements for foldables to date.
+
+ AppsFlyer Reportedly Raises Over $1 Billion
+
+ AppsFlyer, a mobile measurement and attribution platform, has reportedly secured more than $1 billion in new funding, valuing the company at approximately $2.7 billion.
+
+ The funding round is rumoured to have backing from major industry players including Google, Meta, Unity and Moloco. The funding is said to contribute towards investment in AI-powered advertising analytics, mobile attribution and marketing measurement. This comes at a time where competition has intensified across the mobile advertising ecosystem.
+
+ The investment highlights continued confidence in attribution and analytics platforms despite ongoing changes to privacy regulations and advertising measurement.
+
+ Unity Expands IAP with Direct-to-Consumer Payments
+
+ Unity has released IAP SDK 5.4, introducing support for direct-to-consumer (D2C) payments.
+
+ The update enables developers to sell digital content through web-based storefronts alongside traditional in-app purchases via Apple and Google app stores. By supporting external purchasing channels, studios gain greater flexibility over pricing, promotions, customer relationships and overall revenue management.
+
+ The move reflects a growing industry trend toward diversified monetisation strategies and greater control over player transactions.
+
+ Google Lowers Play Store Commission
+
+ Google has announced a significant update to its Play Store fee structure, reducing commission rates to around 10% across many developer scenarios.
+
+ The policy change is designed to lower costs for developers, particularly those exceeding certain revenue thresholds and publishers offering auto-renewing subscription services. The revised fee structure is expected to improve margins while making the Play Store more competitive as developers increasingly explore alternative distribution and payment options.
+
+ The reduction marks another notable shift in Google's evolving approach to app marketplace economics.
+
+ Today's Takeaway
+
+ Today's announcements underline four major industry trends shaping the mobile ecosystem:
+
+ Google continues to invest in unique experiences for emerging hardware, with foldable gaming becoming a growing focus.
+ AI remains a key investment area, as demonstrated by AppsFlyer's reported billion-dollar funding round.
+ Developers are gaining more freedom over monetisation through Unity's new direct-to-consumer purchasing capabilities.
+ Platform economics continue to evolve, with Google's lower Play Store commissions potentially improving profitability for developers.
+ 
+ Together, these developments point toward a more developer-friendly mobile ecosystem, with increased flexibility in distribution, monetisation, and gaming experiences.
+
+ARTICLE 6: Mario Kart Tour closes after seven years and nearly $270m in revenue  [airtime: ~5% of the episode, about 92 words]
+URL: https://mobilegamer.biz/mario-kart-tour-closes-after-seven-years-and-nearly-270m-in-revenue/
+
+By 
+ 
+ Vikki Blake 
+
+ / 30th September 2026 
+
+ Nintendo shut down Mario Kart Tour yesterday, ending almost seven years of service for the mobile racer.
+
+ Nintendo announced the shutdown on July 8 , giving no reason beyond thanking players “who have loved and supported the game since service began so long ago.”
+
+ Mario Kart Tour was released worldwide in September 2019. According to AppMagic estimates, downloads peaked on September 26 2019 , when it was downloaded 14.7m times in 24 hours. In its first week on sale, it was downloaded 54m times, and after its first month it had racked up 81.8m downloads.
+
+ AppMagic estimates suggest Mario Kart Tour has been downloaded over 276m times since launch, generated $268.5m for Nintendo. The game’s IAP revenue peaked just after launch, when it earned just under $22m in October 2019.
+
+ Nintendo failed to build revenue momentum with Mario Kart Tour over time, though – monthly IAP revenue came in at about $5-6m for most of 2020 and 2021, and further declined through late 2021 and 2022, when it averaged roughly $3m per month.
+
+ Nintendo removed the gacha mechanics from the title in late 2022, hastening the IAP revenue decline further. Mario Kart Tour was earning around $650k per month when Nintendo announced that it was closing in July .
+
+ 39% of the game’s $268.5m lifetime IAP revenue came from players in the US, with 26% from Japan. Other markets took up single digit shares of the revenue, with France, Germany and the UK on 5-6%. The download market split was led by the US (21%), Mexico (12%), Brazil (9%) and Japan (7%).
+
+ “Service for the Mario Kart Tour game ends on Sept. 29 at 11:00 p.m. PT / Sept. 30 at 8:00 a.m. CEST. Thank you for your support throughout the years,” Nintendo said via the game’s official account . The app remains listed on the App Store and Google Play but is no longer playable – opening it now returns a message stating service has ended and maintenance is in progress, running until 01/10/2026.
+
+ Nintendo marked the closure with a series of “Final MKT Report” graphics posted to the game’s official account , stating that the game featured over 546 courses in total.
+
+ As we’ve reported before , Nintendo’s mobile efforts appear to be fading after it entered the business in 2016 with the release of Super Mario Run, the first time a firstparty Mario platformer had ever appeared on non-Nintendo hardware.
+
+ Read on 
+
+ Video Games Europe hits back at EU watchdog targeting King, Supercell, Mojang and more over IAP practices 
+
+ AppLovin sues Unity over alleged data collection through its Ad Quality SDK 
+
+ Search for: 
+
+ Search 
+
+ Follow us
+
+ LinkedIn 
+
+ X 
+
+ Apple Podcasts 
+
+ Spotify 
+
+ YouTube 
+
+ Threads 
+
+ Facebook 
+
+ Story archive
+
+ Support this site with a paid newsletter subscription. 
+
+ x 
+
+ Scroll to Top
+
+ARTICLE 7: In-game vs. web store: How to price and package for D2C without breaking your game economy  [airtime: ~5% of the episode, about 92 words]
+URL: https://www.pocketgamer.biz/in-game-vs-web-store-how-to-price-and-package-for-d2c-without-breaking-your-game-economy/
+
+Chip Thurston, FastSpring's head of gaming, breaks down how publishers should think about pricing, packaging and incentives when going D2C, and why your game economy has to come first
+
+ By Guest Author (Sponsored) 
+
+ October 2, 2026 
+
+ Share:
+
+ Prefer PocketGamer.biz on Google 
+
+ Securing that first web store purchase is the hardest challenge in D2C monetisation.
+
+ Additional entitlements consistently outperform price discounts.
+
+ Direct checkout removes the steps that players don’t want to deal with, and conversion rates show it works.
+
+ There’s no universal D2C pricing playbook, but there are proven principles to build from.
+
+ Stay Informed 
+
+ Get Industry News In Your Inbox…
+
+ Sign Up Today
+
+ Only 2% to 3% of players will ever spend money in many mobile games and getting that first purchase is the hardest challenge in game monetisation. It gets even harder when you’re asking a player to step outside of the app to make it. 
+
+ That tension sits at the heart of a direct-to-consumer (D2C) pricing strategy. Publishers who manage it well build thriving web stores. Those who don’t either leave money on the table or, worse, destabilize the in-game economies they’ve spent years crafting. 
+
+ Start with economy management, not the price point 
+
+ Most publishers start building their web store offer by asking what price to charge. But the better question is about what their economy can actually support . 
+
+ A game’s economy runs on sources and sinks. Sources are anything the game gives to players: rewards, currency, loot. Sinks are anything that consumes those resources: hard levels, gear upgrades, consumables. Every pricing and packaging decision exists within that balance and it’s worth getting a clear picture of that balance before setting up any D2C offers. 
+
+ Here’s why it matters: If half of a publisher’s revenue flows through a D2C channel offering 10% more per purchase, the overall economy is absorbing 5% more currency than it was before. 
+
+ For games with elastic economies such as social casino games, that additional sourcing is manageable. For mid-core games with tighter mechanics, it demands more deliberate planning. The goal isn’t to avoid D2C incentives but to make sure the economy has enough sink capacity to keep pace with them. 
+
+ More entitlements vs. lower prices: What the data says 
+
+ The most common question publishers face when designing their web store offerings is whether to give players more for the same price or the same for less. An A/B test comparing both approaches found that additional entitlements consistently outperformed discounts across the metrics that matter: conversion from mobile to web store, total revenue, and new D2C customer creation. The discounts didn’t drive the proportional lift needed to justify the lost margin. 
+
+ The psychology behind it makes sense. When a player sees that $10 buys 100 gems in the app but 110 gems on the web store, the value comparison is immediate. When the price drops from $10 to $9 for the same 100 gems, the math is harder and the perceived benefit is murkier, even if the actual value is the same. 
+
+ “ Most publishers start building their web store offer by asking what price to charge. But the better question is about what their economy can actually support .” Chip Thurston 
+
+ There’s also a straightforward revenue consideration. Offering a discount means taking in less per transaction. Additional entitlements hold the revenue per purchase steady while still giving the player a real reason to make the journey off platform. For most games, entitlements are the stronger lever, as long as the game’s economy can handle the additional sourcing. 
+
+ Of course, this is only one A/B test from one game, not a universal truth. Each game is unique. What’s most important is considering all of the factors surrounding your game’s economy and player base to provide the appropriate D2C incentive. 
+
+ Reducing friction w ith direct checkout 
+
+ Beyond pricing, the structure of the purchase journey itself has a meaningful impact on D2C conversion. The traditional web store flow has multiple handoffs: 
+
+ Tap a button in game . 
+
+ Land on a web store or product catalogue page. 
+
+ Add to cart . 
+
+ Proceed to checkout. 
+
+ Complete the purchase. 
+
+ Return to the game. 
+
+ Each step is an opportunity for a player to drop off. 
+
+ Direct checkout streamlines that journey significantly: 
+
+ Tap on a specific item in game . 
+
+ Land directly on a web-hosted checkout page for that item. 
+
+ Complete the purchase. 
+
+ Return to the game. 
+
+ Players who have already decided what they want to buy don’t need to waste time browsing - they need a fast, frictionless path to completing the transaction. Across FastSpring ’s larger clients, return purchase rates on web stores reach around 90% , a figure that reflects what happens once the habit of D2C purchasing takes hold. 
+
+ One caveat worth flagging: The regulatory environment around steering is moving fast. As steering fees continue to roll out globally , the appeal of direct checkout vs web store checkout will vary from one region to another. Publishers need to stay current with the rules in each territory they operate in. 
+
+ How to drive D2C behaviour without touching your prices 
+
+ Not every game needs to offer more entitlements or cheaper prices to run a successful web store. For publishers who want to maintain pricing parity between in-app and web store - whether to simplify economy management, protect platform relationships or both - there are proven paths to driving D2C behaviour without changing the offer itself. 
+
+ At FastSpring, we found that several triple-A game publishers monetising games on our platform incorporate two key strategies. 
+
+ The first is a content creator program. By integrating a creator code into the web store, publishers give players a reason to purchase there that has nothing to do with price. They can easily support a creator they follow, because a percentage of what the players buy for themselves goes to that creator. 
+
+ The player benefits, the creator benefits and the publisher builds D2C volume without touching their pricing structure. It creates a flywheel of awareness and engagement that keeps running. 
+
+ The second is a loyalty currency. Purchases made on the web store earn a separate currency - loyalty points, VIP credits, exclusive gems - that can only be redeemed back in the web store. 
+
+ The mechanic creates a purchase-and-return loop contained entirely within the D2C channel. Players have a tangible reason to keep coming back and the behaviour compounds over time. 
+
+ Exclusive products as a strategic tool 
+
+ Beyond pricing and incentives, product exclusivity is one of the most effective tools for driving web store behaviour. A subscription tier, a cosmetic item or a content bundle that only exists on the web store gives players who want it no other option than to engage with the D2C channel directly. 
+
+ The product has to earn its exclusivity - meaning that the value has to be real and apparent. But when it lands, it creates a permanent revenue driver tied specifically to the direct channel. 
+
+ “P roduct exclusivity is one of the most effective tools for driving web store behaviour. ” Chip Thurston 
+
+ One example we’ve seen work: a subscription created specifically for a web store, unavailable inside the mobile game, became a meaningful and recurring revenue stream on its own. 
+
+ FastSpring’s subscription management tools are built to support exactly this and publishers that use FastSpring can create and manage web store-exclusive subscription tiers that are entirely separate from in-app purchase flows, with full control over pricing, renewal logic and player communication. 
+
+ Player sentiment around this has shifted considerably too . What felt unfamiliar or inconvenient to players a few years ago is now routine. Web stores have become standard across the major titles, and players broadly accept that some products live on different platforms. 
+
+ The only universal rule: Nothing is universal 
+
+ The most important thing to understand about using a D2C pricing strategy is that there’s no universal playbook. The right incentive level, product exclusivity strategy, checkout structure, etc., will all vary - not just between genres, but between individual titles within the same genre. 
+
+ What does work is forming a clear hypothesis based on the game and its player base, rolling it out, measuring it against the right metrics and iterating quickly. 
+
+ #Pricing 
+
+ #Sponsored 
+
+ #Economy 
+
+ #Direct-to-consumer 
+
+ Companies
+
+ People
+
+ Related
+
+ The great D2C migration: why 96% of game publishers are moving beyond the App Store 
+
+ "2025 was a banner year for direct-to-consumer revenue" 
+
+ “The future couldn’t be brighter for D2C”: FastSpring’s Chip Thurston on gaming’s changing platform economy 
+
+ PGC London's industry health check: Investment, AI, D2C, and advantages of the UK 
+
+ Company Spotlight: FastSpring
+
+ARTICLE 8: Playable Ads in 2027: AI, Creative Strategy & Mobile UA  [airtime: ~5% of the episode, about 92 words]
+URL: https://www.globalgamesforum.com/news-media/playable-ads-playbook-for-2027-ai-depth-and-the-race-for-creative-scale
+
+By Nicole Lumley 1 October 2026 
+
+ In the not too distant past, playable ads were an experiment that studios would put a portion of their budget behind. This has now changed dramatically. 
+
+ Playable ads are becoming an increasingly important part of mobile games user acquisition, but as production becomes faster and more accessible, the challenge is shifting from simply making playables to making playables that deliver meaningful player experiences.
+
+ That was a key theme at Gamesforum London 2026, where industry experts from Zynga, Kwalee, BoomBit, Reactionional Music and Segwise discussed how playable advertising is evolving, the role AI is playing in production, and what studios need to consider as they look towards 2027.
+
+ Playables are moving from experiment to core UA strategy
+
+ The adoption of playable ads has grown significantly in recent years. As competition increases and advertising platforms demand greater creative variety, studios are under pressure to produce more assets while maintaining performance.
+
+ For Robert Hoeft, Head of Playable Ads at BoomBit, the question has already shifted.
+
+ “Two years ago, the question was more like if we should use playables. Now it's more like how we should do it effectively and efficiently. In terms of both performance and costs.”
+
+ Brijesh Bharadwaj, Co Founder of Segwise, highlighted just how quickly production volumes are increasing. According to data discussed during the panel, the proportion of new creatives produced as playables has risen substantially. 
+
+ Brijesh highlighted that in the last four quarters of 2025, playables accounted for 10-15% of new creatives produced by studios using the format. That figure has since risen to 30% representing a 2-3x increase in just six months. 
+
+ Additionally, production volumes have also increased significantly. Studios producing playables were creating an average of around 17 per quarter; that figure has now risen to 71. This is more than four times more than previously. 
+
+ Looking at the broader picture however, only 13 to 15% of gaming studios are using playables. For smaller studios in particular, the cost and complexity of playable production can remain a barrier.
+
+ Playable ads require a combination of design, art and technical development, while assets must also work across different advertising networks. That complexity has historically pushed many studios towards specialist vendors.
+
+ The pressures are getting harder. Not only on a budget level but logistically, studios can find this challenging as well. 
+
+ So, how can we challenge this?
+
+ AI is lowering the barrier to playable production
+
+ AI was arguably the biggest recurring theme of the discussion and its impact clearly varies studio to studio.
+
+ For Adam Watts, Playable Designer at Kwalee, AI is already helping bring playable development further in-house.
+
+ “I think there's obviously still challenges... But I think once you've got into the rhythm of it and you've got a few successful playables under your belt, it's easier to build onto them and create new creative tests.”
+
+ The panel agreed that AI can increase production speed and volume, but there was an important distinction between using AI to make more playables and using it to make better playables.
+
+ AI can help developers prototype ideas, create variations and produce more complex effects in less time. But creative strategy, game knowledge and an understanding of the player remain critical.
+
+ The technology may make production more efficient, but the creative thinking behind a successful playable cannot simply be automated away.
+
+ How much gameplay does a playable really need?
+
+ One of the biggest questions facing playable designers is how deep the experience needs to be.
+
+ The answer from the panel was simple: it depends on the game.
+
+ A playable does not necessarily need to recreate an entire game. Instead, it needs to deliver the core experience or “joy” of the product quickly enough for a player to understand what makes it worth downloading.
+
+ Robert Hoeft stated: ‘’It's never a simple answer because we've seen success with very long playables…But on the other hand, we've also seen very successful case studies with, for example, integral and much shorter narrative driven generated video playables where users can enjoy a story. It's more hook based and it still performs really well, but it's very game dependent.’’
+
+ For a match game, that moment might arrive after a single move. For a more complex puzzle or strategy experience, it could take longer.
+
+ The important point is that players need to experience the fundamental appeal of the game before being asked to install it.
+
+ Making a playable too simple can therefore be just as damaging as making it too complicated. If players do not experience the core appeal, the playable may generate installs without properly qualifying those users.
+
+ Authenticity matters more than ever
+
+ The panel also discussed the evolution away from the novelty-driven playable ads that once dominated mobile advertising.
+
+ Players are increasingly familiar with playable formats, meaning studios need to offer experiences that feel entertaining, authentic and connected to the actual game.
+
+ Adam Watts explained his experience in creating a new playable, and saw that one-click playables were performing well. However when replicated it did not give the same results. He saw that one-click concepts can sometimes go too far in simplifying the experience.
+
+ “There wasn't enough time for the player to actually build a meaningful connection with the experience to then want to go ahead and download it.”
+
+ That connection is particularly important when considering retention.
+
+ A playable should set an expectation that the actual game can fulfil. If the advertising experience promises something fundamentally different, the result may simply be churn after installation rather than genuine player acquisition.
+
+ As Robert Hoeft put it: ‘’The promise made in the playable ad must be matched in the product.” 
+
+ Playable analytics are becoming more sophisticated
+
+ As playable production scales, measurement is also changing. Studios are increasingly able to analyse what happens inside the playable rather than simply looking at the final install or campaign-level results.
+
+ That opens up the possibility of breaking a playable into individual components: the hook, headline, opening move, mechanics, objects, number of interactions and other creative variables.
+
+ Instead of asking whether one playable worked, teams can start asking why it worked.
+
+ Brijesh described this as moving towards a “Lego block” approach to creative analysis, where individual elements can be compared against performance data.
+
+ This could make playable optimisation increasingly similar to established video creative workflows. Rather than producing a playable and starting again from scratch, studios can identify which components are contributing to performance and rapidly produce new iterations around those findings.
+
+ Network differences remain important, however. A playable that performs strongly on one advertising network may not necessarily produce the same results elsewhere, making cross-network testing and benchmarking essential.
+
+ Designing for iteration from the beginning
+
+ One of the most interesting ideas from the panel was that studios should think about experimentation before production begins.
+
+ Rather than creating a finished playable and then trying to work out what worked, teams can build playables around predefined variables that can be changed quickly. These might include the opening mechanic, headline, background, objects or different hooks.
+
+ The result is a more modular approach to production, allowing teams to respond quickly when performance data reveals a promising direction.
+
+ This is particularly powerful for hybrid-casual games, where individual creative elements can be changed without rebuilding the entire experience.
+
+ The approach also reflects a broader shift in mobile UA: creative production is becoming increasingly data-driven, iterative and modular.
+
+ Scaling playables without losing creativity
+
+ As production volumes rise, studios face another challenge: how to scale without creating an endless stream of variations that add volume but little creative value.
+
+ Modular production is one solution. Studios can take successful concepts and change elements such as introductions, end cards, characters, themes or seasonal assets to create additional iterations.
+
+ However, the panel also highlighted the importance of knowing when to use external vendors and when to keep production in-house.
+
+ Craig Smith, Art Director at Zynga highlighted: ‘We're fortunate to have vendors with the customising tools to give video intros and tweak in cards and reskin assets for seasonality or themes or whatever it may be.So you can really maximise your volume out of that, which in the last quarter or two has been essential to us.’’
+
+ Vendors can help studios scale proven concepts and increase production capacity, while internal teams can be better positioned to experiment with completely new ideas and draw on their deeper understanding of the game.
+
+ Rather than viewing the two approaches as mutually exclusive, the panel suggested that a combination of internal and external production can provide both scale and creative diversity.
+
+ The next phase of AI: from volume to experimentation
+
+ The panel's discussion of AI ultimately pointed towards two different creative pipelines. One is focused on speed, automation and volume: rapidly responding to performance data and producing iterations based on what has already been shown to work.
+
+ The other is focused on genuinely new ideas.
+
+ As Brijesh explained, AI can be particularly useful when teams give systems a clear understanding of what constitutes an acceptable creative output.
+
+ “You’re transferring context... like you’re basically treating this system like a new hire who you’re bringing up to speed on what you already know.”
+
+ This could allow AI systems to work within a studio's existing creative guidelines while exploring a much larger number of possible combinations and variations.
+
+ At the same time, human creative teams remain important for developing ideas that do not yet exist in the data. That distinction could become increasingly important as AI makes playable production more accessible.
+
+ Robert Hoeft states: ‘’Now with AI, experienced teams can be really empowered to to quickly prototype some some new playable ideas and and run initial tests.’’
+
+ If everyone has access to the same production tools, simply being able to produce playables quickly will become less of a differentiator.
+
+ What will playable ads look like in 2027?
+
+ Playables could become more personalised, with branching experiences allowing users to take different paths based on their interactions.
+
+ There was also discussion of playables becoming increasingly close to the actual game experience, potentially reducing the distinction between an advertisement and a playable slice of the product.
+
+ For ad networks, better use of behavioural data could also be an important development. The interactions taking place inside a playable provide valuable signals about a potential player's interests and behaviour, but the panel suggested there is still significant room for that data to be better utilised.
+
+ Ultimately, the biggest change may not be the playable format itself, but how studios think about it.
+
+ Playable ads are moving beyond being an additional creative format and towards becoming a sophisticated testing environment for gameplay, creative concepts and player behaviour.
+
+ As production becomes cheaper and AI accelerates iteration, the competitive advantage will increasingly come from knowing what to test, why to test it and how to turn the resulting data into the next creative idea .
+
+ And while AI may make it easier than ever to create a playable, the panel's message was clear: making a playable is becoming easier. Making one that players genuinely want to play is still the real challenge.
+
+
+---
+OUTPUT FORMAT (for this manual test only): plain text, nothing else. First line: `TITLE: <episode title>`. Then the whole dialogue, one turn per line, every line starting with `Dana:` or `Yoni:`. No JSON, no markdown, no commentary before or after.
