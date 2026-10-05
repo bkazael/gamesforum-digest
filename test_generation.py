@@ -247,6 +247,27 @@ check("the intro prompt asks for banter, a teaser, and a hand-over",
       "banter" in ip and "TEASER" in ip and "hands over" in ip)
 check("the intro prompt bans invented personal anecdotes", "invent personal anecdotes" in ip)
 
+# The teaser must lead with what the SCRIPT opens with, not the model's own list order
+DATA_WITH_SCRIPT = dict(DATA, script=[
+    {"speaker": A, "text": "השבוע AppLovin הגישה בקשה לצו מניעה נגד Unity בקליפורניה."},
+    {"speaker": B, "text": "על מה היא מבססת את הטענה הזאת?"},
+    {"speaker": A, "text": "TURN THREE MUST NOT APPEAR"},
+])
+P.write_intro(DATA_WITH_SCRIPT, prep)
+ip2 = intro_seen["prompts"][-1]
+check("the intro prompt states what the script actually opens with",
+      "THE SCRIPT ACTUALLY OPENS WITH" in ip2 and "AppLovin הגישה בקשה לצו מניעה" in ip2)
+check("...from the first two turns only", "TURN THREE MUST NOT APPEAR" not in ip2)
+check("the intro prompt forbids naming a day of the week", "Never name a day of the week" in ip2)
+check("a named weekday in the intro is a STYLE fault",
+      any(p.startswith(P.STYLE) and "day of the week" in p
+          for p in P.intro_problems([dict(t, text=t["text"] + " איזה כיף שהגענו ליום חמישי.")
+                                     if i == 0 else t for i, t in enumerate(GOOD_INTRO["turns"])])))
+check("'שני מיליון' (two million) is not mistaken for Monday",
+      not any("day of the week" in p for p in P.intro_problems(
+          [dict(t, text=t["text"] + " שני מיליון משתמשים.") if i == 0 else t
+           for i, t in enumerate(GOOD_INTRO["turns"])])))
+
 # intro_problems
 check("a clean intro has no problems", P.intro_problems(GOOD_INTRO["turns"]) == [])
 check("too few turns is a problem", any("turns" in p for p in P.intro_problems(GOOD_INTRO["turns"][:2])))

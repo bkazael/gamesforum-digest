@@ -505,6 +505,8 @@ INTRO_MIN_TURNS, INTRO_MAX_TURNS = 3, 12
 INTRO_MIN_WORDS, INTRO_MAX_WORDS = 60, 320
 STYLE = "style: "
 # How a person answers "welcome to the show, I'm Dana, and with me is Yoni".
+INTRO_DAY_RE = re.compile(
+    r"יום\s+(?:ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)|סוף[\s-]?שבוע|סופ.ש|\b(?:monday|tuesday|wednesday|thursday|friday|weekend)\b")
 INTRO_GREETINGS = ("היי", "הי ", "הי,", "שלום", "בוקר טוב", "ערב טוב", "צהריים טובים",
                    "אהלן", "מה קורה", "hi", "hello", "good morning", "good evening")
 
@@ -554,6 +556,11 @@ def intro_problems(turns: list[dict]) -> list[str]:
         if not head.startswith(INTRO_GREETINGS):
             problems.append(f"{STYLE}the first reply does not greet back "
                             "(it starts in the middle of a thought)")
+    # The model has no idea what day it is and invented "איזה כיף שהגענו ליום
+    # חמישי" for an episode recorded on a Monday (2026-10-05 comparison run).
+    if INTRO_DAY_RE.search(text):
+        problems.append(f"{STYLE}it names a day of the week (the episode does not know "
+                        "what day the listener hears it)")
     questions = sum((t.get("text") or "").count("?") for t in turns)
     if questions > 2:
         problems.append(f"{STYLE}{questions} question marks in the intro (at most 2, short ones)")
@@ -600,6 +607,13 @@ def write_intro(data: dict, prep: dict | None) -> tuple[list[dict], str]:
     else:
         lang_inst = "Natural spoken English."
 
+    # The story list above comes from the model's own summary and is not
+    # guaranteed to be in the order the script tells them (the comparison run
+    # announced "let's start with NetEase" on an episode that opens with
+    # AppLovin v. Unity). What the script actually opens with is the ground
+    # truth for the teaser's lead and the hand-over.
+    opening = " ".join((t.get("text") or "") for t in (data.get("script") or [])[:2])
+
     prompt = f"""You write the INTRO of a weekly mobile-games podcast, AFTER the
 rest of the episode already exists, so that it can preview what is really in it.
 
@@ -610,6 +624,11 @@ EPISODE TITLE: {data.get('episode_title', '')}
 
 WHAT THE EPISODE CONTAINS, in running order:
 {stories}
+
+THE SCRIPT ACTUALLY OPENS WITH (the first story told -- the list above may
+not be in running order, so this decides which story the teaser starts with
+and which one the last line hands over to; the other stories follow after it):
+"{opening[:600]}"
 
 FACTS YOU MAY USE (each is only usable with its subject spelled out):
 {facts or '(none)'}
@@ -633,10 +652,10 @@ Write the turns that come right after the welcome line, in this order:
    work or the mood in the studio, never about this episode's content and
    never a mood line about the week (no "what a week", no "שבוע ...").
 2. {SPEAKER_A} answers in one short, friendly line, then turns to the episode:
-   a TEASER in plain spoken sentences -- 3 or 4 stories in the order they will
-   be told, each in ONE sentence saying what happened and why it matters to
-   someone who runs mobile games. Lead with the most interesting one and give
-   it one concrete number WITH its subject. No question marks in the teaser,
+   a TEASER in plain spoken sentences -- 3 or 4 stories, the first being the one
+   the script opens with, each in ONE sentence saying what happened and why it
+   matters to someone who runs mobile games. Give the lead story one concrete
+   number WITH its subject. No question marks in the teaser,
    except at most one short question (under 12 words) that the episode answers
    -- never one marked "left open", and never a compound question.
 3. {SPEAKER_B} reacts in one short, human line to something she just said --
@@ -645,7 +664,8 @@ Write the turns that come right after the welcome line, in this order:
    iceberg", "only you could...").
 4. {SPEAKER_A} hands over to the first story with one short line that names it.
 Do NOT invent personal anecdotes presented as fact, and no weather or holiday
-small talk. Every turn is short and spoken: nothing over about 60 words except
+small talk. Never name a day of the week or say "the weekend": you do not know
+when the listener hears this. Every turn is short and spoken: nothing over about 60 words except
 the teaser (about 90 at most).
 
 EXAMPLE OF THE SHAPE ONLY -- different stories; never reuse its wording or
