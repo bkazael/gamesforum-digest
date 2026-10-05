@@ -413,7 +413,11 @@ check("with no history the prompt says not to refer to earlier episodes at all, 
 check("the script prompt caps turn length and asks for plain questions",
       "No turn longer than about 80 words" in sp and "compound interview question" in sp)
 check("the script prompt stops every story ending on the same 'developers should' line",
-      "at most\n  two stories may end on an explicit" in sp.replace("  two", "\n  two") or "two stories may end on an explicit" in sp)
+      "at most two turns in the whole episode use it" in sp.replace("\n  ", " "))
+check("the script prompt puts the Hebrew rule first and again after the articles",
+      sp.startswith("OUTPUT LANGUAGE: HEBREW") and sp.rstrip().endswith("source material only."))
+check("the script prompt requires Yoni to challenge, and shows the shape of an exchange",
+      "asks for the number behind a claim" in sp.replace("\n     ", " ") and "Shape of a good exchange" in sp)
 
 # ---------------------------------------------------------------- 6c. which model writes what
 #

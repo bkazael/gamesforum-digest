@@ -725,7 +725,7 @@ def add_intro(data: dict) -> dict:
 
 def generate_podcast_content(articles: list[dict], today_date: str, memory_context: str = "",
                               target_words: int | None = None, prep: dict | None = None) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP, web shop, webstore in English (never translate them literally)." if LANG == "he" else "Write in natural spoken English."
+    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP, web shop, webstore, playable ads in English (never translate them literally). Company and product names (AppLovin, Unity, Pix) are written in Latin letters exactly as spelled, never transliterated into Hebrew letters." if LANG == "he" else "Write in natural spoken English."
 
     # target_words exists only for live_smoke.py (Tier 2): production
     # (main(), below) never passes it, so this branch never runs for a real
@@ -818,7 +818,20 @@ is not fine to name a vendor again this week just because it came up before.
    - Respect each "careful" note: do not overstate what it warns about.
 """
 
-    prompt = f"""You are the lead executive producer of a top-tier mobile gaming industry podcast.
+    # The source articles are English, and a model trial (Gemini 3.6 Flash)
+    # wrote the whole Hebrew episode in English because the language rule sat
+    # in the middle of a long prompt. So: said first, said again after the
+    # articles, and checked in code (script_style_problems).
+    if LANG == "he":
+        lang_top = ("OUTPUT LANGUAGE: HEBREW. Every spoken line is in Hebrew, even though "
+                    "the articles below are in English. Only the industry terms and "
+                    "company names listed under SPEECH NATURALISM stay in English.\n\n")
+        lang_bottom = ("\nREMINDER: the dialogue, every turn, is written in Hebrew. The "
+                       "articles above are English source material only.\n")
+    else:
+        lang_top, lang_bottom = "", ""
+
+    prompt = f"""{lang_top}You are the lead executive producer of a top-tier mobile gaming industry podcast.
 
 Your goal is an in-depth, highly structured episode covering key developments.
 {memory_block}{prep_block}
@@ -838,9 +851,14 @@ STRUCTURE OF THE SHOW:
      hanging. When the hosts agree, the second must add something the first
      did not say. Where the evidence supports it, they disagree or point out
      a caveat.
-   - Close each story with one concrete takeaway an operator in casual,
-     puzzle, hybrid-casual or real-money skill games could check, test or
-     watch.
+   - In every story {SPEAKER_B} does more than add a fact: he asks for the
+     number behind a claim, doubts it, or points out what the source does
+     not show -- and {SPEAKER_A} answers him. A story told as two people
+     taking turns to read out facts is the failure to avoid.
+   - Endings vary. Most stories end on a plain observation, a number, an
+     open question, or a hand-off to the next story. An explicit practical
+     takeaway for an operator in casual, puzzle, hybrid-casual or real-money
+     skill games belongs at most twice, and the rest go in the show outro.
 {prep_rules}3. SHOW OUTRO: Summarize the actionable takeaway and sign off.
 4. EPISODE METADATA: Generate a highly engaging, catchy episode title based on the stories covered.
 
@@ -864,9 +882,17 @@ SPEECH NATURALISM:
 - Ask questions the way a person would: short, plain, one clause. Never a
   compound interview question ("given that X and Y, what is the single most
   critical factor for...").
-- Weave each story's takeaway into the conversation in your own words. Do not
-  close every story with the same formula ("developers should ..."); at most
-  two stories may end on an explicit "developers should" line.
+- Do not close stories with the same formula ("operators should ...", "developers
+  must ..."): at most two turns in the whole episode use it.
+- Two people talking, not a news reader: short turns, a half-finished
+  thought now and then, a host answering the question just asked before
+  adding anything. Shape of a good exchange (invented subject, do not reuse
+  its facts or wording):
+    Dana: הרשת X העלתה את העמלה, וה-CPM בקטגוריה קפץ ב-18 אחוז ברבעון.
+    Yoni: עלייה כזו כואבת רק אם ה-ROAS לא עלה איתה. יש נתון על זה?
+    Dana: יש. ב-ROAS של משחקי קז'ואל כמעט לא זז, אז המרווח הצטמצם.
+    Yoni: זה ממוצע. אני מנחש שהפער גדול בין מי שמריץ קריאייטיב אחד לבין מי שמריץ עשרים.
+    Dana: הכתבה לא מפרטת, אז זו שאלה פתוחה. מה שברור הוא שהעלות השולית עלתה.
 {callback_rule}
 - Never read a URL aloud; attribute by outlet name.
 - Never use the ASCII double-quote character (") anywhere in the spoken text.
@@ -876,7 +902,7 @@ SPEECH NATURALISM:
 
 SOURCE ARTICLES:
 {corpus}
-"""
+{lang_bottom}"""
     log("generating podcast content via Gemini text call...")
     # Up to two attempts. script_quality.py explains the bug this guards
     # against (a Hebrew acronym's ASCII quote ending the JSON string and
@@ -898,6 +924,7 @@ SOURCE ARTICLES:
             log(f"  trimmed the leading agreement word from {trimmed} turn(s) "
                 "(limit: two turns open with one)")
         problems = script_quality.script_problems(data["script"])
+        problems += script_quality.script_style_problems(data["script"], LANG)
         words = script_quality.count_words(data["script"])
         short = (not target_words) and words < SCRIPT_FLOOR_WORDS
         if short:
@@ -915,6 +942,7 @@ SOURCE ARTICLES:
                 + "; ".join(problems[:3])
                 + ". Regenerate the whole script with every turn ending in "
                 "complete punctuation and no ASCII double quotes anywhere."
+                + (" Write every turn in Hebrew." if LANG == "he" else "")
                 + (" Go deeper on the highest-airtime stories -- more specifics, "
                    "and every question answered in full; do not pad." if short else "")
             )

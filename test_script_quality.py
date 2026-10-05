@@ -160,5 +160,21 @@ for word in ("דרמה", "דרמת ענק", "דרמטי", "דרמטית"):
 check("an empty turn is reported",
       len(Q.script_problems([{"speaker": "Dana", "text": "  "}])) == 1)
 
+# ---------------------------------------------------------------- style problems (voice, not form)
+heb = [{"speaker": "Dana", "text": "הרשת העלתה את העמלה והמחיר קפץ."}]
+check("a Hebrew script raises no style problem", Q.script_style_problems(heb) == [])
+eng = [{"speaker": "Dana", "text": "The network raised its fee and prices jumped sharply."}]
+check("an English script is flagged when Hebrew was required",
+      any("not in Hebrew" in p for p in Q.script_style_problems(eng, "he")))
+check("...but not when English is the show language", Q.script_style_problems(eng, "en") == [])
+mixed = [{"speaker": "Dana", "text": "החברה AppLovin תבעה את Unity על נתוני הפרסום של המפעילים."}]
+check("English company names inside Hebrew do not trip it", Q.script_style_problems(mixed) == [])
+formula = [{"speaker": "Yoni", "text": f"בסוף מפעילים צריכים לבדוק את זה {i}."} for i in range(3)]
+check("three 'operators should' endings are flagged",
+      any("formula" in p for p in Q.script_style_problems(formula)))
+check("two are allowed", Q.script_style_problems(formula[:2]) == [])
+check("'המפעילים אמרו' is not the formula",
+      Q.script_style_problems([{"speaker": "Dana", "text": "המפעילים אמרו שזה עובד."}] * 5) == [])
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)
