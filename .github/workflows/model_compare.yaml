@@ -27,6 +27,8 @@ jobs:
   compare:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write   # only used to park the dumped prompts on a scratch branch
     steps:
       - uses: actions/checkout@v4
 
@@ -50,3 +52,19 @@ jobs:
           name: exact-prompts
           path: prompts_out/*
           retention-days: 3
+
+      # Artifacts can't always be downloaded from every environment, so the
+      # dumped prompts are also parked on a throwaway orphan branch that holds
+      # nothing else. Delete it when done: git push origin --delete prompt-dump
+      - name: Park the prompts on a scratch branch
+        if: ${{ inputs.dump_prompts }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pd" && cp prompts_out/* "$RUNNER_TEMP/pd/"
+          git config user.name "gamesforum-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git checkout --orphan prompt-dump
+          git rm -rf --quiet .
+          cp "$RUNNER_TEMP"/pd/* .
+          git add prompt_1_script.txt prompt_2_intro.txt
+          git commit -q -m "prompt dump (scratch branch, safe to delete)"
+          git push --force origin prompt-dump
