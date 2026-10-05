@@ -278,7 +278,7 @@ check("a first reply about 'the week' is flagged -- the exact line the user comp
 three_dana = [GOOD_INTRO["turns"][0]] + [dict(GOOD_INTRO["turns"][1]) for _ in range(3)] + [GOOD_INTRO["turns"][4]]
 check("three turns in a row by one host is flagged",
       any("more than two turns in a row" in p for p in P.intro_problems(three_dana)))
-check("the live-run intro (week opener + hype + 2 agreement openers + 3 Dana in a row) trips every rule",
+check("the 10-04 live intro (week opener, no greeting, hype, 2 agreement openers, 3 Dana in a row) trips every rule",
       len([p for p in P.intro_problems([
           {"speaker": B, "text": "אכן, דנה. שבוע שבו המובייל ממשיך לגלגל סכומים מטורפים, ואיפה הוא דורך."},
           {"speaker": A, "text": "בדיוק. ועם כל הכסף הזה שמסתובב, יש מי שרוצה נתח וגם מי שרוצה לווסת."},
@@ -286,9 +286,49 @@ check("the live-run intro (week opener + hype + 2 agreement openers + 3 Dana in 
           {"speaker": A, "text": "ננסה, ננסה. בטח כשמדובר על מיליארדים של דולרים בשוק הזה כולו."},
           {"speaker": A, "text": "אז מה מחכה לנו השבוע? " + words(30)},
           {"speaker": A, "text": "נתחיל, כמובן, עם עדכון ההכנסות ועם כל מה שקשור בחנויות."},
-      ] ) if p.startswith(P.STYLE)]) == 4)
-check("the intro prompt carries the tone rules (hype ban, agreement limit, not-about-the-week)",
-      "No turn" in ip and "agreement word" in ip and "NOT" in ip and "about the week as a whole" in ip)
+      ] ) if p.startswith(P.STYLE)]) == 5)
+check("the intro prompt carries the tone rules (hype ban, agreement limit, no week mood-line)",
+      "No turn opens with an agreement word" in " ".join(ip.split())
+      and "mood line about the week" in " ".join(ip.split()))
+
+# ---- the 2026-10-05 production intro: cold open, banter built on an unexplained
+# figure, a compound question in the teaser. The spec was the problem, not the model.
+check("the intro prompt's most important rule: explain everything in the same breath",
+      "THE RULE THAT MATTERS MOST" in ip and "explained in the same" in ip and "the listener has heard nothing yet" in ip)
+check("the first reply must be a greeting, with a line that needs no context",
+      "greets back" in ip and "needs no context" in ip)
+check("the order puts the banter AFTER the teaser, so it reacts to something already explained",
+      ip.index("answers in one short, friendly line") < ip.index("reacts in one short, human line"))
+check("the prompt shows the shape with an example, marked as shape only",
+      "EXAMPLE OF THE SHAPE ONLY" in ip and "never reuse its wording or" in ip)
+check("compound questions in the teaser are forbidden",
+      "never a compound question" in ip)
+
+COLD_OPEN = [
+    {"speaker": B, "text": "אני מודה שהמספר על Pix בברזיל הפתיע אותי מאוד. 96 אחוז מהמבוגרים."},
+    {"speaker": A, "text": "אתה חושב שזה יגיע גם אלינו מתישהו?"},
+    {"speaker": B, "text": "יש לנו מספיק כאב ראש גם בלי זה, דנה."},
+    {"speaker": A, "text": words(70)},
+    {"speaker": B, "text": "נראה אם זה מחזיק."},
+]
+check("the real cold open (no greeting, straight into an unexplained figure) is flagged",
+      any("does not greet" in p for p in P.intro_problems(COLD_OPEN)))
+fixed = [dict(t) for t in COLD_OPEN]
+fixed[0]["text"] = "היי דנה, בוקר טוב."
+check("a plain greeting passes that rule",
+      not any("does not greet" in p for p in P.intro_problems(fixed)))
+for g in ("שלום דנה.", "בוקר טוב, דנה.", "הי דנה, מה העניינים?"):
+    fx = [dict(t) for t in COLD_OPEN]; fx[0]["text"] = g
+    check(f"greeting accepted: {g}", not any("does not greet" in p for p in P.intro_problems(fx)))
+check("more than two question marks in an intro is flagged",
+      any("question marks" in p for p in P.intro_problems(
+          [dict(t, text=t["text"] + " באמת? כן?") for t in fixed])))
+check("a monologue turn over 110 words is flagged",
+      any("monologue" in p for p in P.intro_problems(
+          fixed[:3] + [{"speaker": A, "text": words(115)}] + fixed[4:])))
+check("every one of those is a STYLE fault (retry, then accept), never a fallback",
+      all(p.startswith(P.STYLE) for p in P.intro_problems(COLD_OPEN)
+          if "greet" in p or "question marks" in p or "monologue" in p))
 
 # style faults earn a retry, but are accepted if they persist (the fallback is worse)
 hyped = {"turns": _variant(2, text="הסכומים מטורפים, ובכל זאת אף אחד לא שם לב לזה.")}
@@ -374,6 +414,37 @@ check("the script prompt caps turn length and asks for plain questions",
       "No turn longer than about 80 words" in sp and "compound interview question" in sp)
 check("the script prompt stops every story ending on the same 'developers should' line",
       "at most\n  two stories may end on an explicit" in sp.replace("  two", "\n  two") or "two stories may end on an explicit" in sp)
+
+# ---------------------------------------------------------------- 6c. which model writes what
+#
+# Scoring, dedupe and editorial prep are classification/extraction -- the fast
+# model is the right tool. The script and the intro are writing, where a
+# stronger model is the lever for how natural the Hebrew sounds, so those two
+# (and only those) take GEMINI_CREATIVE_MODEL. Unset, it is GEMINI_TEXT_MODEL
+# and nothing changes.
+
+check("with GEMINI_CREATIVE_MODEL unset, the creative model IS the text model",
+      os.environ.get("GEMINI_CREATIVE_MODEL") or P.GEMINI_CREATIVE_MODEL == P.GEMINI_TEXT_MODEL)
+
+kws = {}
+def route(prompt, schema=None, **kw):
+    kws[("prep" if schema is P.PREP_SCHEMA else "intro" if schema is P.INTRO_SCHEMA else "script")] = kw
+    if schema is P.PREP_SCHEMA:
+        return GOOD_PREP
+    if schema is P.INTRO_SCHEMA:
+        return GOOD_INTRO
+    return copy.deepcopy(script_resp)
+
+_real_creative = P.GEMINI_CREATIVE_MODEL
+P.GEMINI_CREATIVE_MODEL = "gemini-creative-test"
+P.gemini_json = route
+P.prepare_episode(ARTICLES)
+P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+P.write_intro(DATA, prep)
+P.GEMINI_CREATIVE_MODEL = _real_creative
+check("the script call is sent to the creative model", kws["script"].get("model") == "gemini-creative-test", str(kws["script"]))
+check("the intro call is sent to the creative model", kws["intro"].get("model") == "gemini-creative-test", str(kws["intro"]))
+check("editorial prep stays on the default (fast) model", "model" not in kws["prep"], str(kws["prep"]))
 
 # ---------------------------------------------------------------- 7. main(): the order, and when the checkpoint is written
 

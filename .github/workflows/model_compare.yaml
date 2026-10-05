@@ -1,0 +1,39 @@
+name: Compare text models (manual, spends real quota)
+
+# Manual only -- never on push or a schedule. Answers one question with
+# evidence: would a different Gemini model write the script and intro better?
+# It re-fetches the newest episode's real source articles, runs the editorial
+# prep once, then has each listed model write the script and intro from
+# identical inputs and prints them side by side in the job log
+# (compare_models.py explains the details). Nothing is committed or published.
+#
+# Cost: about 1 request for the shared prep + 2 per model. The Gemini free
+# tier is small (~20 requests a day on the Flash model), so list models
+# sparingly; a model that is not on the free tier will simply fail and say so.
+
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: "Comma-separated Gemini model ids to compare"
+        required: true
+        default: "gemini-2.5-flash,gemini-2.5-pro"
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No pip install and no ffmpeg: stdlib only, and no audio is made.
+      - name: Compare models
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MODELS: ${{ inputs.models }}
+          DIGEST_LANG: he
+        run: python compare_models.py

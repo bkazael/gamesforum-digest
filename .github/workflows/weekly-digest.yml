@@ -81,6 +81,12 @@ jobs:
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
           DIGEST_LANG: he
           TTS_MODEL: gemini-2.5-flash-preview-tts
+          # Optional: the model that WRITES the script and the intro (scoring and
+          # editorial prep keep the default fast model). Set the repo variable
+          # GEMINI_CREATIVE_MODEL (Settings -> Secrets and variables -> Actions
+          # -> Variables) to try a stronger one; unset or empty means the
+          # default, i.e. nothing changes. See compare_models.py.
+          GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
           # Only read by sources.py's from_email() adapter, and only if
           # profile.toml has a source with kind = "email" (Gamigion's is
           # still commented out -- see its comment there for why and what

@@ -29,6 +29,12 @@ import script_quality
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+# The model for the two stages where wording is the product -- the script and
+# the intro. Scoring, dedupe and editorial prep are classification and
+# extraction, where the fast model is the right tool; these two are writing,
+# and a stronger model is the lever for how natural the Hebrew sounds. Unset,
+# it is simply GEMINI_TEXT_MODEL, i.e. nothing changes.
+GEMINI_CREATIVE_MODEL = os.environ.get("GEMINI_CREATIVE_MODEL") or GEMINI_TEXT_MODEL
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
 
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
@@ -162,7 +168,7 @@ def fetch_article(url: str) -> dict | None:
 # ---------------------------------------------------------------- Gemini Text API
 
 def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
-                timeout: int | None = None) -> dict:
+                timeout: int | None = None, model: str | None = None) -> dict:
     """One schema-constrained Gemini call, retried on failure.
 
     `tries` and `timeout` exist for the OPTIONAL stages (editorial prep, the
@@ -176,7 +182,7 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
         raise RuntimeError("GEMINI_API_KEY is required.")
     attempt_timeout = timeout or HTTP_TIMEOUT
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_TEXT_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model or GEMINI_TEXT_MODEL}:generateContent?key={GEMINI_API_KEY}"
 
     gen_config = {"responseMimeType": "application/json"}
     if schema:
@@ -498,6 +504,9 @@ def welcome_turn() -> dict:
 INTRO_MIN_TURNS, INTRO_MAX_TURNS = 3, 12
 INTRO_MIN_WORDS, INTRO_MAX_WORDS = 60, 320
 STYLE = "style: "
+# How a person answers "welcome to the show, I'm Dana, and with me is Yoni".
+INTRO_GREETINGS = ("היי", "הי ", "הי,", "שלום", "בוקר טוב", "ערב טוב", "צהריים טובים",
+                   "אהלן", "מה קורה", "hi", "hello", "good morning", "good evening")
 
 
 def intro_problems(turns: list[dict]) -> list[str]:
@@ -535,6 +544,25 @@ def intro_problems(turns: list[dict]) -> list[str]:
         if "שבוע" in first or "week" in first.lower():
             problems.append(f"{STYLE}the first reply is about the week itself, "
                             "not about one specific thing from the episode")
+    # The 2026-10-05 production intro: no greeting, a cold open on an
+    # unexplained figure, banter built on it, and a teaser ending in a
+    # compound interview question. A greeting is checkable; "explained in the
+    # same breath" is not, so that rule lives in the prompt (and in the
+    # example) while these catch the mechanical symptoms.
+    if turns and turns[0].get("speaker") == SPEAKER_B:
+        head = (turns[0].get("text") or "").strip().lower()
+        if not head.startswith(INTRO_GREETINGS):
+            problems.append(f"{STYLE}the first reply does not greet back "
+                            "(it starts in the middle of a thought)")
+    questions = sum((t.get("text") or "").count("?") for t in turns)
+    if questions > 2:
+        problems.append(f"{STYLE}{questions} question marks in the intro (at most 2, short ones)")
+    for t in turns:
+        n = len((t.get("text") or "").split())
+        if n > 110:
+            problems.append(f"{STYLE}a {t.get('speaker')} turn runs {n} words "
+                            "(a monologue; split it or cut it)")
+            break
     run = 1
     for prev, cur in zip(turns, turns[1:]):
         run = run + 1 if cur.get("speaker") == prev.get("speaker") else 1
@@ -583,39 +611,57 @@ EPISODE TITLE: {data.get('episode_title', '')}
 WHAT THE EPISODE CONTAINS, in running order:
 {stories}
 
-THE MOST STRIKING FACTS (from the editorial notes):
+FACTS YOU MAY USE (each is only usable with its subject spelled out):
 {facts or '(none)'}
 
 QUESTIONS THE EPISODE TAKES ON:
 {questions or '(none)'}
 
-Write the turns that come right after the welcome line:
-1. {SPEAKER_B} replies in one short, natural line that reacts to ONE specific
-   thing from the facts above -- a figure, a ruling, a reversal. It is NOT
-   about the week as a whole: no "what a week", no "a week in which...", no
-   "שבוע ..." -- a sentence that could open any episode is the wrong sentence.
-2. A quick bit of easy banter, 2-3 short turns in all, between people who
-   work together and like it: a tease, a small reaction, a half-joke about
-   the work itself. Avoid stock lines like "only you could make sense of this
-   mess". Do NOT invent personal anecdotes presented as fact, and no weather
-   or holiday small talk.
-3. {SPEAKER_A} then previews the episode as a TEASER, not a table of
-   contents: lead with the single most interesting thing, name 3-4 stories in
-   the order they will be told, include at least one concrete number from the
-   facts above, and pose ONE of the questions -- one the episode actually
-   answers, never one marked "left open" -- without giving its answer away.
-   Split the teaser across two turns with a short interjection from
-   {SPEAKER_B} if it runs long.
-4. The last turn hands over to the first story with one short line that
-   names it.
+THE RULE THAT MATTERS MOST: the listener has heard nothing yet. Every
+company, product, system or figure you mention must be explained in the same
+breath, in a few plain words, the first time it appears -- "Pix, מערכת
+התשלומים המיידית של ברזיל", not "Pix". Never refer to "the number", "that
+story", "what we saw" or anything else the listener has not been told. If you
+cannot explain it in one short clause, leave it out. (The previous intro opened
+with the analyst saying a number about Pix in Brazil had surprised him: no
+hello, no idea what Pix is, and the banter that followed was built on it. It
+sounded like someone who forgot to say hello and started in the middle.)
+
+Write the turns that come right after the welcome line, in this order:
+1. {SPEAKER_B} greets back, simply and warmly ("היי דנה", "בוקר טוב, דנה"),
+   with at most one light line of his own that needs no context -- about the
+   work or the mood in the studio, never about this episode's content and
+   never a mood line about the week (no "what a week", no "שבוע ...").
+2. {SPEAKER_A} answers in one short, friendly line, then turns to the episode:
+   a TEASER in plain spoken sentences -- 3 or 4 stories in the order they will
+   be told, each in ONE sentence saying what happened and why it matters to
+   someone who runs mobile games. Lead with the most interesting one and give
+   it one concrete number WITH its subject. No question marks in the teaser,
+   except at most one short question (under 12 words) that the episode answers
+   -- never one marked "left open", and never a compound question.
+3. {SPEAKER_B} reacts in one short, human line to something she just said --
+   now that the listener knows what it is. A raised eyebrow, a half-joke, a
+   quick opinion. Not a summary, and not a cliche ("just the tip of the
+   iceberg", "only you could...").
+4. {SPEAKER_A} hands over to the first story with one short line that names it.
+Do NOT invent personal anecdotes presented as fact, and no weather or holiday
+small talk. Every turn is short and spoken: nothing over about 60 words except
+the teaser (about 90 at most).
+
+EXAMPLE OF THE SHAPE ONLY -- different stories; never reuse its wording or
+facts:
+Yoni: היי דנה, בוקר טוב.
+Dana: בוקר טוב, יוני. יש לנו היום פרק עם הרבה מספרים. נתחיל בחברת פרסום גדולה שעוברת למודל תמחור חדש, שבו מפתחים משלמים רק על התקנות שעדיין פעילות אחרי שבוע, ויש סטודיו אחד שמדווח שהעלות שלו ירדה בשליש. אחרי זה, חנות אפליקציות שפתחה בשוק גדול אפשרות לתשלום מחוץ לחנות, ומשחק פאזל ותיק שחזר לראש הטבלה אחרי שינוי בקצב העדכונים.
+Yoni: שליש זה לא מעט, אם זה מחזיק.
+Dana: נבדוק אם זה מחזיק. נתחיל בחברת הפרסום.
 
 Company and product names stay in English even here -- write AppLovin and
-Unity, never אפלובין or יוניטי. Name at most 4 stories in the teaser.
+Unity, never אפלובין or יוניטי.
 
 Tone: calm, like colleagues, not radio hosts. No hype words (avoid עצום,
-מטורף, מהפכה, דרמטי, וואו, מדהים, "game changer") and no exclamations. No turn
-opens with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן). Nobody speaks
-more than two turns in a row.
+מטורף, מהפכה, דרמה, דרמטי, וואו, מדהים, "game changer") and no exclamations. No
+turn opens with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן). Nobody
+speaks more than two turns in a row.
 
 Total length: {INTRO_MIN_WORDS + 70}-{INTRO_MAX_WORDS - 90} words across all
 turns. {lang_inst}
@@ -628,7 +674,8 @@ hosts again.
     turns: list[dict] = []
     for attempt in (1, 2):
         try:
-            raw = gemini_json(attempt_prompt, INTRO_SCHEMA, tries=2, timeout=150)
+            raw = gemini_json(attempt_prompt, INTRO_SCHEMA, tries=2, timeout=150,
+                              model=GEMINI_CREATIVE_MODEL)
         except Exception as e:                              # noqa: BLE001
             log(f"  intro attempt {attempt} failed ({type(e).__name__}: {e})")
             break
@@ -842,7 +889,7 @@ SOURCE ARTICLES:
     # single retry rather than adding a second one.
     attempt_prompt = prompt
     for attempt in (1, 2):
-        data = gemini_json(attempt_prompt, PODCAST_SCHEMA, tries=4)
+        data = gemini_json(attempt_prompt, PODCAST_SCHEMA, tries=4, model=GEMINI_CREATIVE_MODEL)
         data["script"], repairs = script_quality.repair_script(data.get("script", []))
         for note in repairs:
             log(f"  script repair: {note}")
