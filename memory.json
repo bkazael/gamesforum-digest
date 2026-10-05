@@ -107,5 +107,21 @@
       "ביצועי שוק הגיימינג באוגוסט ואסטרטגיות שימור"
     ],
     "key_takeaways": "הצעת חוק הילדים של האיחוד האירופי מאיימת על מכניקות מעורבות שחקנים נפוצות כמו בונוסי התחברות יומית ורצפי פעילות, במיוחד עבור קטינים, מה שמחייב מפתחים לחשוב מחדש על אסטרטגיות השימור והמונטיזציה שלהם ולשקול פתרונות אימות גיל. זוהי הרחבה משמעותית של הנטל הרגולטורי. | יוטיוב הרחיבה את פלטפורמת ה-Playables שלה ליותר מ-50 שווקים עם תוכניות לבחון פתרונות IAP, ומטא הציגה את Horizon Create/Studio המאפשר יצירת משחקים מבוססי AI ופרסומם ישירות ברשתות חברתיות. שתי היוזמות מצביעות על ערוצי הפצה חדשים ותחרות גוברת בתחום התוכן המיידי וה-UGC. | רובלוקס הפסידה במאמציה לעצור תביעה בלוס אנג'לס בגין אי-הגנה מספקת על ילדים, מה שמדגיש את הלחץ הגובר על פלטפורמות לאכוף אמצעי בטיחות חזקים. במקביל, טרנד רגולטורי זה מתרחב עם חקירת TikTok וסגירת תכונת ה-Connect של רובלוקס, המשקף דגש הולך וגובר על אחריות הפלטפורמה. | הוצאות הצרכנים על משחקי מובייל באוגוסט הגיעו ל-6.57 מיליארד דולר (ירידה קלה של 1% חודש בחודש), כאשר Honor of Kings הוביל בהכנסות ורובלוקס בהורדות. אירועי 'לייב אופס' ויום נישואין למשחקים מוכיחים את עצמם כמנועי הכנסה. דוגמאות לשיפור שימור דרך חוויות מתגמלות 'Player-First' מצביעות על הכיוון החדש בתעשייה."
+  },
+  {
+    "episode_id": "ep_009",
+    "date": "2026-10-05",
+    "title": "רגולציה על מטבעות ונתונים, D2C חדש ושיווק יצירתי: מאחורי הקלעים של גיימינג מובייל | Ben's Weekly Digest",
+    "topics_covered": [
+      "AppLovin takes legal action against Unity over Ad Quality SDK",
+      "NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this y",
+      "Europe's CPC targets King, Supercell, Mojang and others over virtual currencies",
+      "King’s Minecraft Blast is back in soft launch",
+      "The Weekly Round-up",
+      "Mario Kart Tour closes after seven years and nearly $270m in revenue",
+      "In-game vs. web store: How to price and package for D2C without breaking your ga",
+      "Playable Ads in 2027: AI, Creative Strategy & Mobile UA"
+    ],
+    "key_takeaways": "Operators should review their agreements with ad partners like Unity and AppLovin, especially regarding data collection and usage by SDKs, and understand implications for their own data privacy policies and compliance. | Evaluate the adoption of local payment methods and D2C strategies for key emerging markets in LATAM to address unbanked populations and leverage popular local payment options, potentially expanding revenue channels. | Operators with games in the EU, particularly those with virtual currencies and monetization mechanics for children, must review their in-game commercial practices against the CPC Network's 'Key Principles' and prepare for potential regulatory enforcement or legislative changes. | Observe how established IP (Minecraft) and proven casual mechanics (Candy Crush-style match-3, building meta) are iterated and re-tested in soft launch to inform potential future IP licensing, development, or genre expansion strategies. | Investigate Unity's new D2C payment options (IAP SDK 5.4) and Google's lowered Play Store commissions to optimize revenue. Also, monitor the development of foldable devices for potential future gaming opportunities and the role of AI in ad tech. | Analyze the long-term revenue performance of existing live-service games, especially those that have modified core monetization mechanics like gacha, to inform future game design, live ops, and sunsetting strategies. | When implementing D2C, experiment with exclusive entitlements, loyalty programs, and direct checkout flows instead of just discounts, and consider creating web-store exclusive content, while always balancing changes with the game's economy. | For mobile UA, evaluate integrating playable ads as a core strategy, explore AI tools to streamline their production while maintaining creative authenticity, and invest in analytics to iterate on specific 'Lego blocks' of playable design for better user qualification and retention."
   }
 ]

@@ -1,0 +1,48 @@
+{
+  "title": "רגולציה על מטבעות ונתונים, D2C חדש ושיווק יצירתי: מאחורי הקלעים של גיימינג מובייל | Ben's Weekly Digest",
+  "summary": "Operators should review their agreements with ad partners like Unity and AppLovin, especially regarding data collection and usage by SDKs, and understand implications for their own data privacy policies and compliance.",
+  "notes": "<p>Operators should review their agreements with ad partners like Unity and AppLovin, especially regarding data collection and usage by SDKs, and understand implications for their own data privacy policies and compliance.</p><p><strong>Sources (8):</strong></p><ol><li><a href=\"https://www.pocketgamer.biz/applovin-takes-legal-action-against-unity-over-ad-quality-sdk/\">AppLovin takes legal action against Unity over Ad Quality SDK</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/netease-games-club-partners-with-ebanx-projecting-84bn-in-latam-revenue-this-year/\">NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this year</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/europes-cpc-targets-king-supercell-mojang-and-others-over-virtual-currencies/\">Europe's CPC targets King, Supercell, Mojang and others over virtual currencies</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://mobilegamer.biz/kings-minecraft-blast-is-back-in-soft-launch/\">King’s Minecraft Blast is back in soft launch</a> <em>(MobileGamer.biz)</em></li><li><a href=\"https://www.globalgamesforum.com/news-media/the-weekly-round-up\">The Weekly Round-up</a> <em>(Gamesforum)</em></li><li><a href=\"https://mobilegamer.biz/mario-kart-tour-closes-after-seven-years-and-nearly-270m-in-revenue/\">Mario Kart Tour closes after seven years and nearly $270m in revenue</a> <em>(MobileGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/in-game-vs-web-store-how-to-price-and-package-for-d2c-without-breaking-your-game-economy/\">In-game vs. web store: How to price and package for D2C without breaking your game economy</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.globalgamesforum.com/news-media/playable-ads-playbook-for-2027-ai-depth-and-the-race-for-creative-scale\">Playable Ads in 2027: AI, Creative Strategy &amp; Mobile UA</a> <em>(Gamesforum)</em></li></ol>",
+  "duration": 771,
+  "sources": [
+    {
+      "title": "AppLovin takes legal action against Unity over Ad Quality SDK",
+      "url": "https://www.pocketgamer.biz/applovin-takes-legal-action-against-unity-over-ad-quality-sdk/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this year",
+      "url": "https://www.pocketgamer.biz/netease-games-club-partners-with-ebanx-projecting-84bn-in-latam-revenue-this-year/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Europe's CPC targets King, Supercell, Mojang and others over virtual currencies",
+      "url": "https://www.pocketgamer.biz/europes-cpc-targets-king-supercell-mojang-and-others-over-virtual-currencies/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "King’s Minecraft Blast is back in soft launch",
+      "url": "https://mobilegamer.biz/kings-minecraft-blast-is-back-in-soft-launch/",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "The Weekly Round-up",
+      "url": "https://www.globalgamesforum.com/news-media/the-weekly-round-up",
+      "source": "Gamesforum"
+    },
+    {
+      "title": "Mario Kart Tour closes after seven years and nearly $270m in revenue",
+      "url": "https://mobilegamer.biz/mario-kart-tour-closes-after-seven-years-and-nearly-270m-in-revenue/",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "In-game vs. web store: How to price and package for D2C without breaking your game economy",
+      "url": "https://www.pocketgamer.biz/in-game-vs-web-store-how-to-price-and-package-for-d2c-without-breaking-your-game-economy/",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Playable Ads in 2027: AI, Creative Strategy & Mobile UA",
+      "url": "https://www.globalgamesforum.com/news-media/playable-ads-playbook-for-2027-ai-depth-and-the-race-for-creative-scale",
+      "source": "Gamesforum"
+    }
+  ]
+}
