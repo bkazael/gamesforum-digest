@@ -84,6 +84,74 @@ def describe(script: list[dict]) -> str:
             f"hype words {hype} | agreement openers {openers} | question turns {questions}")
 
 
+SCRIPT_FOOTER = (
+    "\n\n---\nOUTPUT FORMAT (for this manual test only): plain text, nothing else. "
+    "First line: `TITLE: <episode title>`. Then the whole dialogue, one turn per "
+    "line, every line starting with `Dana:` or `Yoni:`. No JSON, no markdown, no "
+    "commentary before or after."
+)
+INTRO_FOOTER = (
+    "\n\n---\nOUTPUT FORMAT (for this manual test only): plain text, nothing else. "
+    "One turn per line, every line starting with `Dana:` or `Yoni:`, in order, "
+    "starting with Yoni's reply to the welcome line. No JSON, no markdown, no "
+    "commentary before or after."
+)
+
+
+class _Captured(Exception):
+    """Raised by the recording stub to stop right after the prompt is built."""
+
+
+def parse_digest(date: str) -> list[dict]:
+    """The published episode's per-story summary, from digests/<date>.md --
+    what write_intro() would have been given had it run on that script."""
+    import re
+    text = (ROOT / "digests" / f"{date}.md").read_text(encoding="utf-8")
+    out = []
+    for m in re.finditer(r"^## (.+)\n\*\*Key Takeaway:\*\* (.+)$", text, re.M):
+        if m.group(1).startswith(("Discussion", "Sources")):
+            continue
+        out.append({"title": m.group(1).strip(), "key_takeaway": m.group(2).strip(),
+                    "metrics_mentioned": []})
+    return out
+
+
+def dump_prompts(articles: list[dict], prep: dict, date: str, meta: dict) -> int:
+    """Write the EXACT prompts the pipeline sends, without calling the model,
+    so they can be pasted into any other model (AI Studio, another provider)
+    and the answers compared. Nothing here is a paraphrase: the prompts come
+    out of generate_podcast_content() and write_intro() themselves, with the
+    network call replaced by a stub that records the prompt and stops."""
+    out = ROOT / "prompts_out"
+    out.mkdir(exist_ok=True)
+    cap: dict[str, str] = {}
+
+    def recorder(prompt, schema=None, **kw):
+        cap["prompt"] = prompt
+        raise _Captured()
+
+    real = P.gemini_json
+    P.gemini_json = recorder
+    try:
+        try:
+            P.generate_podcast_content(articles, "dump", "", prep=prep)
+        except _Captured:
+            pass
+        script_prompt = cap.pop("prompt")
+        data = {"episode_title": meta.get("title", "").replace(" | Ben's Weekly Digest", ""),
+                "digest_summary": parse_digest(date)}
+        P.write_intro(data, prep)
+        intro_prompt = cap.pop("prompt")
+    finally:
+        P.gemini_json = real
+    (out / "prompt_1_script.txt").write_text(script_prompt + SCRIPT_FOOTER, encoding="utf-8")
+    (out / "prompt_2_intro.txt").write_text(intro_prompt + INTRO_FOOTER, encoding="utf-8")
+    for name in ("prompt_1_script.txt", "prompt_2_intro.txt"):
+        size = (out / name).stat().st_size
+        say(f"  wrote {name}: {size:,} bytes")
+    return 0
+
+
 def main() -> int:
     if not P.GEMINI_API_KEY:
         sys.exit("set GEMINI_API_KEY")
@@ -113,7 +181,14 @@ def main() -> int:
     say("\n=== shared editorial prep (default model, run once) ===")
     prep = P.prepare_episode(articles, "")
     if not prep:
-        sys.exit("editorial prep failed; nothing to compare on")
+        if not os.environ.get("DUMP_PROMPTS"):
+            sys.exit("editorial prep failed; nothing to compare on")
+        say("  WARNING: editorial prep failed (quota?); the dumped prompts will "
+            "have no EDITORIAL PREP block")
+
+    if os.environ.get("DUMP_PROMPTS"):
+        say("\n=== DUMP_PROMPTS: writing the exact prompts, no model call ===")
+        return dump_prompts(articles, prep, date, meta)
 
     for model in models:
         say("\n" + "=" * 78)

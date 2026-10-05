@@ -16,8 +16,12 @@ on:
     inputs:
       models:
         description: "Comma-separated Gemini model ids to compare"
-        required: true
-        default: "gemini-2.5-flash,gemini-2.5-pro"
+        required: false
+        default: "gemini-2.5-flash"
+      dump_prompts:
+        description: "Instead of calling the models, save the exact script and intro prompts as a downloadable artifact (to try them in another tool)"
+        type: boolean
+        default: false
 
 jobs:
   compare:
@@ -35,5 +39,14 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MODELS: ${{ inputs.models }}
+          DUMP_PROMPTS: ${{ inputs.dump_prompts && '1' || '' }}
           DIGEST_LANG: he
         run: python compare_models.py
+
+      - name: Upload the prompts
+        if: ${{ inputs.dump_prompts }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: exact-prompts
+          path: prompts_out/*
+          retention-days: 3
