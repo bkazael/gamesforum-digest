@@ -123,5 +123,21 @@
       "Playable Ads in 2027: AI, Creative Strategy & Mobile UA"
     ],
     "key_takeaways": "Operators should review their agreements with ad partners like Unity and AppLovin, especially regarding data collection and usage by SDKs, and understand implications for their own data privacy policies and compliance. | Evaluate the adoption of local payment methods and D2C strategies for key emerging markets in LATAM to address unbanked populations and leverage popular local payment options, potentially expanding revenue channels. | Operators with games in the EU, particularly those with virtual currencies and monetization mechanics for children, must review their in-game commercial practices against the CPC Network's 'Key Principles' and prepare for potential regulatory enforcement or legislative changes. | Observe how established IP (Minecraft) and proven casual mechanics (Candy Crush-style match-3, building meta) are iterated and re-tested in soft launch to inform potential future IP licensing, development, or genre expansion strategies. | Investigate Unity's new D2C payment options (IAP SDK 5.4) and Google's lowered Play Store commissions to optimize revenue. Also, monitor the development of foldable devices for potential future gaming opportunities and the role of AI in ad tech. | Analyze the long-term revenue performance of existing live-service games, especially those that have modified core monetization mechanics like gacha, to inform future game design, live ops, and sunsetting strategies. | When implementing D2C, experiment with exclusive entitlements, loyalty programs, and direct checkout flows instead of just discounts, and consider creating web-store exclusive content, while always balancing changes with the game's economy. | For mobile UA, evaluate integrating playable ads as a core strategy, explore AI tools to streamline their production while maintaining creative authenticity, and invest in analytics to iterate on specific 'Lego blocks' of playable design for better user qualification and retention."
+  },
+  {
+    "episode_id": "ep_010",
+    "date": "2026-10-12",
+    "title": "AI: בועה או חדשנות, צמיחה אגרסיבית בטורקיה וייטנאם, ותביעות מול ענקיות הפלטפורמה | Ben's Weekly Digest",
+    "topics_covered": [
+      "הבהלה ל-AI: בועה של טריליונים או חדשנות אמיתית?",
+      "טורקיה: מעצמת גיימינג עולה עם 'Scaling אגרסיבי'",
+      "תביעה נגד AppLovin: האם מודעות למבוגרים מגיעות לילדים?",
+      "כישלון לפיתוח ארוך: Rainbow Six Mobile נסגר לאחר 7 חודשים",
+      "גוגל שוב בבית המשפט: עמלות ה-Play Store תחת מתקפה בבריטניה",
+      "מעבר לרשתות ה-UA הגדולות: איפה הרווחים האמיתיים?",
+      "Google Playground: כלי ה-AI החדש לפיתוח משחקים מהיר",
+      "וייטנאם: מרכז כוח ייצור גלובלי ל-LiveOps ומשחקי היבריד"
+    ],
+    "key_takeaways": "מפתחים צריכים להעריך מחדש השקעות ב-AI, לתעדף חוויות שחקן חדשות על פני פרודוקטיביות גרידא, ולהיות מודעים לעלויות ארוכות טווח של שירותי AI צד שלישי שעלולות לעלות פי 20. | מפתחים צריכים לנתח את אסטרטגיות ה-Scaling האגרסיביות והמבוססות-תהליך של סטודיואים טורקיים בז'אנרים כמו פאזל ו-Hybridcasual, ולשקול שיתופי פעולה או כניסה לשווקים מתפתחים אלו. | מפעילים חייבים לבדוק בקפדנות את מדיניות הבטיחות לילדים, איסוף הנתונים ומנגנוני הציות של שותפי ה-Ad Monetization שלהם, במיוחד במשחקים שעשויים למשוך ילדים. | מפעילים צריכים להעריך ביקורתית מחזורי פיתוח ממושכים והקצאת משאבים נרחבת, גם עבור IP מבוסס, כדי להבטיח היתכנות שוק ברורה ומדדי ביצועים ניתנים להשגה לפני השקות גלובליות. | מפעילים צריכים לעקוב מקרוב אחר תביעה ייצוגית זו בבריטניה ולחצים רגולטוריים דומים, שכן התוצאה עשויה להשפיע עוד יותר על מבני עמלות הפלטפורמה והסכמי מפתחים-פלטפורמה. | מפעילים צריכים להעריך מחדש את אסטרטגיות ה-UA שלהם מעבר לרשתות המובילות, להתמקד ב-'Profit' כ-KPI מרכזי במקום מדדי Proxy, ולחקור את ה-'Long Tail' של ערוצי הפרסום. | מפעילים צריכים להתנסות בכלי יצירת משחקי AI כמו Google Playground לפרוטוטיפינג מהיר ואימות רעיונות, תוך ניצול כלי אלו לבדיקת קונספטים לפני הקצאת תקציבי פיתוח או UA משמעותיים. | מפעילים צריכים לבחון את וייטנאם כמרכז מתפתח לפיתוח משחקי מובייל, במיוחד משחקי Hybridcasual ופאזל, ולשקול יישום אסטרטגיות LiveOps המתמקדות ב'מרדפי משאבים' וב'חוויות Event-First' כדי לשפר את מעורבות השחקנים."
   }
 ]
