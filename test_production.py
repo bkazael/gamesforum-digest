@@ -20,6 +20,7 @@ import gamesforum_pipeline as p
 import memory
 import runtime
 import sources
+import speech
 
 
 class ProductionTests(unittest.TestCase):
@@ -31,14 +32,17 @@ class ProductionTests(unittest.TestCase):
 
     def test_article_metadata_beats_navigation_and_modified_date(self):
         body = "Actual mobile business reporting. " * 30
-        page = '<nav>Noise</nav><script type="application/ld+json">' + json.dumps({
+        page = '<meta property="article:section" content="Sponsored"><nav>Noise</nav><script type="application/ld+json">' + json.dumps({
             "@graph": [{"@type": "NewsArticle", "headline": "A real headline",
+                        "author": {"@type": "Person", "name": "A. Reporter"},
                         "datePublished": "2026-10-01", "dateModified": "2026-10-13",
                         "articleBody": body}]}) + '</script><footer>Other stories</footer>'
         result = article_parser.extract(page, "https://e.test/article", p.strip_tags)
         self.assertEqual(result["published"], dt.date(2026, 10, 1))
         self.assertEqual(result["title"], "A real headline")
         self.assertEqual(result["text"], body.strip())
+        self.assertEqual(result["author"], "A. Reporter")
+        self.assertEqual(result["content_label"], "Sponsored")
 
     def test_meta_attributes_and_article_fallback(self):
         page = "<meta content='2026-10-12T03:00:00Z' property='article:published_time'>"
@@ -75,6 +79,14 @@ class ProductionTests(unittest.TestCase):
             f.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
             f.writeframes(b"\x00\x01" * 100)
         self.assertEqual(audio_tools.decode_pcm(buff.getvalue(), "audio/wav"), b"\x00\x01" * 100)
+
+    def test_hebrew_speech_glossary_is_case_insensitive_and_does_not_mutate_script(self):
+        original = [{"speaker": "Dana", "text": "Tamatem works across MENA with IAP."}]
+        spoken = speech.prepare_turns(original, {"Tamatem": "טאמאטם", "MENA": "המזרח התיכון"})
+        self.assertEqual(spoken[0]["text"], "טאמאטם works across המזרח התיכון with IAP.")
+        self.assertEqual(original[0]["text"], "Tamatem works across MENA with IAP.")
+        self.assertEqual(speech.untranslated_hebrew_terms(
+            [{"text": "ה-IAP ירד, אבל MENA נשאר."}], "he"), ["MENA", "IAP"])
 
     def test_audio_cache_requires_content_voice_and_integrity(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(checkpoint, "CHECKPOINT_DIR", pathlib.Path(tmp)):
@@ -122,6 +134,9 @@ class ProductionTests(unittest.TestCase):
 
     def review(self, **updates):
         result = {"naturalness": 4, "focus": 4, "covered_article_ids": [1],
+                  "source_assessments": [{"article_id": 1, "type": "REPORTING",
+                    "basis": "Bylined report", "independent_context": True,
+                    "listener_value": True, "treatment": "DEEP"}],
                   "summary": "Ready", "issues": []}
         result.update(updates)
         return result
@@ -157,6 +172,29 @@ class ProductionTests(unittest.TestCase):
         call = Mock(side_effect=[self.review(covered_article_ids=[]), self.draft(),
                                  self.review(covered_article_ids=[])])
         with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "absent"):
+            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
+
+    def test_promotional_event_without_listener_value_fails_editorial_gate(self):
+        promotional = {"article_id": 1, "type": "EVENT_PROMOTION", "basis": "Speaker promo",
+                       "independent_context": False, "listener_value": False, "treatment": "EXCLUDE"}
+        reporting = {"article_id": 2, "type": "REPORTING", "basis": "Independent report",
+                     "independent_context": True, "listener_value": True, "treatment": "DEEP"}
+        call = Mock(return_value=self.review(covered_article_ids=[2],
+                                             source_assessments=[promotional, reporting]))
+        with tempfile.TemporaryDirectory() as tmp:
+            data = editorial.review_and_revise(self.draft(), [
+                {"title": "Event", "text": "Promo details."},
+                {"title": "Reporting", "text": "The studio reported growth."}],
+                pathlib.Path(tmp) / "r.json", call, p.PODCAST_SCHEMA, "test-model",
+                ("Dana", "Yoni"), "en")
+            self.assertTrue(data["editorial_review"]["passed"])
+
+    def test_announcement_without_independent_context_cannot_be_deep(self):
+        announcement = {"article_id": 1, "type": "COMPANY_ANNOUNCEMENT", "basis": "Partnership",
+                        "independent_context": False, "listener_value": True, "treatment": "DEEP"}
+        call = Mock(side_effect=[self.review(source_assessments=[announcement]), self.draft(),
+                                 self.review(source_assessments=[announcement])])
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "must be brief"):
             self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
 
     def test_memory_retry_replaces_same_date(self):
@@ -218,9 +256,15 @@ class ProductionTests(unittest.TestCase):
         import struct
         pcm = b"".join(struct.pack("<h", int(2500 * math.sin(2 * math.pi * 200 * i / 24000)))
                        for i in range(48000))
-        with tempfile.TemporaryDirectory() as tmp, patch.object(p, "gemini_tts_chunk", return_value=pcm):
+        turns = self.draft()["script"]
+        turns[0]["text"] = "Tamatem reported growth across MENA."
+        tts = Mock(return_value=pcm)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(p, "gemini_tts_chunk", tts):
             root = pathlib.Path(tmp)
-            p.synthesize_audio(self.draft()["script"], root / "a.wav", root / "a.mp3")
+            p.synthesize_audio(turns, root / "a.wav", root / "a.mp3")
+            spoken_payload = "\n".join(call.args[0] for call in tts.call_args_list)
+            self.assertIn("טאמאטם", spoken_payload)
+            self.assertIn("המזרח התיכון וצפון אפריקה", spoken_payload)
             self.assertGreater(p.get_duration(root / "a.mp3"), 5)
             self.assertFalse((root / "a.part.mp3").exists())
             self.assertFalse((root / "a.wav").exists())

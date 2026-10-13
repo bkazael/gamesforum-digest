@@ -84,6 +84,22 @@ checks; they do not prove pronunciation or perfect transcript adherence.
   produce a full episode selected only by how many numbers articles contain.
 - `voice`: two speaker names, two voices and delivery instructions. Voice
   changes invalidate cached speech automatically.
+- `speech.replacements`: a case-insensitive glossary applied only to TTS,
+  not to the readable script, source links or evidence. Add a term with the
+  spelling used by the model and the Hebrew form that sounds right; for
+  example, `Tamatem = "טאמאטם"`. Check a short audio preview before treating a
+  new pronunciation as correct. The editorial gate also catches MENA, D2C and
+  IAP left untranslated in Hebrew dialogue.
+
+Every source now receives an editorial classification (reporting, company
+announcement, sponsored, event promotion, opinion or unclear), an assessment
+of independent context and listener value, and a DEEP / BRIEF / EXCLUDE
+treatment. A no-value sponsored/event item must be excluded; a company
+announcement without independent context cannot be a deep dive. Its byline and
+page content label are passed through when the publisher exposes them. The
+classification is a review aid, not a claim that a publisher's disclosure is
+always complete; unclear status stays unclear. Review the report before
+publishing when a source's commercial relationship matters.
 
 The intro targets 60–100 words and previews two or three stories. The script
 prompt favors 15–55-word turns, with no obligatory interview question in every

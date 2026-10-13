@@ -29,6 +29,7 @@ import runtime
 import article_parser
 import audio_tools
 import editorial
+import speech as speech_tools
 import source_health
 
 # ---------------------------------------------------------------- config
@@ -759,7 +760,7 @@ def add_intro(data: dict) -> dict:
 
 def generate_podcast_content(articles: list[dict], today_date: str, memory_context: str = "",
                               target_words: int | None = None, prep: dict | None = None) -> dict:
-    lang_inst = f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Keep English terms like UA, CPI, ROAS, LTV, SKAN, DTC, IAP, web shop, webstore, playable ads in English (never translate them literally). Company and product names (AppLovin, Unity, Pix) are written in Latin letters exactly as spelled, never transliterated into Hebrew letters." if LANG == "he" else "Write in natural spoken English."
+    lang_inst = (f"Write in natural Hebrew as spoken by Israeli mobile gaming executives (use {SPEAKER_A} [Female Anchor] and {SPEAKER_B} [Male Analyst]). Translate jargon naturally on first mention when clearer: say 'המזרח התיכון וצפון אפריקה' rather than MENA, 'מכירה ישירה לצרכן' rather than D2C, and 'רכישות בתוך האפליקציה' rather than IAP. Keep familiar terms (UA, CPI, ROAS, LTV, SKAN, web shop, webstore, playable ads) and company/product names in Latin letters exactly as spelled; do not transliterate names in the readable transcript. A configurable TTS glossary handles difficult name pronunciation." if LANG == "he" else "Write in natural spoken English.")
 
     # target_words exists only for live_smoke.py (Tier 2): production
     # (main(), below) never passes it, so this branch never runs for a real
@@ -1116,7 +1117,11 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
     most -- see checkpoint.py for the incident this came from. Passing None
     keeps the old stateless behaviour, which is what the tests want.
     """
-    chunks = audio_tools.chunks_for_turns(script_turns, TTS_CHUNK_CHAR_LIMIT)
+    # Preserve the editorial transcript; pronunciation substitutions apply to
+    # synthesized speech only and are configurable in profile.toml.
+    glossary = runtime.load_profile().get("speech", {}).get("replacements", {})
+    spoken_turns = speech_tools.prepare_turns(script_turns, glossary)
+    chunks = audio_tools.chunks_for_turns(spoken_turns, TTS_CHUNK_CHAR_LIMIT)
 
     log(f"synthesizing audio via Gemini TTS in {len(chunks)} batched chunks...")
     USAGE_LOG["tts_chunks"] = len(chunks)
@@ -1469,6 +1474,11 @@ def main() -> int:
 
     data = review_episode(data, articles, today)
     checkpoint.save_content(today, articles, data)
+    excluded = {a.get("article_id") for a in data.get("editorial_review", {}).get("source_assessments", [])
+                if a.get("treatment") == "EXCLUDE"}
+    if excluded:
+        articles = [article for index, article in enumerate(articles, 1) if index not in excluded]
+        log(f"editorial review excluded {len(excluded)} promotional/low-value source(s) from publication")
 
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
     full_title = show_title(episode_title)

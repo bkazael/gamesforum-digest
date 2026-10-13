@@ -243,6 +243,15 @@ Two industry colleagues talking. Measured, unhurried, genuinely interested. Stra
 מה לא לעשות: לא התלהבות של רדיו בוקר. לא הפתעה מוגזמת. לא חיוך בקול. אמצע החיים.
 """
 
+[speech]
+# Replacements affect only audio synthesis, never the readable transcript.
+# Add/edit entries after listening to a short preview of the actual voice.
+[speech.replacements]
+"Tamatem" = "טאמאטם"
+"MENA" = "המזרח התיכון וצפון אפריקה"
+"D2C" = "מכירה ישירה לצרכן"
+"IAP" = "רכישות בתוך האפליקציה"
+
 # ---------------------------------------------------------------- זמן אוויר
 
 [airtime]

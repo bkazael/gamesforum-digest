@@ -61,12 +61,25 @@ def _articles(value):
         yield from _articles(value.get("@graph", []))
 
 
+def _name(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return value.get("name") or ""
+    if isinstance(value, list):
+        return ", ".join(filter(None, (_name(v) for v in value)))
+    return ""
+
+
 def extract(page: str, url: str, strip_tags) -> dict | None:
     parser = Page()
     parser.feed(page)
     nodes = list(_articles(parser.jsonld))
     node = max(nodes, key=lambda n: len(str(n.get("articleBody", ""))), default={})
     title = node.get("headline") or parser.meta.get("og:title") or url.rsplit("/", 1)[-1]
+    author = _name(node.get("author")) or parser.meta.get("article:author") or parser.meta.get("author")
+    content_label = next((parser.meta[k] for k in
+        ("article:section", "article:tag", "content:type", "sponsored") if parser.meta.get(k)), "")
     published = parse_date(node.get("datePublished") or parser.meta.get("article:published_time")
                            or parser.meta.get("datepublished"))
     body = node.get("articleBody")
@@ -87,4 +100,6 @@ def extract(page: str, url: str, strip_tags) -> dict | None:
     if len(text) < 400:
         return None
     return {"url": url, "title": strip_tags(str(title)), "text": text[:18000],
-            "published": published, "extraction": method}
+            "published": published, "author": strip_tags(str(author)) if author else None,
+            "content_label": strip_tags(str(content_label)) if content_label else None,
+            "extraction": method}
