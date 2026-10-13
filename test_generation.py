@@ -499,10 +499,16 @@ with tempfile.TemporaryDirectory() as tmp:
     CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
     P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
     P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
+    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
     P.gemini_json = fake_all
-    P.synthesize_audio = lambda script, *a, **k: synth.append(list(script))
+    def fake_synthesize(script, _wav, mp3_path, **_kw):
+        synth.append(list(script))
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+    P.synthesize_audio = fake_synthesize
     P.get_duration = lambda *_a, **_k: 600
-    P.build_feed = lambda *_a, **_k: None
+    def fake_build_feed():
+        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
+    P.build_feed = fake_build_feed
     P.memory.append_entry = lambda *_a, **_k: None
     P.memory.load_recent_context = lambda *_a, **_k: ""
     real_save = CP.save_content
@@ -593,11 +599,15 @@ with tempfile.TemporaryDirectory() as tmp:
     CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
     P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
     P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
+    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
     P.gemini_json = only_script
     synth2 = []
-    P.synthesize_audio = lambda script, *a, **k: synth2.append(list(script))
+    def fake_synthesize2(script, _wav, mp3_path, **_kw):
+        synth2.append(list(script))
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+    P.synthesize_audio = fake_synthesize2
     P.get_duration = lambda *_a, **_k: 600
-    P.build_feed = lambda *_a, **_k: None
+    P.build_feed = lambda: (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
     P.memory.append_entry = lambda *_a, **_k: None
     P.memory.load_recent_context = lambda *_a, **_k: ""
     _D.select = lambda *a, **k: [dict(a_) for a_ in ARTICLES]

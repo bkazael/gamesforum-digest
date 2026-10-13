@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import datetime as dt
 import html
+import hashlib
 import json
 import os
 import pathlib
@@ -28,6 +29,7 @@ import runtime
 import article_parser
 import audio_tools
 import editorial
+import source_health
 
 # ---------------------------------------------------------------- config
 
@@ -215,6 +217,7 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
             usage = data.get("usageMetadata", {})
             USAGE_LOG["input_tokens"] += usage.get("promptTokenCount", 0)
             USAGE_LOG["output_tokens"] += usage.get("candidatesTokenCount", 0)
+            USAGE_LOG["thinking_tokens"] = USAGE_LOG.get("thinking_tokens", 0) + usage.get("thoughtsTokenCount", 0)
             log(f"    [Gemini responded in {time.monotonic() - started:.1f}s]")
             result = json.loads(text)
             if not isinstance(result, dict):
@@ -1347,6 +1350,22 @@ def review_episode(data: dict, articles: list[dict], today: str) -> dict:
         save_draft=lambda draft: checkpoint.save_content(today, articles, draft))
 
 
+def preflight(audio: bool = True) -> None:
+    """Catch local setup faults before spending model quota."""
+    import shutil
+    runtime.load_profile()
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is required")
+    if LANG not in {"he", "en"}:
+        raise ValueError("DIGEST_LANG must be he or en")
+    if not 0 < max(HTTP_TIMEOUT, TTS_TIMEOUT) < RUN_DEADLINE_SEC:
+        raise ValueError("API and TTS timeouts must be positive and below RUN_DEADLINE_SEC")
+    if audio:
+        for tool in ("ffmpeg", "ffprobe"):
+            if not shutil.which(tool):
+                raise RuntimeError(f"Install {tool} before generating an episode")
+
+
 def publication_complete(today: str) -> bool:
     """A playable file alone is not a committed publication transaction."""
     required = [EPISODES / f"{today}.mp3", EPISODES / f"{today}.json",
@@ -1355,7 +1374,10 @@ def publication_complete(today: str) -> bool:
         return False
     try:
         manifest = json.loads((ROOT / "reports" / f"{today}-run.json").read_text())
-        return (manifest.get("status") == "complete"
+        fingerprints = manifest.get("artifacts", {})
+        intact = all(fingerprints.get(str(p.relative_to(ROOT)))
+                     == hashlib.sha256(p.read_bytes()).hexdigest() for p in required)
+        return (manifest.get("status") == "complete" and intact
                 and f"bens-digest-{today}</guid>" in (ROOT / "feed.xml").read_text()
                 and json.loads(STATE_FILE.read_text()).get("last_run") == today)
     except (OSError, ValueError):
@@ -1365,7 +1387,7 @@ def publication_complete(today: str) -> bool:
 def main() -> int:
     global _run_started
     _run_started = time.monotonic()
-    USAGE_LOG.update(input_tokens=0, output_tokens=0, tts_chunks=0)
+    USAGE_LOG.update(input_tokens=0, output_tokens=0, thinking_tokens=0, tts_chunks=0)
     EPISODES.mkdir(parents=True, exist_ok=True)
     DIGESTS.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(exist_ok=True)
@@ -1405,6 +1427,7 @@ def main() -> int:
     resumed = checkpoint.load_content(today)
     if resumed:
         articles, data = resumed
+        source_health.record(data.get("source_alerts", []))
         log(f"resuming from checkpoint: {len(articles)} articles, "
             f"{len(data.get('script', []))} script turns already generated")
     else:
@@ -1428,6 +1451,7 @@ def main() -> int:
         prep = prepare_episode(articles, memory_context)
         data = generate_podcast_content(articles, today, memory_context, prep=prep)
         data["prep"] = prep
+        data["source_alerts"] = source_health.pending_alerts()
         # Explicitly False, so a resumed run knows the intro is still owed
         # (see below) and a legacy checkpoint without the key is never given
         # a second greeting.
@@ -1494,6 +1518,8 @@ def main() -> int:
     entry["date"] = today
     memory.append_entry(entry)
 
+    published_files = [mp3_path, mp3_path.with_suffix(".json"), DIGESTS / f"{today}.md",
+                       DIGESTS / f"{today}-script.md", ROOT / "feed.xml"]
     runtime.atomic_write(ROOT / "reports" / f"{today}-run.json", json.dumps({
         "status": "complete", "date": today, "words": words, "duration_seconds": duration,
         "words_per_minute": wpm, "models": {"text": GEMINI_TEXT_MODEL,
@@ -1501,6 +1527,8 @@ def main() -> int:
         "elapsed_seconds": round(time.monotonic() - _run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),
         "editorial": data.get("editorial_review"),
+        "artifacts": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+                      for path in published_files},
         "sources": [{"title": a["title"], "url": a["url"], "published": a.get("published"),
                      "score": a.get("_score"), "airtime": a.get("_airtime")} for a in articles],
     }, ensure_ascii=False, indent=2, default=str))
@@ -1518,4 +1546,5 @@ if __name__ == "__main__":
     if urlsplit(BASE_URL).scheme not in {"https", "http"} or not urlsplit(BASE_URL).netloc:
         sys.exit("PODCAST_BASE_URL must be an absolute http(s) URL")
     runtime.load_profile()
+    preflight()
     sys.exit(main())

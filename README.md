@@ -1,152 +1,65 @@
 # Ben's Weekly Digest — Gamesforum Digest
 
-פודקאסט שבועי אוטומטי על תעשיית המשחקים לנייד, בעברית, בהנחיית שני
-מנחים (דנה ויוני). כל שבוע: איסוף כתבות → דירוג לפי טעם אישי → תסריט →
-סינתזת קול → פרסום ל-RSS. הכל דרך Gemini בלבד (טקסט + TTS).
+An automated weekly Hebrew podcast for mobile-game operators, hosted by Dana
+and Yoni. It finds recent reporting, selects relevant developments, prepares
+discussion notes, writes and reviews a conversational script, synthesizes
+two-speaker audio, and publishes an RSS feed.
 
-לתיעוד מפורט של כל שינוי — מה, למה, ואיך בודקים — ראה `CHANGELOG.md`.
+The audience works in casual/puzzle, hybrid-casual and real-money skill games.
+Topics emphasize competitors, monetization, UA, LiveOps, payments, store
+policies and useful market developments.
 
-## איך זה בנוי
+## Quick start
 
-```
-sources.py  ──▶  discovery.py  ──▶  gamesforum_pipeline.py  ──▶  feed.xml
-(scrape)         (סינון + דירוג)     (תסריט + TTS + פרסום)
-```
+Requires Python 3.12+ and `ffmpeg` / `ffprobe`. Runtime modules use the standard
+library only. Paid generation needs `GEMINI_API_KEY` in the environment.
 
-### 1. `sources.py` — איסוף
-מתאמים ל-RSS (`PocketGamer.biz/.com`, `MobileGamer.biz`) ול-HTML
-(`Gamesforum`, שאין לו feed). גם "כורה" roundups שבועיים של כל אתר —
-הכתבות שהעורכים שם עצמם הדגישו מקבלות בוסט בציון.
+```sh
+# Offline tests, no model cost. Each legacy test runs as its own script.
+for test in test_*.py; do python3.12 "$test" || exit 1; done
 
-מתאם שלישי, `kind = "email"`, קיים למקור שהאתר שלו חסום ל-CI לגמרי
-(Gamigion — Cloudflare מחזיר 403 גם ל-RSS feed שלו, ר' `profile.toml`).
-הוא קורא את מייל "פוסט חדש" מתיבת דואר ייעודית ב-IMAP במקום לגעת באתר —
-המייל כבר מכיל את גוף הכתבה המלא, אז אין שום בקשת HTTP למקור החסום בכלל.
-`discovery.py` מדלג על שליפה חוזרת (`fetch_article()`) כש-candidate כבר
-מגיע עם `text` משלו. מקור מסוג הזה שמחזיר 0 באותו שבוע נחשב שקט ותקין,
-לא כשל — ניוזלטר שלא יצא השבוע הוא נורמלי; רק כשל חיבור/כניסה אמיתי
-ל-IMAP מתריע. פרטי ההפעלה (Gmail ייעודי, App Password, שני secrets)
-בהערה מעל הקונפיג המושבת של Gamigion ב-`profile.toml`.
+# Live sources, no model calls or changes to the published artifacts.
+python3.12 preview.py --discovery-only
 
-### 2. `discovery.py` — הצינור, מהזול ליקר
-ארבעה שלבים, כל אחד יקר יותר מקודמו, כך שכסף (טוקנים) מוציאים רק על מי
-ששרד את השלבים הקודמים:
+# Generate and review a script without paying for audio.
+python3.12 preview.py --script-only
 
-| שלב | מה קורה | עלות |
-|---|---|---|
-| LIST | scrape דפי listing | 0 |
-| BLOCK | סינון כותרות זבל/שיווקיות | 0 |
-| SIGNAL | הורדת גוף הכתבה, מדידת צפיפות נתונים | 0 (בקשת רשת) |
-| SCORE | קריאה אחת ל-Gemini לכל ~20 כתבות, לפי `profile.toml` | טוקנים |
-
-אחרי הדירוג: דה-דופליקציה של סיפורים חופפים, תקרה למקור בודד (כדי
-שמקור פורה לא ישתלט על הפרק), וחלוקת "זמן אוויר" לפי דירוג. כל החלטה —
-מה נכנס, מה נזרק, ולמה — נכתבת ל-`ledger/<date>.md`.
-
-הרצה עצמאית לכוונון בלי לייצר אודיו:
-```
-python discovery.py --dry-run     # ללא קריאת LLM, ללא עלות
-python discovery.py               # דירוג מלא, כותב ledger
+# Complete isolated episode, resuming saved paid work where available.
+python3.12 preview.py
 ```
 
-`source_health.py` בודק בכל ריצה, מיד — בלי לחכות לדפוס חוזר — האם מקור
-חזר עם אפס תוצאות, ומאבחן אם זה ספציפי לו (שאר ה-RSS תקין) או משהו רחב
-יותר אצלנו (כל ה-RSS נפל יחד). `weekly-digest.yml` מכשיל את עצמו בכוונה
-**אחרי** שהפרק כבר פורסם אם יש התרעה, כדי שמקור שקרס בשקט (feed שנעלם,
-שינוי במבנה עמוד) לא יישאר בלתי מורגש — GitHub שולח על זה מייל כשל
-אוטומטי, בלי שום שירות או secret נוסף.
+Previews go to the Git-ignored `preview_output/`. In GitHub Actions, run **Live
+smoke test** on the desired branch with `smoke`, `script`, or `preview` mode.
+The output becomes a downloadable artifact; that workflow never publishes.
 
-### 3. `gamesforum_pipeline.py` — תסריט, קול, פרסום
-הפרק נכתב בשלושה שלבים, בסדר שבו מפיק היה עושה את זה:
-1. **הכנה** (`prepare_episode`, `PREP_SCHEMA`): קריאה אחת על כל הכתבות
-   שנבחרו — נקודות קונקרטיות לכל כתבה, מידת האמון במקור (ניטרלי / טענות
-   חברה / שיווק של ספק), ושאלות לדיון שנענות רק מתוך החומר או מפרקים קודמים,
-   או מסומנות כפתוחות.
-2. **התסריט** (`generate_podcast_content`, `PODCAST_SCHEMA`): כותרת, תקציר
-   לפי נושא, ודו-שיח בין דנה ליוני — מתוך ההכנה, בלי פתיחה, עם זמן אוויר
-   לכל כתבה לפי הדירוג.
-3. **הפתיחה, אחרונה** (`write_intro`, `INTRO_SCHEMA`): ברכה קבועה בקוד,
-   רגע של שיחה בין המנחים, ו-teaser של מה שבאמת בפרק.
+Production uses `python3.12 gamesforum_pipeline.py` with `PODCAST_BASE_URL`
+set to the absolute public hosting URL. The weekly publishing workflow is
+limited to `main` and retries automatically. Completion requires the full
+publication manifest, not just an MP3 on disk.
 
-אם שלב 1 או 3 נכשל, הריצה ממשיכה בלי הכנה / עם פתיחה פשוטה — הם לא יכולים
-להפיל פרק. `script_quality.py` מתקן/מזהה תורות שנחתכו באמצע מילה (ראשי תיבות
-עם גרשיים), `memory.py` מזין הקשר מהפרקים האחרונים (ראה למטה).
-- הטקסט מפוצל ל-chunks (`TTS_CHUNK_CHAR_LIMIT`, כרגע 3800 תווים) ונשלח
-  ל-Gemini TTS רב-דובר. ה-audio מעורבב עם ג'ינגל (fade + ducking) דרך
-  ffmpeg.
-- `feed.xml` נבנה מחדש מכל הפרקים ב-`episodes/`.
+## Components
 
-## `checkpoint.py` — ריצה שנכשלת לא מתחילה מאפס
+| Module | Responsibility |
+| --- | --- |
+| `sources.py`, `article_parser.py` | RSS/Atom, HTML and read-only email; article text and publication dates |
+| `discovery.py` | Bounded retrieval, freshness, relevance scoring, dedupe, source mix and airtime |
+| `gamesforum_pipeline.py` | Evidence preparation, dialogue, intro, speech, audio mixing and RSS |
+| `editorial.py`, `script_quality.py` | Final evidence/coverage/naturalness gate and deterministic text checks |
+| `audio_tools.py` | Bounded text chunks and strict audio-format decoding |
+| `checkpoint.py`, `runtime.py` | Verified speech reuse, crash-safe writes, paths and validated configuration |
+| `memory.py`, `source_health.py` | Episode continuity and source diagnostics |
 
-TTS הוא השלב האיטי והשביר ביותר, והוא גם זה שהכי כואב לאבד. לכן כל שלב
-יקר נשמר לדיסק ברגע שהוא מצליח, במפתח לפי תאריך הפרק: הכתבות הנבחרות
-והתסריט (כלומר **כל** קריאות הטקסט ל-Gemini) מיד אחרי יצירת התסריט, וכל
-chunk אודיו ברגע שהוא חוזר. ריצה חוזרת לאותו תאריך ממשיכה ממה שכבר קיים
-ומסנתזת רק את מה שחסר — בלי לשלם שוב על כלום. ריצה שמסתיימת בהצלחה
-מוחקת את ה-checkpoint.
+Edit `profile.toml` for the audience, sources, interests, thresholds, airtime
+and voices. Standard RSS/Atom additions need only another `[[sources]]` entry.
+Current settings select at most six stories: 30% planned airtime for the lead,
+20% for the second, and 50% shared by the remainder.
 
-ב-CI כל ריצה מקבלת runner נקי, אז `weekly-digest.yml` שומר את התיקייה
-ב-`actions/cache` עם `if: always()` — ברירת המחדל של cache היא לשמור רק
-בהצלחה, שזה בדיוק ההפך ממה שצריך כאן: הערך כולו הוא במה ששורד כישלון.
+Inspect `ledger/`, `digests/`, `reports/<date>-editorial.json` and
+`reports/<date>-run.json` to understand selection, the exact spoken text,
+review decisions, models, duration and usage. A reviewer model can miss errors;
+listen to the preview before approving a major prompt, voice or model change.
 
-## ריצה חוזרת אוטומטית
-
-`weekly-digest.yml` רץ שלוש פעמים בשני (03:00, 06:00, 10:00 UTC). שתי
-התקלות של ספטמבר היו איטיות רגעית של Gemini ושתיהן דרשו התערבות ידנית;
-ריצה חוזרת סוגרת את הפער בין "נכשל בצורה מסודרת" ל"בסוף יצא פרק".
-
-זה בטוח בזכות שומר אידמפוטנטיות ב-`main()`: אם `episodes/<today>.mp3`
-כבר קיים, הריצה יוצאת מיד — כלומר ירייה אחרי הצלחה היא no-op, לא פרק
-שני. יחד עם ה-checkpoint, ירייה אחרי כישלון חלקי מסנתזת רק את מה שחסר.
-לרינדור מכוון מחדש של תאריך קיים: `FORCE_REGENERATE=1`.
-
-## זיכרון פרקים (`memory.py`)
-
-כדי שהפודקאסט יישמע כמו תוכנית מתמשכת ולא שישה פרקים חד-פעמיים:
-כל פרק מסתיים בכתיבת entry ל-`memory.json`, נגזר **ישירות** מה-
-`digest_summary` שכבר נוצר — בלי שום קריאת Gemini נוספת. בפרק הבא,
-עד `[memory].lookback_episodes` (ברירת מחדל 3) מהפרקים האחרונים נכנסים
-לפרומפט תחת "PREVIOUS EPISODES", עם הנחיה מפורשת להזכיר רק כשבאמת
-רלוונטי. הארכיון המלא נשמר לצמיתות ב-`memory.json`; רק החלון שנכנס
-לפרומפט מוגבל, כדי שעלות הטוקנים לא תגדל עם הזמן.
-
-## `profile.toml` — הקובץ היחיד שצריך לערוך
-
-מי הקורא, מה מעניין אותו, המקורות ומשקלם, חסימות, סף כניסה לפרק,
-הגדרות הקול, וחלוקת זמן האוויר. אחרי כל ריצה, `ledger/<date>.md` מראה
-מה נכנס ומה נזרק ולמה — תכוון לפי זה.
-
-## משתני סביבה
-
-| משתנה | ברירת מחדל | למה |
-|---|---|---|
-| `GEMINI_API_KEY` | (חובה) | היחיד ש-Gemini צריך — לטקסט וגם ל-TTS |
-| `GEMINI_TEXT_MODEL` | `gemini-2.5-flash` | מודל התסריט |
-| `TTS_MODEL` | `gemini-2.5-flash-preview-tts` | מודל הקול |
-| `PODCAST_BASE_URL` | (ריק) | בסיס ה-URL של הפודקאסט ב-`feed.xml` — **חובה** בפרודקשן, אחרת ה-enclosure יוצא יחסי ולא ייקרא ע"י אף פלייר |
-| `DIGEST_LANG` | `he` | שפת הפרק |
-| `API_TIMEOUT_SEC` | `300` | timeout לקריאת טקסט בודדת ל-Gemini |
-| `TTS_TIMEOUT_SEC` | `270` | timeout לקריאת TTS בודדת (קצר יותר: קריאה תקינה לוקחת 1-4 דקות, תקועה לא חוזרת לעולם) |
-| `RUN_DEADLINE_SEC` | `1500` | תקרת זמן כוללת לריצה — **חייב להישאר קטן מה-timeout של השלב ב-CI (30 דקות)**, אחרת הריצה נהרגת מבחוץ במקום לעצור את עצמה בחן |
-
-שלושת אלה חייבים לקנן: נסיון בודד < הריצה כולה < השלב ב-CI < ה-job.
-כשזה לא היה נכון (21.9), מנגנון העצירה העצמית מעולם לא הספיק לרוץ.
-
-## בדיקות — שלוש רמות
-
-| רמה | קובץ | עלות | מתי רץ |
-|---|---|---|---|
-| 0/1 — לוגיקה + חיווט | `test_episode.py`, `test_memory.py`, `test_discovery.py`, `test_contracts.py`, `test_source_health.py`, `test_checkpoint.py`, `test_email_source.py`, `test_script_quality.py`, `test_generation.py`, `test_ci_coverage.py` | אפס (הכל מדומה) | כל push (`test.yaml`) |
-| 2 — smoke אמיתי | `live_smoke.py` | טוקנים אמיתיים, מינימלי | ידני בלבד (`manual_test.yaml`) |
-| 3 — הריצה האמיתית | `gamesforum_pipeline.py` | מלא | שבועי, מתוזמן (`weekly-digest.yml`) |
-
-`test_contracts.py` הוא הבדיקה החשובה ביותר: היא מייבאת את `discovery.py`
-ו-`gamesforum_pipeline.py` יחד ומוודאת שכל שם ששני הקבצים מצפים לו באמת
-קיים, ושהצורה שה-discovery מחזיר תואמת למה שהתסריט צריך. זו בדיוק הבדיקה
-שהייתה תופסת את התקלה שהשביתה את הפרודקשן ב-24 באוגוסט 2026 — ייבוא
-שבור של `discovery.select()`.
-
-הרצה מקומית של הכל, בלי מפתח API אמיתי ובלי עלות:
-```
-python test_episode.py && python test_memory.py && python test_discovery.py && python test_contracts.py && python test_source_health.py && python test_checkpoint.py && python test_email_source.py && python test_script_quality.py && python test_generation.py && python test_ci_coverage.py
-```
+[OPERATIONS.md](OPERATIONS.md) documents all environment variables, tuning,
+source onboarding, previews, failure recovery and rollback.
+[AUDIT.md](AUDIT.md) records the review findings and validation evidence.
+[CHANGELOG.md](CHANGELOG.md) retains the earlier incident history.

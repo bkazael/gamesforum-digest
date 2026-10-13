@@ -343,9 +343,14 @@ with tempfile.TemporaryDirectory() as tmp:
 
     audio_calls = []
     P.gemini_json = boom
-    P.synthesize_audio = lambda *a, **k: audio_calls.append(k.get("date"))
+    def fake_resume_audio(_script, _wav, mp3_path, date=None):
+        audio_calls.append(date)
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+    P.synthesize_audio = fake_resume_audio
     P.get_duration = lambda *_a, **_k: 8
-    P.build_feed = lambda *_a, **_k: None
+    def fake_build_feed():
+        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
+    P.build_feed = fake_build_feed
     P.memory.append_entry = lambda *_a, **_k: None
     import discovery as _D
     _D.select = boom
@@ -400,7 +405,13 @@ with tempfile.TemporaryDirectory() as tmp:
         (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
         P.STATE_FILE.write_text(__import__("json").dumps({"last_run": today}))
         (P.ROOT / "reports").mkdir()
-        (P.ROOT / "reports" / f"{today}-run.json").write_text('{"status":"complete"}')
+        __import__("hashlib")
+        required = [P.EPISODES / f"{today}.mp3", P.EPISODES / f"{today}.json",
+                    P.DIGESTS / f"{today}.md", P.DIGESTS / f"{today}-script.md", P.ROOT / "feed.xml"]
+        hashes = {str(path.relative_to(P.ROOT)): __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+                  for path in required}
+        (P.ROOT / "reports" / f"{today}-run.json").write_text(
+            __import__("json").dumps({"status": "complete", "artifacts": hashes}))
         rc = P.main()
         check("a rerun after a published episode exits 0 without re-running discovery",
               rc == 0 and not select_calls, f"rc={rc}, select calls={len(select_calls)}")

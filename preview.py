@@ -37,6 +37,7 @@ def main():
         return 0
     if not p.GEMINI_API_KEY:
         ap.error("Set GEMINI_API_KEY for a paid preview; use --discovery-only without one")
+    p.preflight(audio=not args.script_only)
     if args.script_only:
         import datetime as dt
         import checkpoint

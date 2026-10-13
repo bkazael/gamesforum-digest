@@ -191,6 +191,27 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(path.read_text(), "old")
             self.assertEqual(len(list(path.parent.iterdir())), 1)
 
+    def test_publication_marker_detects_modified_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            paths = [root / "episodes" / "2026-10-13.mp3",
+                     root / "episodes" / "2026-10-13.json", root / "digests" / "2026-10-13.md",
+                     root / "digests" / "2026-10-13-script.md", root / "feed.xml"]
+            for path in paths:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("bens-digest-2026-10-13</guid>" if path.name == "feed.xml" else "complete")
+            (root / "state.json").write_text('{"last_run":"2026-10-13"}')
+            (root / "reports").mkdir()
+            (root / "reports/2026-10-13-run.json").write_text(json.dumps({
+                "status": "complete", "artifacts": {
+                    str(path.relative_to(root)): __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+                    for path in paths}}))
+            with patch.object(p, "ROOT", root), patch.object(p, "EPISODES", root / "episodes"), \
+                    patch.object(p, "DIGESTS", root / "digests"), patch.object(p, "STATE_FILE", root / "state.json"):
+                self.assertTrue(p.publication_complete("2026-10-13"))
+                paths[0].write_text("corrupt")
+                self.assertFalse(p.publication_complete("2026-10-13"))
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg tools unavailable")
     def test_real_audio_render_is_playable_mono_with_jingle(self):
         import math
