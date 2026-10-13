@@ -43,4 +43,5 @@ jobs:
           python test_email_source.py
           python test_script_quality.py
           python test_generation.py
+          python test_production.py
           python test_ci_coverage.py

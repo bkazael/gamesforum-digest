@@ -35,8 +35,9 @@ from __future__ import annotations
 import json
 import pathlib
 import shutil
+import runtime
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = runtime.OUTPUT_ROOT
 CHECKPOINT_DIR = ROOT / ".checkpoint"
 
 
@@ -76,10 +77,9 @@ def save_content(date: str, articles: list[dict], data: dict) -> None:
     """
     try:
         CHECKPOINT_DIR.mkdir(exist_ok=True)
-        _content_path(date).write_text(
+        runtime.atomic_write(_content_path(date),
             json.dumps({"articles": articles, "data": data},
                        ensure_ascii=False, indent=2, default=_json_default),
-            encoding="utf-8",
         )
     except Exception as e:                              # noqa: BLE001
         # Failing to *save* a checkpoint must never fail the run that
@@ -105,22 +105,30 @@ def load_content(date: str) -> tuple[list[dict], dict] | None:
         return None
 
 
-def save_chunk(date: str, index: int, pcm: bytes) -> None:
+def save_chunk(date: str, index: int, pcm: bytes, identity: str | None = None) -> None:
     """Store one synthesized audio chunk, by its position in the script."""
     try:
         CHECKPOINT_DIR.mkdir(exist_ok=True)
-        _chunk_path(date, index).write_bytes(pcm)
+        path = _chunk_path(date, index)
+        runtime.atomic_write(path, pcm)
+        runtime.atomic_write(path.with_suffix(".json"), json.dumps({
+            "identity": identity, "sha256": runtime.fingerprint(pcm.hex()), "bytes": len(pcm)}))
     except Exception as e:                              # noqa: BLE001
         print(f"::warning::checkpoint: could not save audio chunk {index} ({e}) -- a failed run will re-synthesize it", flush=True)
 
 
-def load_chunk(date: str, index: int) -> bytes | None:
+def load_chunk(date: str, index: int, identity: str | None = None) -> bytes | None:
     """Return a previously synthesized chunk, or None if we must redo it."""
     path = _chunk_path(date, index)
     if not path.exists():
         return None
     try:
         pcm = path.read_bytes()
+        if identity is not None:
+            meta = json.loads(path.with_suffix(".json").read_text())
+            if (meta.get("identity") != identity or meta.get("bytes") != len(pcm)
+                    or meta.get("sha256") != runtime.fingerprint(pcm.hex())):
+                return None
         # A zero-byte chunk means an interrupted write, not silence worth
         # reusing -- redo it rather than splicing a gap into the episode.
         return pcm or None

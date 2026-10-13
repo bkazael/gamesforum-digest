@@ -102,49 +102,26 @@ urls = ["https://mobilegamer.biz/feed/"]
 weight = 1.0
 max_per_episode = 2
 
-# ===== מושבת עד שהתשתית מוכנה -- ר' CHANGELOG 2026-09-23 =====
-#
-# ניוזלטר שבועי "Mobile Gaming Today". התוכן עצמו רצוי (במיוחד סדרת
-# "Deconstruction" החודשית, זווית level-design שאין לאף מקור אחר), אבל
-# Cloudflare שמגן על Substack מחזיר 403 לכל בקשה מ-GitHub Actions -- גם
-# ל-URL של ה-RSS feed עצמו, לא רק לדף הכתבה. אומת פעמיים בפרודקשן (14.9
-# ו-21.9), ושרד גם את המעבר ל-User-Agent של דפדפן אמיתי -- זו חסימה ברמת
-# מוניטין IP/טביעת אצבע TLS, לא משהו שאפשר לעקוף מ-CI בגישה רגילה.
-#
-# הפתרון: kind = "email" (sources.py: from_email()) קורא את המייל של
-# "פוסט חדש" מתיבת דואר ייעודית -- לא סורק את האתר בכלל. מייל כזה מכיל את
-# גוף הכתבה המלא, אז אין שום קריאת HTTP ל-Substack או ל-Gamigion בכל
-# התהליך; discovery.py כבר מדלג על fetch_article() כשל-candidate יש כבר
-# שדה "text" (ר' discovery.py, שלב 3).
-#
-# להפעיל, שלושה צעדים בלבד:
-#   1. Gmail ייעודי חדש (לא האישי שלך -- App Password נותן גישה לכל
-#      התיבה) ומינוי אותו לניוזלטר ב-gamigion.substack.com.
-#   2. באותו חשבון: הפעלת אימות דו-שלבי, ואז Google Account -> Security ->
-#      App Passwords -> ליצור סיסמה ל-"Mail".
-#   3. שני secrets חדשים ב-repo (Settings -> Secrets and variables ->
-#      Actions): GMAIL_ADDRESS וה-GMAIL_APP_PASSWORD. weekly-digest.yml
-#      כבר מעביר אותם ל-pipeline (ר' env שם) -- לא נדרש שינוי workflow.
-# ואז: להסיר את ה-# משורות ה-[[sources]] למטה. זהו.
-#
-# אימות ה-parsing עצמו (חילוץ הכותרת/קישור/טקסט מתוך HTML של המייל)
-# נבנה נגד תבנית סינתטית שמדמה מייל אמיתי של Substack, לא נגד מייל אמיתי
-# מ-Gamigion -- אין לי דרך לקבל אחד מהסביבה הזו. יכול להיות שיידרש כיוונון
-# קטן ל-_FOOTER_MARKERS ב-sources.py אחרי שהמייל הראשון האמיתי יגיע; אם
-# ריצה מחזירה "message ...: body too short" או "no .../p/... link found"
-# בלוג, זה הסימן. שלח לי את המייל הגולמי (Gmail -> שלוש נקודות -> Show
-# original) ואכוון בדיוק לפי זה.
-#
-# [[sources]]
-# name = "Gamigion (Mobile Gaming Today)"
-# kind = "email"
-# urls = ["https://gamigion.substack.com/feed"]  # רק לזיהוי הדומיין -- לעולם לא נשלף
-# mailbox = "INBOX"
-# weight = 1.0
-# max_per_episode = 2
-# block = [
-#   "conference", "summit", "webinar", "meetup", "in person event",
-# ]
+# Gamigion's Substack RSS is blocked from GitHub Actions by Cloudflare, so
+# ingest its full-article newsletter email instead. The email adapter reads
+# the dedicated Gmail inbox read-only; it does not fetch the blocked site.
+# To activate: subscribe a dedicated Gmail inbox to gamigion.substack.com,
+# create a Google App Password, and add GMAIL_ADDRESS and GMAIL_APP_PASSWORD
+# under GitHub Settings -> Secrets and variables -> Actions. Then set enabled
+# below to true. Until then it is explicitly disabled and cannot break runs.
+# Parsing is tested against a synthetic Substack email, not a real Gamigion
+# specimen; inspect the first run's logs for extraction warnings.
+[[sources]]
+name = "Gamigion (Mobile Gaming Today)"
+kind = "email"
+enabled = false
+urls = ["https://gamigion.substack.com/feed"]  # domain only; never fetched
+mailbox = "INBOX"
+weight = 1.0
+max_per_episode = 2
+block = [
+  "conference", "summit", "webinar", "meetup", "in person event",
+]
 
 # ---------------------------------------------------------------- טעם
 
@@ -182,8 +159,8 @@ title_patterns = [
 
 [thresholds]
 min_score = 6
-max_articles = 8
-min_words = 250
+max_articles = 6
+min_words = 120
 max_age_days = 7        # שבועי, קבוע. הניסיון החד-פעמי בסריקת חודש שלם (30 יום) הסתיים.
 
 # תקרת ביטחון על שלב ה-fetch: כמות המועמדים המקסימלית שהמנוע יוריד וימדוד
@@ -193,6 +170,10 @@ max_age_days = 7        # שבועי, קבוע. הניסיון החד-פעמי �
 # timeout של GitHub Actions. אפשר להעלות בבטחה אם תוסיף מקורות ותראה
 # "SKIPPED" מופיע ב-ledger.
 max_candidates_to_fetch = 150
+fetch_workers = 4
+require_publication_date = true
+min_scoring_coverage = 0.8
+max_source_bonus = 0.5
 
 # תקרות המקור (max_per_episode) הן "רכות", בשני צעדים תחומים. ב-28.9 היה
 # מקום ל-8 כתבות ונבחרו 7, ובכל זאת נזרקו כתבות בציון 9 (Newzoo עם נתוני
@@ -239,9 +220,23 @@ Two industry colleagues talking. Measured, unhurried, genuinely interested. Stra
 מה לא לעשות: לא התלהבות של רדיו בוקר. לא הפתעה מוגזמת. לא חיוך בקול. אמצע החיים.
 """
 
+[speech]
+# Replacements affect only audio synthesis, never the readable transcript.
+# Add/edit entries after listening to a short preview of the actual voice.
+[speech.replacements]
+"Tamatem" = "טאמאטם"
+"MENA" = "המזרח התיכון וצפון אפריקה"
+"D2C" = "מכירה ישירה לצרכן"
+"IAP" = "רכישות בתוך האפליקציה"
+
 # ---------------------------------------------------------------- זמן אוויר
 
 [airtime]
-lead_share = 0.40
-second_share = 0.25
-remainder_share = 0.35
+lead_share = 0.30
+second_share = 0.20
+remainder_share = 0.50
+
+[editorial]
+# One review and at most one revision, before spending on speech synthesis.
+enabled = true
+minimum_rating = 4

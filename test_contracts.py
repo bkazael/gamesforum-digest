@@ -127,7 +127,7 @@ def fake_collect(sources, max_age_days):
     counts = {c["source"]: 0 for c in FIXTURE_CANDIDATES}
     for c in FIXTURE_CANDIDATES:
         counts[c["source"]] += 1
-    return list(FIXTURE_CANDIDATES), set(), counts
+    return [dict(c, published=__import__("datetime").date.today()) for c in FIXTURE_CANDIDATES], set(), counts
 
 def fake_fetch_article(url):
     if url == "https://gamigion.substack.com/p/fixture-issue":
@@ -320,6 +320,9 @@ if chosen:
 # that actually matters: that those functions are never called at all.
 
 import checkpoint as CP
+# Editorial behavior is tested independently in test_production.py. These
+# historical contracts isolate orchestration of the pre-existing stages.
+P.review_episode = lambda data, *_args: data
 
 with tempfile.TemporaryDirectory() as tmp:
     tmp_path = pathlib.Path(tmp)
@@ -333,16 +336,21 @@ with tempfile.TemporaryDirectory() as tmp:
     today = __import__("datetime").date.today().isoformat()
     CP.save_content(today, FIXTURE_CANDIDATES,
                     {"episode_title": "Resumed", "digest_summary": [],
-                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום"}]})
+                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום חברים."}]})
 
     def boom(*_a, **_k):
         raise AssertionError("resumed run made a Gemini text call")
 
     audio_calls = []
     P.gemini_json = boom
-    P.synthesize_audio = lambda *a, **k: audio_calls.append(k.get("date"))
-    P.get_duration = lambda *_a, **_k: 600
-    P.build_feed = lambda *_a, **_k: None
+    def fake_resume_audio(_script, _wav, mp3_path, date=None):
+        audio_calls.append(date)
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+    P.synthesize_audio = fake_resume_audio
+    P.get_duration = lambda *_a, **_k: 8
+    def fake_build_feed():
+        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
+    P.build_feed = fake_build_feed
     P.memory.append_entry = lambda *_a, **_k: None
     import discovery as _D
     _D.select = boom
@@ -390,6 +398,20 @@ with tempfile.TemporaryDirectory() as tmp:
     try:
         # Today's episode already on disk -> stop before spending anything.
         (P.EPISODES / f"{today}.mp3").write_bytes(b"already published")
+        (P.EPISODES / f"{today}.json").write_text("{}")
+        P.DIGESTS.mkdir(parents=True, exist_ok=True)
+        (P.DIGESTS / f"{today}.md").write_text("digest")
+        (P.DIGESTS / f"{today}-script.md").write_text("script")
+        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
+        P.STATE_FILE.write_text(__import__("json").dumps({"last_run": today}))
+        (P.ROOT / "reports").mkdir()
+        __import__("hashlib")
+        required = [P.EPISODES / f"{today}.mp3", P.EPISODES / f"{today}.json",
+                    P.DIGESTS / f"{today}.md", P.DIGESTS / f"{today}-script.md", P.ROOT / "feed.xml"]
+        hashes = {str(path.relative_to(P.ROOT)): __import__("hashlib").sha256(path.read_bytes()).hexdigest()
+                  for path in required}
+        (P.ROOT / "reports" / f"{today}-run.json").write_text(
+            __import__("json").dumps({"status": "complete", "artifacts": hashes}))
         rc = P.main()
         check("a rerun after a published episode exits 0 without re-running discovery",
               rc == 0 and not select_calls, f"rc={rc}, select calls={len(select_calls)}")

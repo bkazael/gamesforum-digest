@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Was 20. The 2026-09-14 run got killed by this exact timeout at
     # 20m13s -- three TTS chunks legitimately took 3-7 minutes *each*
@@ -61,8 +62,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .checkpoint
-          key: checkpoint-${{ steps.ep.outputs.date }}-${{ github.run_id }}
-          restore-keys: checkpoint-${{ steps.ep.outputs.date }}-
+          key: checkpoint-v2-${{ steps.ep.outputs.date }}-${{ hashFiles('*.py', 'profile.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: checkpoint-v2-${{ steps.ep.outputs.date }}-${{ hashFiles('*.py', 'profile.toml') }}-
 
       # A step-level timeout smaller than the job's own (35) matters
       # specifically because a JOB-level timeout cancels every remaining
@@ -87,14 +88,9 @@ jobs:
           # -> Variables) to try a stronger one; unset or empty means the
           # default, i.e. nothing changes. See compare_models.py.
           GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
-          # Only read by sources.py's from_email() adapter, and only if
-          # profile.toml has a source with kind = "email" (Gamigion's is
-          # still commented out -- see its comment there for why and what
-          # activates it). Wired here ahead of that on purpose: adding the
-          # two secrets in GitHub and flipping the profile.toml comment can
-          # then happen as one independent step, with nothing else to touch.
-          # Unset, these are just empty strings that from_email() never
-          # gets called to read.
+          # Used only by enabled kind=email sources. Gamigion is configured
+          # but disabled in profile.toml until these secrets are added and
+          # the source is explicitly enabled there.
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python gamesforum_pipeline.py
@@ -117,15 +113,26 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .checkpoint
-          key: checkpoint-${{ steps.ep.outputs.date }}-${{ github.run_id }}
+          key: checkpoint-v2-${{ steps.ep.outputs.date }}-${{ hashFiles('*.py', 'profile.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload diagnostics
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/
+            ledger/
+            source_alerts.json
+          retention-days: 14
 
       - name: Commit episode
         id: commit_episode
         run: |
           git config user.name  "gamesforum-bot"
           git config user.email "bot@users.noreply.github.com"
-          rm -rf __pycache__
-          git add -A
+          git add episodes digests ledger reports feed.xml state.json memory.json
           if git diff --cached --quiet; then
             echo "nothing new this week"
           else

@@ -177,6 +177,8 @@ check("a vendor/company source must be attributed, not endorsed", "ATTRIBUTED, n
 check("open questions must be said to be open, never invented", "OPEN" in sp and "never answered with something invented" in sp)
 check("the hype ban and the agreement-opener limit are in the prompt",
       "no stacked" in sp.lower() or "stacked" in sp.lower())
+check("the word range is a target, not a ceiling on useful coverage",
+      "not a ceiling" in sp and "go longer" in sp)
 check("a question may not be left hanging", "never left" in sp and "hanging" in sp)
 
 prompts.clear()
@@ -202,9 +204,23 @@ check("the longer second attempt is what comes back", P.script_quality.count_wor
 prompts.clear()
 queue = [short]
 P.gemini_json = fake_floor
-d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
-check("a script that stays short is still accepted after the one retry (never an exception)",
-      len(prompts) == 2 and bool(d["script"]))
+try:
+    P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+    check("a script that stays short is rejected after the one retry", False, "no exception")
+except RuntimeError as e:
+    check("a script that stays short is rejected after the one retry",
+          len(prompts) == 2 and "Refusing to continue" in str(e), str(e))
+
+# A very short malformed retry must not replace a longer complete first draft.
+prompts.clear()
+queue = [short, dict(script_resp, script=[{"speaker": A, "text": words(21)}])]
+P.gemini_json = fake_floor
+try:
+    P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+    check("a malformed retry falls back to the longer complete first draft", False)
+except RuntimeError as e:
+    check("a malformed retry falls back to the longer complete first draft",
+          "400-word episode script" in str(e), str(e))
 
 prompts.clear()
 queue = [short]
@@ -432,13 +448,13 @@ check("with no history the prompt says not to refer to earlier episodes at all, 
       "and never mentions a PREVIOUS EPISODES block that isn't there",
       "Do not refer to earlier episodes at all" in prompts[0] and "PREVIOUS EPISODES" not in prompts[0])
 check("the script prompt caps turn length and asks for plain questions",
-      "No turn longer than about 80 words" in sp and "compound interview question" in sp)
+      "none longer than 80 words" in sp and "compound interview question" in sp)
 check("the script prompt stops every story ending on the same 'developers should' line",
       "at most two turns in the whole episode use it" in sp.replace("\n  ", " "))
 check("the script prompt puts the Hebrew rule first and again after the articles",
       sp.startswith("OUTPUT LANGUAGE: HEBREW") and sp.rstrip().endswith("source material only."))
-check("the script prompt requires Yoni to challenge, and shows the shape of an exchange",
-      "asks for the number behind a claim" in sp.replace("\n     ", " ") and "Shape of a good exchange" in sp)
+check("the script prompt varies exchanges rather than forcing a question in every story",
+      "Do not force a doubt" in sp and "Shape of a good exchange" in sp)
 
 # ---------------------------------------------------------------- 6c. which model writes what
 #
@@ -474,6 +490,8 @@ check("editorial prep stays on the default (fast) model", "model" not in kws["pr
 # ---------------------------------------------------------------- 7. main(): the order, and when the checkpoint is written
 
 order, saves, synth = [], [], []
+# The new final editorial gate has its own integration tests.
+P.review_episode = lambda data, *_args: data
 
 def fake_all(prompt, schema=None, **kw):
     if schema is P.PREP_SCHEMA:
@@ -497,10 +515,16 @@ with tempfile.TemporaryDirectory() as tmp:
     CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
     P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
     P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
+    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
     P.gemini_json = fake_all
-    P.synthesize_audio = lambda script, *a, **k: synth.append(list(script))
+    def fake_synthesize(script, _wav, mp3_path, **_kw):
+        synth.append(list(script))
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+    P.synthesize_audio = fake_synthesize
     P.get_duration = lambda *_a, **_k: 600
-    P.build_feed = lambda *_a, **_k: None
+    def fake_build_feed():
+        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
+    P.build_feed = fake_build_feed
     P.memory.append_entry = lambda *_a, **_k: None
     P.memory.load_recent_context = lambda *_a, **_k: ""
     real_save = CP.save_content
@@ -530,9 +554,9 @@ with tempfile.TemporaryDirectory() as tmp:
         check("the intro prompt was built from the finished script's story list",
               ARTICLES[0]["title"] in fake_all.intro_prompt)
         check("the checkpoint is saved after the script (intro still owed), then after the intro",
-              saves == [False, True], str(saves))
+              saves == [False, True, True], str(saves))
         check("...and both saves really landed on disk, with real date-bearing articles",
-              persisted == [True, True], str(persisted))
+              persisted == [True, True, True], str(persisted))
         final = synth[0] if synth else []
         check("the audio script opens with the fixed welcome, then the model's intro, then the stories",
               final and final[0] == P.welcome_turn() and final[1] == GOOD_INTRO["turns"][0]
@@ -591,11 +615,15 @@ with tempfile.TemporaryDirectory() as tmp:
     CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
     P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
     P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
+    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
     P.gemini_json = only_script
     synth2 = []
-    P.synthesize_audio = lambda script, *a, **k: synth2.append(list(script))
+    def fake_synthesize2(script, _wav, mp3_path, **_kw):
+        synth2.append(list(script))
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+    P.synthesize_audio = fake_synthesize2
     P.get_duration = lambda *_a, **_k: 600
-    P.build_feed = lambda *_a, **_k: None
+    P.build_feed = lambda: (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
     P.memory.append_entry = lambda *_a, **_k: None
     P.memory.load_recent_context = lambda *_a, **_k: ""
     _D.select = lambda *a, **k: [dict(a_) for a_ in ARTICLES]
