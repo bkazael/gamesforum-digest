@@ -88,14 +88,9 @@ jobs:
           # -> Variables) to try a stronger one; unset or empty means the
           # default, i.e. nothing changes. See compare_models.py.
           GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
-          # Only read by sources.py's from_email() adapter, and only if
-          # profile.toml has a source with kind = "email" (Gamigion's is
-          # still commented out -- see its comment there for why and what
-          # activates it). Wired here ahead of that on purpose: adding the
-          # two secrets in GitHub and flipping the profile.toml comment can
-          # then happen as one independent step, with nothing else to touch.
-          # Unset, these are just empty strings that from_email() never
-          # gets called to read.
+          # Used only by enabled kind=email sources. Gamigion is configured
+          # but disabled in profile.toml until these secrets are added and
+          # the source is explicitly enabled there.
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python gamesforum_pipeline.py

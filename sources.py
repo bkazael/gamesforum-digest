@@ -171,7 +171,7 @@ class EmailFetchError(RuntimeError):
 # built from Substack's publicly documented email template shape, not a
 # real Gamigion specimen -- nobody has been able to fetch one from CI, and
 # the sandbox this was written in cannot reach a live inbox either. The
-# mechanism below (IMAP connect, seen-flagging, text-already-fetched wiring
+# mechanism below (IMAP connect, text-already-fetched wiring
 # into discovery.py, the source_health silence-is-normal fix) is real and
 # tested against a synthetic fixture. The exact _FOOTER_MARKERS regex is
 # the one piece that will likely need a one-line adjustment once a real
@@ -184,7 +184,7 @@ _FOOTER_MARKERS = re.compile(
 
 
 def from_email(source: dict) -> list[dict]:
-    """Pull unread "new post" emails from a dedicated inbox.
+    """Pull recent "new post" emails from a dedicated inbox, read-only.
 
     Every message in this mailbox is assumed to be a subscription email for
     this one source -- that's why the setup instructions call for a
@@ -193,11 +193,9 @@ def from_email(source: dict) -> list[dict]:
     doesn't need it, and skipping it means one less thing that can silently
     stop matching if a newsletter platform changes its sending address.
 
-    Only UNSEEN messages are read (via BODY.PEEK[], which does not itself
-    mark a message seen), and a message is only flagged \\Seen *after* it
-    parses successfully -- so a message that fails to parse is retried next
-    run instead of being silently lost, the same resilience checkpoint.py
-    gives the rest of the pipeline.
+    Messages are date-bounded, not marked read or changed. BODY.PEEK[] plus
+    SELECT readonly=True keeps the mailbox untouched; downstream URL/history
+    deduplication prevents old newsletter posts from being reused.
     """
     address = os.environ.get("GMAIL_ADDRESS")
     app_password = os.environ.get("GMAIL_APP_PASSWORD")

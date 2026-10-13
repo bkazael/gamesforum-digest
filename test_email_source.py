@@ -12,9 +12,8 @@ why, and what to do once a real Gamigion email is available to calibrate
 against.
 
 What IS real and being tested for keeps regardless of the exact template:
-  - IMAP is only ever asked for UNSEEN messages, via BODY.PEEK (no
-    unintended read-marking).
-  - A message is flagged \\Seen only after it parses successfully.
+  - IMAP searches a date-bounded window and fetches with BODY.PEEK while
+    selecting the mailbox read-only (no mailbox mutation).
   - The URL/title/text extraction shape matches what discovery.py expects.
   - A connection/login failure raises EmailFetchError distinctly from
     "mailbox reachable, nothing new" (empty list).
@@ -145,11 +144,11 @@ real_imap_ssl = S.imaplib.IMAP4_SSL
 os.environ["GMAIL_ADDRESS"] = "digest-ingest@example.com"
 os.environ["GMAIL_APP_PASSWORD"] = "correct-password"
 
-# ---------------------------------------------------------------- 1. happy path: one unread message
+# ---------------------------------------------------------------- 1. happy path: one recent message
 
 _install_fake({b"1": _fixture_email_bytes()}, {b"1"})
 items = S.from_email(SOURCE)
-check("one unread message yields one item", len(items) == 1, f"got {len(items)}")
+check("one recent message yields one item", len(items) == 1, f"got {len(items)}")
 if items:
     it = items[0]
     check("url is the /p/<slug> permalink",
@@ -161,16 +160,16 @@ if items:
     check("text excludes footer boilerplate",
           "Unsubscribe" not in it["text"] and "Manage your subscription" not in it["text"])
     check("item carries a usable published date", it["published"] is not None)
-check("collection leaves the message unread for a failed run's retry",
+check("collection leaves mailbox message unchanged",
       b"1" in _FakeIMAP.UNSEEN, f"unseen: {_FakeIMAP.UNSEEN}")
-check("collecting again after a downstream failure retains the article",
+check("collecting again does not consume the article",
       len(S.from_email(SOURCE)) == 1)
 
-# ---------------------------------------------------------------- 2. no unread mail this week -- silence, not an error
+# ---------------------------------------------------------------- 2. no mail this week -- silence, not an error
 
 _install_fake({}, set())
 items = S.from_email(SOURCE)
-check("zero unread messages returns an empty list without raising", items == [])
+check("zero recent messages returns an empty list without raising", items == [])
 
 # ---------------------------------------------------------------- 3. a message with no discoverable permalink is skipped, not crashed
 
@@ -183,7 +182,7 @@ Content-Type: text/html; charset="utf-8"
 _install_fake({b"2": bad}, {b"2"})
 items = S.from_email(SOURCE)
 check("a message with no matching /p/... link is skipped, not returned", items == [])
-check("an unparseable message is left UNSEEN for retry next run",
+check("an unparseable message remains unchanged for retry next run",
       b"2" in _FakeIMAP.UNSEEN, f"unseen: {_FakeIMAP.UNSEEN}")
 
 # ---------------------------------------------------------------- 4. login failure raises EmailFetchError distinctly
