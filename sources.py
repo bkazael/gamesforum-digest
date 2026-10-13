@@ -42,6 +42,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 
 from gamesforum_pipeline import http_get, log, strip_tags
+from runtime import canonical_url
 
 # RSS dates are RFC-822; some feeds emit ISO-8601 anyway.
 _RFC822 = "%a, %d %b %Y %H:%M:%S"
@@ -92,18 +93,21 @@ def from_rss(source: dict) -> list[dict]:
                  if n.tag.rsplit("}", 1)[-1].lower() in ("item", "entry")]
         for node in nodes:
             title = _text(node, "title")
-            link = _text(node, "link", "guid")
+            link = _text(node, "link")
             if not link:                                # Atom puts it in href
                 for child in node:
-                    if child.tag.rsplit("}", 1)[-1].lower() == "link":
+                    if (child.tag.rsplit("}", 1)[-1].lower() == "link"
+                            and child.attrib.get("rel", "alternate") == "alternate"
+                            and child.attrib.get("type", "text/html") in ("text/html", "application/xhtml+xml")):
                         link = child.attrib.get("href", "")
                         if link:
                             break
-            if not (title and link.startswith("http")):
+            link = link or _text(node, "guid")
+            if not (title and urllib.parse.urlsplit(link).scheme in ("http", "https")):
                 continue
             summary = strip_tags(_text(node, "description", "summary"))
             items.append({
-                "url": link.split("?")[0],
+                "url": canonical_url(link),
                 "title": title,
                 "source": source["name"],
                 "published": _parse_date(
@@ -213,10 +217,16 @@ def from_email(source: dict) -> list[dict]:
     )
 
     try:
-        conn = imaplib.IMAP4_SSL("imap.gmail.com")
+        conn = imaplib.IMAP4_SSL(source.get("imap_host", "imap.gmail.com"), timeout=30)
         conn.login(address, app_password)
-        conn.select(mailbox)
-        status, data = conn.search(None, "UNSEEN")
+        status, _ = conn.select(mailbox, readonly=True)
+        if status != "OK":
+            raise EmailFetchError(f"IMAP SELECT failed: {status}")
+        # Search by date, not unread status: collection is not publication.
+        # A downstream failure or a dry run must never consume a newsletter.
+        since = dt.date.today() - dt.timedelta(days=source.get("max_age_days", 7))
+        imap_date = f"{since.day:02d}-{('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')[since.month-1]}-{since.year}"
+        status, data = conn.search(None, "SINCE", imap_date)
         if status != "OK":
             raise EmailFetchError(f"IMAP SEARCH failed: {status}")
     except EmailFetchError:
@@ -293,7 +303,6 @@ def from_email(source: dict) -> list[dict]:
             })
             # Only mark read once everything above succeeded -- a crash or
             # a "skip" above leaves the message UNSEEN for next run's retry.
-            conn.store(msg_id, "+FLAGS", "\\Seen")
         except Exception as e:                            # noqa: BLE001
             log(f"  [{source['name']}] error processing message {msg_id!r}: {e} -- "
                 "leaving it unread for next run")
@@ -385,6 +394,8 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
     raw_counts: dict[str, int] = {}
 
     for source in sources:
+        if source.get("enabled", True) is False:
+            continue
         adapter = ADAPTERS.get(source.get("kind", "rss"))
         if not adapter:
             log(f"  [{source.get('name')}] unknown kind, skipped")
@@ -395,7 +406,7 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
         # catch inside, e.g. an IMAP login rejection. One source's adapter
         # blowing up must not take the whole run down with it.
         try:
-            fetched = adapter(source)
+            fetched = adapter(dict(source, max_age_days=max_age_days))
         except Exception as e:                          # noqa: BLE001
             log(f"  [{source['name']}] adapter raised: {e}")
             raw_counts[source["name"]] = -1
@@ -406,9 +417,10 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
         for item in fetched:
             # An unknown date is kept: html sources have none, and dropping
             # them would silently disable Gamesforum entirely.
-            if item["published"] and item["published"] < cutoff:
+            if item["published"] and not cutoff <= item["published"] <= dt.date.today():
                 continue
-            key = item["url"].rstrip("/").lower()
+            item["url"] = canonical_url(item["url"])
+            key = item["url"]
             if key in seen:
                 continue
             seen.add(key)

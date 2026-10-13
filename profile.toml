@@ -182,8 +182,8 @@ title_patterns = [
 
 [thresholds]
 min_score = 6
-max_articles = 8
-min_words = 250
+max_articles = 6
+min_words = 120
 max_age_days = 7        # שבועי, קבוע. הניסיון החד-פעמי בסריקת חודש שלם (30 יום) הסתיים.
 
 # תקרת ביטחון על שלב ה-fetch: כמות המועמדים המקסימלית שהמנוע יוריד וימדוד
@@ -193,6 +193,10 @@ max_age_days = 7        # שבועי, קבוע. הניסיון החד-פעמי �
 # timeout של GitHub Actions. אפשר להעלות בבטחה אם תוסיף מקורות ותראה
 # "SKIPPED" מופיע ב-ledger.
 max_candidates_to_fetch = 150
+fetch_workers = 4
+require_publication_date = true
+min_scoring_coverage = 0.8
+max_source_bonus = 0.5
 
 # תקרות המקור (max_per_episode) הן "רכות", בשני צעדים תחומים. ב-28.9 היה
 # מקום ל-8 כתבות ונבחרו 7, ובכל זאת נזרקו כתבות בציון 9 (Newzoo עם נתוני
@@ -242,6 +246,11 @@ Two industry colleagues talking. Measured, unhurried, genuinely interested. Stra
 # ---------------------------------------------------------------- זמן אוויר
 
 [airtime]
-lead_share = 0.40
-second_share = 0.25
-remainder_share = 0.35
+lead_share = 0.30
+second_share = 0.20
+remainder_share = 0.50
+
+[editorial]
+# One review and at most one revision, before spending on speech synthesis.
+enabled = true
+minimum_rating = 4

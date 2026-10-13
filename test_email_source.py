@@ -90,7 +90,7 @@ class _FakeIMAP:
     UNSEEN: set[bytes] = set()
     RAISE_ON_CONNECT = False
 
-    def __init__(self, host):
+    def __init__(self, host, timeout=None):
         if _FakeIMAP.RAISE_ON_CONNECT:
             raise OSError("connection refused (simulated)")
         self.host = host
@@ -99,12 +99,13 @@ class _FakeIMAP:
         if app_password == "wrong-password":
             raise Exception("AUTHENTICATIONFAILED")  # noqa: TRY002
 
-    def select(self, mailbox):
+    def select(self, mailbox, readonly=False):
+        assert readonly
         return "OK", [b"1"]
 
-    def search(self, charset, criteria):
-        assert criteria == "UNSEEN"
-        ids = b" ".join(sorted(_FakeIMAP.UNSEEN))
+    def search(self, charset, criteria, since=None):
+        assert criteria == "SINCE" and since
+        ids = b" ".join(sorted(_FakeIMAP.INBOX))
         return "OK", [ids]
 
     def fetch(self, msg_id, spec):
@@ -160,8 +161,10 @@ if items:
     check("text excludes footer boilerplate",
           "Unsubscribe" not in it["text"] and "Manage your subscription" not in it["text"])
     check("item carries a usable published date", it["published"] is not None)
-check("the message was marked \\Seen after successful parse",
-      b"1" not in _FakeIMAP.UNSEEN, f"still unseen: {_FakeIMAP.UNSEEN}")
+check("collection leaves the message unread for a failed run's retry",
+      b"1" in _FakeIMAP.UNSEEN, f"unseen: {_FakeIMAP.UNSEEN}")
+check("collecting again after a downstream failure retains the article",
+      len(S.from_email(SOURCE)) == 1)
 
 # ---------------------------------------------------------------- 2. no unread mail this week -- silence, not an error
 

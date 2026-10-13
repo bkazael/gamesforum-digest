@@ -35,8 +35,9 @@ from __future__ import annotations
 
 import json
 import pathlib
+import runtime
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = runtime.OUTPUT_ROOT
 ALERTS_FILE = ROOT / "source_alerts.json"
 
 
@@ -104,9 +105,7 @@ def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
 
 def record(alerts: list[str]) -> None:
     """Persist this run's alerts so the workflow's later step can read them."""
-    ALERTS_FILE.write_text(
-        json.dumps(alerts, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    runtime.atomic_write(ALERTS_FILE, json.dumps(alerts, ensure_ascii=False, indent=2))
 
 
 def pending_alerts() -> list[str]:
