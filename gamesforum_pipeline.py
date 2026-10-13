@@ -773,10 +773,13 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
         # and adds roughly 200 words, so the finished episode still lands in
         # the old 1,500-1,900 range. SCRIPT_FLOOR_WORDS is where a short
         # script earns a retry (2026-09-28 came out at 1,301 words total).
-        length_inst = (f"Target Script Length: {SCRIPT_TARGET_WORDS[0]:,} to "
+        length_inst = (f"Aim for {SCRIPT_TARGET_WORDS[0]:,} to "
                        f"{SCRIPT_TARGET_WORDS[1]:,} words for the stories and outro "
-                       "(the intro is recorded separately). Keep it detailed, "
-                       "engaging, and professional.")
+                       "(the intro is recorded separately), but this is a target, "
+                       "not a ceiling. If the selected stories contain enough "
+                       "important, interesting evidence to deserve more time, go "
+                       "longer and explain it clearly; never omit useful context "
+                       "just to fit the range. Do not pad with repetition.")
         budget_words = sum(SCRIPT_TARGET_WORDS) // 2
 
     # Airtime was computed by discovery.assign_airtime() and printed in the
@@ -952,6 +955,8 @@ Do not add specific facts from your own knowledge or from the style example.
     # out at 1,301 words against a 1,500-1,900 target), but shares the same
     # single retry rather than adding a second one.
     attempt_prompt = prompt
+    best_data = None
+    best_rank = None
     for attempt in (1, 2):
         data = gemini_json(attempt_prompt, PODCAST_SCHEMA, tries=4, model=GEMINI_CREATIVE_MODEL)
         data["script"], repairs = script_quality.repair_script(data.get("script", []))
@@ -970,7 +975,15 @@ Do not add specific facts from your own knowledge or from the style example.
                 f"the script is only {words} words; the target is "
                 f"{SCRIPT_TARGET_WORDS[0]:,}-{SCRIPT_TARGET_WORDS[1]:,}"
             )
+        # A retry can itself be truncated. Keep the best complete-ish draft
+        # rather than letting a 20-word retry overwrite a 900-word first
+        # attempt. Structural/style integrity outranks raw length.
+        non_length_problems = [p for p in problems if not p.startswith("the script is only")]
+        rank = (len(non_length_problems), -words)
+        if best_rank is None or rank < best_rank:
+            best_data, best_rank = data, rank
         if not problems:
+            best_data = data
             break
         for p in problems:
             log(f"  script problem (attempt {attempt}): {p}")
@@ -985,6 +998,7 @@ Do not add specific facts from your own knowledge or from the style example.
                    "and every question answered in full; do not pad." if short else "")
             )
     else:
+        data = best_data or data
         data["script"], closed = script_quality.close_remaining(data["script"])
         log(f"  script still had problems after a retry; closed {closed} "
             "turn(s) with a full stop rather than ship a cut-off fragment")
@@ -996,6 +1010,11 @@ Do not add specific facts from your own knowledge or from the style example.
 
     if total_words < 600:
         log(f"Warning: Script is short ({total_words} words), but proceeding.")
+    if not target_words and total_words < SCRIPT_FLOOR_WORDS:
+        raise RuntimeError(
+            f"Refusing to continue with a {total_words}-word episode script; "
+            f"minimum is {SCRIPT_FLOOR_WORDS}. The next scheduled retry can try again."
+        )
 
     return data
 

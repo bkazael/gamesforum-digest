@@ -177,6 +177,8 @@ check("a vendor/company source must be attributed, not endorsed", "ATTRIBUTED, n
 check("open questions must be said to be open, never invented", "OPEN" in sp and "never answered with something invented" in sp)
 check("the hype ban and the agreement-opener limit are in the prompt",
       "no stacked" in sp.lower() or "stacked" in sp.lower())
+check("the word range is a target, not a ceiling on useful coverage",
+      "not a ceiling" in sp and "go longer" in sp)
 check("a question may not be left hanging", "never left" in sp and "hanging" in sp)
 
 prompts.clear()
@@ -202,9 +204,23 @@ check("the longer second attempt is what comes back", P.script_quality.count_wor
 prompts.clear()
 queue = [short]
 P.gemini_json = fake_floor
-d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
-check("a script that stays short is still accepted after the one retry (never an exception)",
-      len(prompts) == 2 and bool(d["script"]))
+try:
+    P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+    check("a script that stays short is rejected after the one retry", False, "no exception")
+except RuntimeError as e:
+    check("a script that stays short is rejected after the one retry",
+          len(prompts) == 2 and "Refusing to continue" in str(e), str(e))
+
+# A very short malformed retry must not replace a longer complete first draft.
+prompts.clear()
+queue = [short, dict(script_resp, script=[{"speaker": A, "text": words(21)}])]
+P.gemini_json = fake_floor
+try:
+    P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+    check("a malformed retry falls back to the longer complete first draft", False)
+except RuntimeError as e:
+    check("a malformed retry falls back to the longer complete first draft",
+          "400-word episode script" in str(e), str(e))
 
 prompts.clear()
 queue = [short]
