@@ -562,10 +562,11 @@ with tempfile.TemporaryDirectory() as tmp:
               final and final[0] == P.welcome_turn() and final[1] == GOOD_INTRO["turns"][0]
               and final[len(GOOD_INTRO["turns"]) + 1]["text"].startswith("מילה"),
               str(final[:2]))
-        script_md = (P.DIGESTS / f"{pathlib.Path(str(P.DIGESTS)).name and __import__('datetime').date.today().isoformat()}-script.md")
+        utc_today = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).date().isoformat()
+        script_md = P.DIGESTS / f"{utc_today}-script.md"
         check("the saved script file starts with the welcome line",
               script_md.exists() and script_md.read_text(encoding="utf-8").startswith(A + ": ברוכים הבאים"))
-        digest_md = (P.DIGESTS / f"{__import__('datetime').date.today().isoformat()}.md").read_text(encoding="utf-8")
+        digest_md = (P.DIGESTS / f"{utc_today}.md").read_text(encoding="utf-8")
         check("the digest shows the discussion questions, answered and open",
               "Discussion questions" in digest_md and "Only for minors" in digest_md and "Open:" in digest_md)
 
@@ -573,7 +574,7 @@ with tempfile.TemporaryDirectory() as tmp:
         order.clear(); saves.clear(); synth.clear()
         for f in (P.EPISODES.glob("*")):
             f.unlink()
-        today = __import__("datetime").date.today().isoformat()
+        today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
         CP.save_content(today, ARTICLES, dict(script_resp, prep=prep, intro_done=False))
         saves.clear()
         P.main()

@@ -347,5 +347,27 @@ with _tempfile.TemporaryDirectory() as _tmp:
     finally:
         _memory.MEMORY_FILE = _real
 
+# ---------------------------------------------------------------- 13. daily quota failures stop the scoring loop immediately
+
+_quota_calls = []
+def _daily_quota(prompt, schema=None, **kwargs):
+    _quota_calls.append(kwargs)
+    raise D.GeminiQuotaExhausted("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+
+D.gemini_json = _daily_quota
+_score_profile = {"identity": {"who": "test"},
+                  "interests": {"core": [], "deprioritize": []}}
+_score_candidates = [{"_idx": i, "title": "A mobile game update",
+                      "text": "Game update data " * 100,
+                      "signals": D.substance_signals("Game update data " * 100)}
+                     for i in range(D.SCORE_BATCH + 1)]
+try:
+    D.score_all(_score_profile, _score_candidates)
+    check("a provider daily quota failure aborts scoring instead of retrying later batches", False)
+except D.GeminiQuotaExhausted:
+    check("a provider daily quota failure aborts scoring instead of retrying later batches",
+          len(_quota_calls) == 1 and _quota_calls[0].get("model") == D.GEMINI_SCORING_MODEL,
+          f"calls={len(_quota_calls)}, kwargs={_quota_calls}")
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

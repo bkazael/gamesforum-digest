@@ -105,10 +105,11 @@ The intro targets 60–100 words and previews two or three stories. The script
 prompt favors 15–55-word turns, with no obligatory interview question in every
 item. Editorial review checks the complete script including intro and summary.
 
-Model environment variables remain `GEMINI_TEXT_MODEL`,
-`GEMINI_CREATIVE_MODEL`, and `TTS_MODEL`. Changing a model is not automatically
-an improvement: run a script preview and full audio preview before publishing.
-The existing defaults are preserved pending evidence from comparisons.
+Model environment variables are `GEMINI_TEXT_MODEL`, `GEMINI_SCORING_MODEL`,
+`GEMINI_CREATIVE_MODEL`, and `TTS_MODEL`. Relevance scoring defaults to
+`gemini-2.5-flash-lite`; writing and editorial review remain on the existing
+creative/text model. Changing a model is not automatically an improvement:
+run a script preview and full audio preview before publishing.
 
 ## Add a source
 

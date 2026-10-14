@@ -127,7 +127,8 @@ def fake_collect(sources, max_age_days):
     counts = {c["source"]: 0 for c in FIXTURE_CANDIDATES}
     for c in FIXTURE_CANDIDATES:
         counts[c["source"]] += 1
-    return [dict(c, published=__import__("datetime").date.today()) for c in FIXTURE_CANDIDATES], set(), counts
+    return [dict(c, published=__import__("datetime").date.today())
+            for c in FIXTURE_CANDIDATES], set(), counts
 
 def fake_fetch_article(url):
     if url == "https://gamigion.substack.com/p/fixture-issue":
@@ -138,7 +139,9 @@ def fake_fetch_article(url):
     cand = next(c for c in FIXTURE_CANDIDATES if c["url"] == url)
     return {"url": url, "title": cand["title"], "text": FIXTURE_TEXT}
 
-def fake_gemini_json_score(prompt, schema=None):
+def fake_gemini_json_score(prompt, schema=None, **kwargs):
+    check("story scoring selects the configured classification model",
+          kwargs.get("model") == P.GEMINI_SCORING_MODEL, str(kwargs))
     # Mirrors SCORE_SCHEMA's shape: one row per candidate in the batch,
     # scored comfortably above profile.toml's min_score (6).
     return {"articles": [
@@ -333,7 +336,7 @@ with tempfile.TemporaryDirectory() as tmp:
     P.STATE_FILE = tmp_path / "state.json"
     P.ASSETS_DIR = tmp_path / "assets"
 
-    today = __import__("datetime").date.today().isoformat()
+    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
     CP.save_content(today, FIXTURE_CANDIDATES,
                     {"episode_title": "Resumed", "digest_summary": [],
                      "script": [{"speaker": P.SPEAKER_A, "text": "שלום חברים."}]})
@@ -388,7 +391,7 @@ with tempfile.TemporaryDirectory() as tmp:
     P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
     CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
     P.EPISODES.mkdir(parents=True, exist_ok=True)
-    today = __import__("datetime").date.today().isoformat()
+    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
 
     import discovery as _D
     real_select = _D.select
