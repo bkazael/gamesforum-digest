@@ -485,7 +485,8 @@ P.write_intro(DATA, prep)
 P.GEMINI_CREATIVE_MODEL = _real_creative
 check("the script call is sent to the creative model", kws["script"].get("model") == "gemini-creative-test", str(kws["script"]))
 check("the intro call is sent to the creative model", kws["intro"].get("model") == "gemini-creative-test", str(kws["intro"]))
-check("editorial prep stays on the default (fast) model", "model" not in kws["prep"], str(kws["prep"]))
+check("editorial prep uses the configured classification model",
+      kws["prep"].get("model") == P.GEMINI_SCORING_MODEL, str(kws["prep"]))
 
 # ---------------------------------------------------------------- 7. main(): the order, and when the checkpoint is written
 
@@ -562,10 +563,11 @@ with tempfile.TemporaryDirectory() as tmp:
               final and final[0] == P.welcome_turn() and final[1] == GOOD_INTRO["turns"][0]
               and final[len(GOOD_INTRO["turns"]) + 1]["text"].startswith("מילה"),
               str(final[:2]))
-        script_md = (P.DIGESTS / f"{pathlib.Path(str(P.DIGESTS)).name and __import__('datetime').date.today().isoformat()}-script.md")
+        utc_today = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).date().isoformat()
+        script_md = P.DIGESTS / f"{utc_today}-script.md"
         check("the saved script file starts with the welcome line",
               script_md.exists() and script_md.read_text(encoding="utf-8").startswith(A + ": ברוכים הבאים"))
-        digest_md = (P.DIGESTS / f"{__import__('datetime').date.today().isoformat()}.md").read_text(encoding="utf-8")
+        digest_md = (P.DIGESTS / f"{utc_today}.md").read_text(encoding="utf-8")
         check("the digest shows the discussion questions, answered and open",
               "Discussion questions" in digest_md and "Only for minors" in digest_md and "Open:" in digest_md)
 
@@ -573,7 +575,7 @@ with tempfile.TemporaryDirectory() as tmp:
         order.clear(); saves.clear(); synth.clear()
         for f in (P.EPISODES.glob("*")):
             f.unlink()
-        today = __import__("datetime").date.today().isoformat()
+        today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
         CP.save_content(today, ARTICLES, dict(script_resp, prep=prep, intro_done=False))
         saves.clear()
         P.main()

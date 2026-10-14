@@ -47,7 +47,7 @@ except ModuleNotFoundError:           # 3.10 and older
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from gamesforum_pipeline import (          # noqa: E402
-    fetch_article, gemini_json, log,
+    fetch_article, gemini_json, log, GEMINI_SCORING_MODEL, GeminiQuotaExhausted,
 )
 from sources import collect                # noqa: E402
 import memory                              # noqa: E402
@@ -354,8 +354,10 @@ def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
         batch = candidates[start:start + SCORE_BATCH]
         try:
             result = gemini_json(build_scoring_prompt(profile, batch),
-                                 SCORE_SCHEMA)
+                                 SCORE_SCHEMA, model=GEMINI_SCORING_MODEL)
             rows = result.get("articles", []) if isinstance(result, dict) else []
+        except GeminiQuotaExhausted:
+            raise
         except Exception as e:                          # noqa: BLE001
             log(f"  batch {start // SCORE_BATCH + 1} failed ({e})")
             continue
@@ -559,7 +561,7 @@ ARTICLE B: {b.get('title', '')}
 Are these genuinely the SAME underlying news event -- the same announcement,
 ruling, launch, or figures -- not merely related or about the same company?"""
     try:
-        result = gemini_json(prompt, DEDUPE_SCHEMA)
+        result = gemini_json(prompt, DEDUPE_SCHEMA, model=GEMINI_SCORING_MODEL)
         same = bool(result.get("same_story"))
         log(f"    dedupe check: {a['title'][:40]!r} vs {b['title'][:40]!r} "
             f"-> {'SAME' if same else 'distinct'} "

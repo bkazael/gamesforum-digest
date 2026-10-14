@@ -36,11 +36,10 @@ import source_health
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
-# The model for the two stages where wording is the product -- the script and
-# the intro. Scoring, dedupe and editorial prep are classification and
-# extraction, where the fast model is the right tool; these two are writing,
-# and a stronger model is the lever for how natural the Hebrew sounds. Unset,
-# it is simply GEMINI_TEXT_MODEL, i.e. nothing changes.
+GEMINI_SCORING_MODEL = os.environ.get("GEMINI_SCORING_MODEL") or "gemini-2.5-flash-lite"
+# The model for stages where wording is the product -- script, intro, and
+# editorial review. Keep this separate from high-volume scoring so the latter
+# can use a model with more suitable throughput/cost characteristics.
 GEMINI_CREATIVE_MODEL = os.environ.get("GEMINI_CREATIVE_MODEL") or GEMINI_TEXT_MODEL
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
 
@@ -225,7 +224,29 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
                 raise ValueError("Expected a JSON object from Gemini")
             return result
         except urllib.error.HTTPError as e:
-            log(f"    Gemini API attempt {attempt + 1}/{tries} failed: HTTP {e.code}")
+            detail = ""
+            try:
+                payload = json.loads(e.read().decode("utf-8", "replace"))
+                error = payload.get("error", {})
+                pieces = [str(error.get("status", "")), str(error.get("message", ""))]
+                for item in error.get("details", []):
+                    if isinstance(item, dict):
+                        pieces.extend(str(item.get(k, "")) for k in ("reason", "domain"))
+                        for violation in item.get("violations", []):
+                            if isinstance(violation, dict):
+                                pieces.extend(str(violation.get(k, "")) for k in
+                                              ("quotaMetric", "quotaId", "quotaValue"))
+                        metadata = item.get("metadata", {})
+                        if isinstance(metadata, dict):
+                            pieces.extend(str(metadata.get(k, "")) for k in
+                                          ("quota_metric", "quota_id", "quota_limit", "quota_limit_value"))
+                detail = ": " + " | ".join(dict.fromkeys(p for p in pieces if p))[:700]
+            except Exception:                              # noqa: BLE001
+                pass
+            log(f"    Gemini API attempt {attempt + 1}/{tries} failed: HTTP {e.code}{detail}")
+            if e.code == 429 and re.search(
+                    r"per.?day|daily|requestsperday|free.?tier.?requests", detail, re.I):
+                raise GeminiQuotaExhausted(detail or "daily quota exhausted") from e
             if e.code not in (408, 429, 500, 502, 503, 504) or attempt == tries - 1:
                 raise
             _retry_sleep(10 * (attempt + 1))
@@ -235,6 +256,10 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
                 raise
             _retry_sleep(10 * (attempt + 1))
     raise RuntimeError("unreachable")
+
+
+class GeminiQuotaExhausted(RuntimeError):
+    """A provider daily quota is exhausted; retrying the same run won't help."""
 
 # ---------------------------------------------------------------- JSON Schema & Prompt
 
@@ -461,7 +486,8 @@ ARTICLES:
 """
     log("editorial prep: points, source stance, and answered questions...")
     try:
-        raw = gemini_json(prompt, PREP_SCHEMA, tries=2, timeout=240)
+        raw = gemini_json(prompt, PREP_SCHEMA, tries=2, timeout=240,
+                          model=GEMINI_SCORING_MODEL)
         prep = _clean_prep(raw, len(articles))
     except Exception as e:                                  # noqa: BLE001
         log(f"  editorial prep failed ({type(e).__name__}: {e}); "
@@ -1369,9 +1395,10 @@ def review_episode(data: dict, articles: list[dict], today: str) -> dict:
     if not config.get("enabled", True):
         raise RuntimeError("Editorial review is disabled; production publication requires it")
     return editorial.review_and_revise(data, articles, ROOT / "reports" / f"{today}-editorial.json",
-        gemini_json, PODCAST_SCHEMA, GEMINI_CREATIVE_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
+        gemini_json, PODCAST_SCHEMA, GEMINI_SCORING_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
         minimum=config.get("minimum_rating", 4),
-        save_draft=lambda draft: checkpoint.save_content(today, articles, draft))
+        save_draft=lambda draft: checkpoint.save_content(today, articles, draft),
+        revision_model=GEMINI_CREATIVE_MODEL)
 
 
 def preflight(audio: bool = True) -> None:
@@ -1552,7 +1579,8 @@ def main() -> int:
     runtime.atomic_write(ROOT / "reports" / f"{today}-run.json", json.dumps({
         "status": "complete", "date": today, "words": words, "duration_seconds": duration,
         "words_per_minute": wpm, "models": {"text": GEMINI_TEXT_MODEL,
-        "creative": GEMINI_CREATIVE_MODEL, "tts": TTS_MODEL}, "usage": USAGE_LOG,
+        "scoring": GEMINI_SCORING_MODEL, "creative": GEMINI_CREATIVE_MODEL,
+        "tts": TTS_MODEL}, "usage": USAGE_LOG,
         "elapsed_seconds": round(time.monotonic() - _run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),
         "editorial": data.get("editorial_review"),
