@@ -134,6 +134,18 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(call.call_count, 1)
             sleep.assert_not_called()
 
+    def test_free_tier_request_metric_without_daily_suffix_is_still_terminal(self):
+        body = json.dumps({"error": {"status": "RESOURCE_EXHAUSTED",
+            "message": "Quota exceeded for metric: generate_content_free_tier_requests, limit: 20",
+            "details": []}}).encode()
+        error = urllib.error.HTTPError("https://api.test", 429, "quota", {}, io.BytesIO(body))
+        with patch.object(p, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
+                side_effect=error) as call, patch.object(p, "_retry_sleep") as sleep:
+            with self.assertRaises(p.GeminiQuotaExhausted):
+                p.gemini_json("x")
+            self.assertEqual(call.call_count, 1)
+            sleep.assert_not_called()
+
     def test_request_timeout_cannot_outlive_run_budget(self):
         with patch.object(p, "_run_started", 100), patch.object(p.time, "monotonic", return_value=155), \
                 patch.object(p, "RUN_DEADLINE_SEC", 60):

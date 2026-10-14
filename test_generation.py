@@ -485,7 +485,8 @@ P.write_intro(DATA, prep)
 P.GEMINI_CREATIVE_MODEL = _real_creative
 check("the script call is sent to the creative model", kws["script"].get("model") == "gemini-creative-test", str(kws["script"]))
 check("the intro call is sent to the creative model", kws["intro"].get("model") == "gemini-creative-test", str(kws["intro"]))
-check("editorial prep stays on the default (fast) model", "model" not in kws["prep"], str(kws["prep"]))
+check("editorial prep uses the configured classification model",
+      kws["prep"].get("model") == P.GEMINI_SCORING_MODEL, str(kws["prep"]))
 
 # ---------------------------------------------------------------- 7. main(): the order, and when the checkpoint is written
 

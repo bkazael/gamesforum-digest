@@ -561,7 +561,7 @@ ARTICLE B: {b.get('title', '')}
 Are these genuinely the SAME underlying news event -- the same announcement,
 ruling, launch, or figures -- not merely related or about the same company?"""
     try:
-        result = gemini_json(prompt, DEDUPE_SCHEMA)
+        result = gemini_json(prompt, DEDUPE_SCHEMA, model=GEMINI_SCORING_MODEL)
         same = bool(result.get("same_story"))
         log(f"    dedupe check: {a['title'][:40]!r} vs {b['title'][:40]!r} "
             f"-> {'SAME' if same else 'distinct'} "

@@ -77,7 +77,7 @@ check("an unrelated article does not trip the heuristic",
 
 # ---------------------------------------------------------------- 2. false positive is NOT rejected
 
-D.gemini_json = lambda prompt, schema=None: {
+D.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": False,
     "reasoning": "One is a lawsuit settlement, the other is a technical "
                  "policy change; different announcements.",
@@ -93,7 +93,7 @@ check("when Gemini says two heuristically-flagged articles are NOT the "
 
 # ---------------------------------------------------------------- 3. confirmed duplicate IS rejected, and the freed cap slot backfills
 
-D.gemini_json = lambda prompt, schema=None: {
+D.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": True,
     "reasoning": "Both describe the same Google Play settlement.",
 }
@@ -111,7 +111,7 @@ check("this is the actual bug fix: the cap slot the duplicate would have "
 
 # ---------------------------------------------------------------- 4. confirmation failure fails open (keeps both, never silently drops a topic)
 
-def _raise(prompt, schema=None):
+def _raise(prompt, schema=None, **kwargs):
     raise RuntimeError("simulated API error")
 D.gemini_json = _raise
 result = D.select_stories(
@@ -126,7 +126,7 @@ check("a dedupe-confirmation API error fails open -- both articles are "
 THIRD = art("Google Play adds new safety controls for kids accounts",
             "Google Play rolls out parental controls and age verification.",
             6.5)
-D.gemini_json = lambda prompt, schema=None: {
+D.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": False, "reasoning": "distinct announcements",
 }
 result = D.select_stories(
@@ -172,7 +172,7 @@ def cap_field():
     ]
 
 
-D.gemini_json = lambda prompt, schema=None: {"same_story": False, "reasoning": "distinct"}
+D.gemini_json = lambda prompt, schema=None, **kwargs: {"same_story": False, "reasoning": "distinct"}
 
 field = cap_field()
 result = D.select_stories(field, CAP_SOURCES, CAP_THR)

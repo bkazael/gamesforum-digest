@@ -244,7 +244,8 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
             except Exception:                              # noqa: BLE001
                 pass
             log(f"    Gemini API attempt {attempt + 1}/{tries} failed: HTTP {e.code}{detail}")
-            if e.code == 429 and re.search(r"per.?day|daily|requestsperday", detail, re.I):
+            if e.code == 429 and re.search(
+                    r"per.?day|daily|requestsperday|free.?tier.?requests", detail, re.I):
                 raise GeminiQuotaExhausted(detail or "daily quota exhausted") from e
             if e.code not in (408, 429, 500, 502, 503, 504) or attempt == tries - 1:
                 raise
@@ -485,7 +486,8 @@ ARTICLES:
 """
     log("editorial prep: points, source stance, and answered questions...")
     try:
-        raw = gemini_json(prompt, PREP_SCHEMA, tries=2, timeout=240)
+        raw = gemini_json(prompt, PREP_SCHEMA, tries=2, timeout=240,
+                          model=GEMINI_SCORING_MODEL)
         prep = _clean_prep(raw, len(articles))
     except Exception as e:                                  # noqa: BLE001
         log(f"  editorial prep failed ({type(e).__name__}: {e}); "
@@ -1393,9 +1395,10 @@ def review_episode(data: dict, articles: list[dict], today: str) -> dict:
     if not config.get("enabled", True):
         raise RuntimeError("Editorial review is disabled; production publication requires it")
     return editorial.review_and_revise(data, articles, ROOT / "reports" / f"{today}-editorial.json",
-        gemini_json, PODCAST_SCHEMA, GEMINI_CREATIVE_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
+        gemini_json, PODCAST_SCHEMA, GEMINI_SCORING_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
         minimum=config.get("minimum_rating", 4),
-        save_draft=lambda draft: checkpoint.save_content(today, articles, draft))
+        save_draft=lambda draft: checkpoint.save_content(today, articles, draft),
+        revision_model=GEMINI_CREATIVE_MODEL)
 
 
 def preflight(audio: bool = True) -> None:
