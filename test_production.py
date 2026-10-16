@@ -61,6 +61,24 @@ class ProductionTests(unittest.TestCase):
             items = sources.from_rss({"name": "Atom", "urls": ["https://e.test/feed"]})
         self.assertEqual(items[0]["url"], "https://e.test/story?id=1")
 
+    def test_full_text_in_feed_supplies_article_text(self):
+        # gamigion.com: the page extractor can't read its short WordPress
+        # posts, but content:encoded in the feed is the whole post.
+        feed = """<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item>
+          <title>Studio raises $49M</title><link>https://www.gamigion.com/studio-raises/</link>
+          <pubDate>Fri, 16 Oct 2026 08:00:00 +0000</pubDate>
+          <description>Short teaser.</description>
+          <content:encoded><![CDATA[<p>The studio raised <b>$49M</b> to expand.</p><p>Second paragraph.</p>]]></content:encoded>
+        </item></channel></rss>"""
+        with patch.object(sources, "http_get", return_value=feed):
+            plain = sources.from_rss({"name": "G", "urls": ["https://gamigion.com/feed"]})
+            full = sources.from_rss({"name": "G", "urls": ["https://gamigion.com/feed"],
+                                     "full_text_in_feed": True})
+        self.assertNotIn("text", plain[0])
+        self.assertIn("raised $49M to expand", full[0]["text"])
+        self.assertIn("Second paragraph", full[0]["text"])
+        self.assertNotIn("<p>", full[0]["text"])
+
     def test_chunking_preserves_text_and_bounds_long_turns(self):
         text = "First sentence is spoken. " * 180
         turns = [{"speaker": "Dana", "text": text}, {"speaker": "Yoni", "text": "A short reply."}]

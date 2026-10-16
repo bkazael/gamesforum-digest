@@ -84,6 +84,14 @@ def main() -> int:
                       f"content:encoded ~{words(full.group(1)) if full else 0:,} words")
                 if link:
                     post_links.append(link.group(1).strip())
+            # What the pipeline's own feed reader gets with full_text_in_feed.
+            import sources
+            got = sources.from_rss({"name": "probe", "urls": [url], "full_text_in_feed": True})
+            for it in got[:5]:
+                text = it.get("text") or ""
+                print(f"   from_rss: {len(text.split()):>4} words | {it['published']} | {it['title'][:70]!r}")
+            if got and got[0].get("text"):
+                print(f"   first text starts: {got[0]['text'][:300]!r}")
         else:
             post_links += re.findall(r"https://gamigion\.(?:substack\.)?com/p/[a-z0-9-]+", body)[:3]
             title = re.search(r"<title>(.*?)</title>", body, re.S | re.I)

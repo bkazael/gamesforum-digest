@@ -102,6 +102,18 @@ urls = ["https://mobilegamer.biz/feed/"]
 weight = 1.0
 max_per_episode = 2
 
+# Gamigion's own website (not its Substack): short daily news posts, reachable
+# from GitHub Actions, with each post's full text inside the feed itself
+# (probe_source.py, 2026-10-16). The page extractor can't read these short
+# WordPress pages, so the feed text is used instead of fetching the page.
+[[sources]]
+name = "Gamigion"
+kind = "rss"
+urls = ["https://gamigion.com/feed"]
+full_text_in_feed = true
+weight = 1.0
+max_per_episode = 2
+
 # Gamigion's Substack RSS is blocked from GitHub Actions by Cloudflare, so
 # ingest its full-article newsletter email instead. The email adapter reads
 # the dedicated Gmail inbox read-only; it does not fetch the blocked site.

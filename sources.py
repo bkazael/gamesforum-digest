@@ -106,7 +106,7 @@ def from_rss(source: dict) -> list[dict]:
             if not (title and urllib.parse.urlsplit(link).scheme in ("http", "https")):
                 continue
             summary = strip_tags(_text(node, "description", "summary"))
-            items.append({
+            item = {
                 "url": canonical_url(link),
                 "title": title,
                 "source": source["name"],
@@ -114,7 +114,17 @@ def from_rss(source: dict) -> list[dict]:
                     _text(node, "pubdate", "published", "updated", "date")
                 ),
                 "summary": summary[:600],
-            })
+            }
+            # full_text_in_feed: the feed's own content:encoded (RSS) or
+            # <content> (Atom) is the whole post, so discovery.py skips
+            # fetching the page. For gamigion.com, whose short WordPress posts
+            # the page extractor can't read but whose feed carries them in
+            # full (probe_source.py, 2026-10-16).
+            if source.get("full_text_in_feed"):
+                body = strip_tags(_text(node, "encoded", "content"))
+                if body:
+                    item["text"] = body[:18000]
+            items.append(item)
     log(f"  [{source['name']}] {len(items)} items from feed")
     return items
 
