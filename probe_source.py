@@ -73,6 +73,17 @@ def main() -> int:
                       f"body_html ~{words(body_html):,} words | {p.get('canonical_url')}")
                 if p.get("canonical_url"):
                     post_links.append(p["canonical_url"])
+        elif "xml" in ctype or "rss" in ctype:
+            items = re.findall(r"<item>.*?</item>", body, re.S)
+            print(f"   RSS items: {len(items)}")
+            for item in items[:3]:
+                link = re.search(r"<link>(.*?)</link>", item, re.S)
+                title = re.search(r"<title>(.*?)</title>", item, re.S)
+                full = re.search(r"<content:encoded>(.*?)</content:encoded>", item, re.S)
+                print(f"   item: {(title.group(1) if title else '?').strip()[:90]!r} | "
+                      f"content:encoded ~{words(full.group(1)) if full else 0:,} words")
+                if link:
+                    post_links.append(link.group(1).strip())
         else:
             post_links += re.findall(r"https://gamigion\.(?:substack\.)?com/p/[a-z0-9-]+", body)[:3]
             title = re.search(r"<title>(.*?)</title>", body, re.S | re.I)
@@ -84,7 +95,21 @@ def main() -> int:
             continue
         seen.add(link)
         status, ctype, body = get(link)
-        print(f"\n== post page {link}\n   status {status} | ~{words(body):,} words")
+        print(f"\n== post page {link}\n   status {status} | ~{words(body):,} words on the page")
+        # What the pipeline itself would extract -- the number that matters.
+        try:
+            import gamesforum_pipeline as P
+            art = P.fetch_article(link)
+        except Exception as e:                              # noqa: BLE001
+            art = None
+            print(f"   fetch_article raised {type(e).__name__}: {e}")
+        if art:
+            text = art.get("text") or ""
+            print(f"   fetch_article: {len(text.split()):,} words | title {art.get('title')!r}")
+            print(f"   starts: {text[:300]!r}")
+            print(f"   ends:   {text[-200:]!r}")
+        else:
+            print("   fetch_article: nothing usable")
     return 0
 
 
