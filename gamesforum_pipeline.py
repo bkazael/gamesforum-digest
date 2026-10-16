@@ -380,6 +380,11 @@ MAX_OPEN_QUESTIONS = 2
 # finished episode in the show's long-standing 1,500-1,900 range.
 SCRIPT_TARGET_WORDS = (1400, 1800)
 SCRIPT_FLOOR_WORDS = 1250
+# Below SCRIPT_FLOOR_WORDS a script earns its one retry; only below this is it
+# unusable and the run stops. A 1,175-word script (about ten minutes) was
+# refused on the 2026-10-16 preview of a six-story week -- on a Monday that
+# would have been no episode rather than a slightly short one.
+SCRIPT_HARD_FLOOR_WORDS = 800
 
 
 def _clean_prep(prep: dict, n_articles: int) -> dict:
@@ -1041,11 +1046,14 @@ Do not add specific facts from your own knowledge or from the style example.
 
     if total_words < 600:
         log(f"Warning: Script is short ({total_words} words), but proceeding.")
-    if not target_words and total_words < SCRIPT_FLOOR_WORDS:
+    if not target_words and total_words < SCRIPT_HARD_FLOOR_WORDS:
         raise RuntimeError(
             f"Refusing to continue with a {total_words}-word episode script; "
-            f"minimum is {SCRIPT_FLOOR_WORDS}. The next scheduled retry can try again."
+            f"minimum is {SCRIPT_HARD_FLOOR_WORDS}. The next scheduled retry can try again."
         )
+    if not target_words and total_words < SCRIPT_FLOOR_WORDS:
+        print(f"::warning::short episode script: {total_words} words "
+              f"(target {SCRIPT_TARGET_WORDS[0]:,}+); publishing it anyway", flush=True)
 
     return data
 

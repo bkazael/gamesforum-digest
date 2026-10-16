@@ -211,6 +211,17 @@ except RuntimeError as e:
     check("a script that stays short is rejected after the one retry",
           len(prompts) == 2 and "Refusing to continue" in str(e), str(e))
 
+# Short of the target but not unusable (2026-10-16: 1,175 words on a six-story
+# week): retried once, then published with a warning instead of no episode.
+prompts.clear()
+medium = dict(script_resp, script=[{"speaker": A, "text": words(550)}, {"speaker": B, "text": words(550)}])
+queue = [medium]
+P.gemini_json = fake_floor
+d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+check("a script between the hard floor and the target is retried once, then kept",
+      len(prompts) == 2 and P.script_quality.count_words(d["script"]) == 1100,
+      f"{len(prompts)} calls")
+
 # A very short malformed retry must not replace a longer complete first draft.
 prompts.clear()
 queue = [short, dict(script_resp, script=[{"speaker": A, "text": words(21)}])]
