@@ -345,6 +345,9 @@ def from_email(source: dict) -> list[dict]:
                 "published": published,
                 "summary": text[:600],
                 "text": text[:14000] + (_PREVIEW_NOTE if previewed else ""),
+                # Only the preview was available: the rest of the post could
+                # qualify or contradict it, so it must not carry an episode.
+                "partial": previewed,
             })
             # Only mark read once everything above succeeded -- a crash or
             # a "skip" above leaves the message UNSEEN for next run's retry.

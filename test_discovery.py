@@ -369,5 +369,19 @@ except D.GeminiQuotaExhausted:
           len(_quota_calls) == 1 and _quota_calls[0].get("model") == D.GEMINI_SCORING_MODEL,
           f"calls={len(_quota_calls)}, kwargs={_quota_calls}")
 
+# ---------------------------------------------------------------- partial (email-preview) articles never lead
+_prof = {"airtime": {"lead_share": 0.4, "second_share": 0.25, "remainder_share": 0.35}}
+_arts = [{"title": "preview", "_score": 10, "partial": True},
+         {"title": "full-a", "_score": 8}, {"title": "full-b", "_score": 7},
+         {"title": "full-c", "_score": 6}]
+D.assign_airtime(_arts, _prof)
+check("a partial article is moved behind the full ones, whatever its score",
+      [a["title"] for a in _arts] == ["full-a", "full-b", "full-c", "preview"],
+      str([a["title"] for a in _arts]))
+check("...so it gets the smallest share, never the lead",
+      _arts[0]["_airtime"] == 0.4 and _arts[-1]["_airtime"] < 0.25, str([a["_airtime"] for a in _arts]))
+check("the order inside the full articles is untouched (score order)",
+      [a["_score"] for a in _arts[:3]] == [8, 7, 6])
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

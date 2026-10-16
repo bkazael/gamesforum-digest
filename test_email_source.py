@@ -172,6 +172,7 @@ if items:
     check("text excludes footer boilerplate",
           "Unsubscribe" not in it["text"] and "Manage your subscription" not in it["text"])
     check("item carries a usable published date", it["published"] is not None)
+    check("a full-text email is not flagged partial", it["partial"] is False)
 check("collection leaves mailbox message unchanged",
       b"1" in _FakeIMAP.UNSEEN, f"unseen: {_FakeIMAP.UNSEEN}")
 check("collecting again does not consume the article",
@@ -257,6 +258,7 @@ if items:
           not any(x in t for x in ("Continue reading", "Claim my free post", "Upgrade to paid",
                                    "Forwarded this email", "READ IN APP", "Unsubscribe", "Restack")), t[:300])
     check("...and the model is told this is only a preview", "email preview of a longer post" in t)
+    check("...and the item is flagged partial, so it can never lead an episode", items[0]["partial"] is True)
     check("the permalink comes from the Read-in-app link",
           items[0]["url"] == "https://gamigion.substack.com/p/smash-fest-level-deconstruction", items[0]["url"])
     check("title is the Subject", items[0]["title"] == "Smash Fest Level Deconstruction (1-100)")

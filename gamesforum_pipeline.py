@@ -827,6 +827,9 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
         note = ""
         if share:
             note = f"  [airtime: ~{int(share * 100)}% of the episode, about {int(share * budget_words)} words]"
+        if a.get("partial"):
+            note += ("  [PARTIAL: only the newsletter preview was available -- report what it "
+                     "states, attribute it to the preview, draw no conclusion about the rest of the post]")
         return f"ARTICLE {i + 1}: {a['title']}{note}"
 
     corpus = "\n\n".join(f"{_header(i, a)}\nURL: {a['url']}\n\n{a['text']}"

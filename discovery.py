@@ -709,6 +709,11 @@ def assign_airtime(chosen: list[dict], profile: dict) -> None:
     second = air.get("second_share", 0.25)
     rest_pool = air.get("remainder_share", 0.35)
 
+    # A partial article (an email preview of a longer post) goes last, with
+    # the smallest share: its unseen remainder could qualify or contradict
+    # what the preview says, so it never leads or carries a deep segment.
+    # Stable sort keeps the score order inside each group.
+    chosen.sort(key=lambda a: bool(a.get("partial")))
     n = len(chosen)
     for i, art in enumerate(chosen):
         if i == 0:
@@ -800,7 +805,8 @@ def select(dry_run: bool = False) -> list[dict]:
         # one stage later. See CHANGELOG for the Gamigion incident this
         # closes the loop on.
         if cand.get("text"):
-            return {"url": cand["url"], "title": cand["title"], "text": cand["text"]}
+            return {"url": cand["url"], "title": cand["title"], "text": cand["text"],
+                    "partial": bool(cand.get("partial"))}
         else:
             return fetch_article(cand["url"])
     with ThreadPoolExecutor(max_workers=thr.get("fetch_workers", 4)) as pool:

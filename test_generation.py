@@ -462,6 +462,17 @@ check("the script prompt caps turn length and asks for plain questions",
       "none longer than 80 words" in sp and "compound interview question" in sp)
 check("the script prompt stops every story ending on the same 'developers should' line",
       "at most two turns in the whole episode use it" in sp.replace("\n  ", " "))
+_prev = []
+def _grab(prompt, schema=None, **kw):
+    _prev.append(prompt)
+    return copy.deepcopy(script_resp)
+_saved = P.gemini_json
+P.gemini_json = _grab
+P.generate_podcast_content([dict(ARTICLES[0], partial=True), ARTICLES[1]], "2026-10-05", prep=prep)
+P.gemini_json = _saved
+check("a partial article is flagged in the script prompt as preview-only, no conclusions about the rest",
+      "PARTIAL: only the newsletter preview was available" in _prev[0] and "draw no conclusion" in _prev[0])
+check("a full article is not flagged", _prev[0].count("PARTIAL:") == 1)
 check("the script prompt puts the Hebrew rule first and again after the articles",
       sp.startswith("OUTPUT LANGUAGE: HEBREW") and sp.rstrip().endswith("source material only."))
 check("the script prompt varies exchanges rather than forcing a question in every story",
