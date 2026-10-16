@@ -168,9 +168,9 @@ class ProductionTests(unittest.TestCase):
         result.update(updates)
         return result
 
-    def run_review(self, data, call, path):
+    def run_review(self, data, call, path, strict=False):
         return editorial.review_and_revise(data, [{"title": "A", "text": "The studio reported growth."}],
-            path, call, p.PODCAST_SCHEMA, "test-model", ("Dana", "Yoni"), "en")
+            path, call, p.PODCAST_SCHEMA, "test-model", ("Dana", "Yoni"), "en", strict=strict)
 
     def test_review_revises_unsupported_claim_then_rechecks(self):
         issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Unsupported number", "fix": "Remove it"}
@@ -188,7 +188,7 @@ class ProductionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = pathlib.Path(tmp) / "report.json"
             with self.assertRaisesRegex(RuntimeError, "quality gate failed"):
-                self.run_review(self.draft(), call, path)
+                self.run_review(self.draft(), call, path, strict=True)
             self.assertFalse(json.loads(path.read_text())["passed"])
             self.assertEqual(call.call_count, 3)
 
@@ -199,7 +199,7 @@ class ProductionTests(unittest.TestCase):
         call = Mock(side_effect=[self.review(covered_article_ids=[]), self.draft(),
                                  self.review(covered_article_ids=[])])
         with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "absent"):
-            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
+            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json", strict=True)
 
     def test_promotional_event_without_listener_value_fails_editorial_gate(self):
         promotional = {"article_id": 1, "type": "EVENT_PROMOTION", "basis": "Speaker promo",
@@ -222,7 +222,32 @@ class ProductionTests(unittest.TestCase):
         call = Mock(side_effect=[self.review(source_assessments=[announcement]), self.draft(),
                                  self.review(source_assessments=[announcement])])
         with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "must be brief"):
+            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json", strict=True)
+
+    def test_non_factual_problems_publish_with_warnings_by_default(self):
+        # 2026-10-16 preview: a correct episode was rejected over wording and
+        # coverage; without strict, that publishes and says why, loudly.
+        call = Mock(side_effect=[self.review(naturalness=2), self.draft(), self.review(naturalness=2)])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "report.json"
+            data = self.run_review(self.draft(), call, path)
+            self.assertTrue(data["editorial_review"]["published_with_warnings"])
+            self.assertFalse(data["editorial_review"]["passed"])
+            self.assertFalse(json.loads(path.read_text())["passed"])
+
+    def test_persistent_factual_error_still_blocks_by_default(self):
+        issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Invented number", "fix": "Remove it"}
+        call = Mock(side_effect=[self.review(issues=[issue]), self.draft(), self.review(issues=[issue])])
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "Invented number"):
             self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
+
+    def test_hebrew_acronyms_are_translated_before_review(self):
+        turns = [{"speaker": "Dana", "text": "ה-D2C עולה ב-MENA, ו-IAP יורד."}]
+        fixed, n = speech.translate_hebrew_terms(turns, "he")
+        self.assertEqual(n, 3)
+        self.assertEqual(speech.untranslated_hebrew_terms(fixed, "he"), [])
+        self.assertIn("במזרח התיכון", fixed[0]["text"])
+        self.assertEqual(speech.translate_hebrew_terms(turns, "en"), (turns, 0))
 
     def test_memory_retry_replaces_same_date(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(memory, "MEMORY_FILE", pathlib.Path(tmp) / "memory.json"):

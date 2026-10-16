@@ -102,10 +102,22 @@ class _FakeIMAP:
         assert readonly
         return "OK", [b"1"]
 
-    def search(self, charset, criteria, since=None):
-        assert criteria == "SINCE" and since
-        ids = b" ".join(sorted(_FakeIMAP.INBOX))
-        return "OK", [ids]
+    LAST_SEARCH: tuple = ()
+
+    def search(self, charset, *criteria):
+        assert criteria[0] == "SINCE" and criteria[1]
+        _FakeIMAP.LAST_SEARCH = criteria
+        ids = sorted(_FakeIMAP.INBOX)
+        if "FROM" in criteria:
+            # Real IMAP: case-insensitive substring of the From header.
+            want = criteria[criteria.index("FROM") + 1].strip('"').lower()
+            def sender(raw):
+                for line in raw.decode("utf-8", "replace").splitlines():
+                    if line.lower().startswith("from:"):
+                        return line.lower()
+                return ""
+            ids = [i for i in ids if want in sender(_FakeIMAP.INBOX[i])]
+        return "OK", [b" ".join(ids)]
 
     def fetch(self, msg_id, spec):
         assert spec == "(BODY.PEEK[])"
@@ -170,6 +182,30 @@ check("collecting again does not consume the article",
 _install_fake({}, set())
 items = S.from_email(SOURCE)
 check("zero recent messages returns an empty list without raising", items == [])
+
+# ---------------------------------------------------------------- 2b. a shared (PA) inbox: only the newsletter's sender is read
+
+personal = b"""From: Dentist <reminders@clinic.example>
+Subject: Your appointment on Thursday
+Date: Mon, 01 Sep 2025 08:00:00 +0000
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>See you at 10:00. https://clinic.example/p/appointment-123</p></body></html>"""
+_install_fake({b"1": _fixture_email_bytes(), b"9": personal}, {b"1", b"9"})
+items = S.from_email(dict(SOURCE, sender="gamigion"))
+check("with sender set, IMAP is asked for FROM that sender",
+      _FakeIMAP.LAST_SEARCH[2:] == ("FROM", '"gamigion"'), str(_FakeIMAP.LAST_SEARCH))
+check("...and unrelated mail in the same inbox never becomes an article",
+      len(items) == 1 and "clinic" not in items[0]["url"], str([i["url"] for i in items]))
+items = S.from_email(SOURCE)
+check("without sender, the whole mailbox is read (dedicated-inbox mode)",
+      _FakeIMAP.LAST_SEARCH[2:] == ())
+
+import tomllib
+_profile = tomllib.loads((pathlib.Path(__file__).parent / "profile.toml").read_text(encoding="utf-8"))
+_gamigion = [x for x in _profile["sources"] if x.get("kind") == "email"]
+check("profile.toml's Gamigion source is narrowed to its sender (the inbox is shared)",
+      bool(_gamigion) and _gamigion[0].get("sender") == "gamigion")
 
 # ---------------------------------------------------------------- 3. a message with no discoverable permalink is skipped, not crashed
 

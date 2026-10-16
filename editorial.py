@@ -85,7 +85,18 @@ def identity(data, articles, model):
 def review_and_revise(data: dict, articles: list[dict], report_path: Path,
                       call, schema: dict, model: str, speakers: tuple[str, str],
                       lang: str, minimum: int = 4, save_draft=None,
-                      revision_model: str | None = None) -> dict:
+                      revision_model: str | None = None, strict: bool = False) -> dict:
+    """Review, revise once, re-review.
+
+    strict=True: any remaining problem stops publication (the original gate).
+    strict=False (default): only blocking FACT/ATTRIBUTION errors stop it --
+    a misleading claim must never air. Anything else that survives the
+    revision (style, a rating under the bar, a story the reviewer wanted
+    dropped) publishes with a ::warning:: and the full report saved. The
+    2026-10-16 preview showed why: a correct, well-sourced episode was
+    rejected for a spoken "D2C" and two stories the revision didn't fully
+    cut, which on a Monday would have meant no episode at all.
+    """
     revision_model = revision_model or model
     policy = [model, revision_model, speakers, lang, minimum]
     cache_key = identity(data, articles, policy)
@@ -187,6 +198,8 @@ DRAFT: {json.dumps(draft, ensure_ascii=False)}"""
                     and assessment.get("treatment") == "DEEP"):
                 problems.append(f"Article {assessment.get('article_id')} is an announcement without independent context and must be brief")
         problems += [i["problem"] for i in issues if i["blocking"]]
+        fact_problems = [i["problem"] for i in issues if i["blocking"]
+                         and i.get("kind") in ("FACT", "ATTRIBUTION")]
         for key in ("naturalness", "focus"):
             if report[key] < minimum:
                 problems.append(f"{key} {report[key]}/5 is below {minimum}/5")
@@ -221,4 +234,11 @@ AUDIT: {json.dumps(report, ensure_ascii=False)}""", schema, tries=2, timeout=210
                 data["script"], _ = script_quality.trim_agreement_openers(data["script"])
             if save_draft:
                 save_draft(data)
-    raise RuntimeError(f"Editorial quality gate failed; inspect {report_path}: " + "; ".join(problems[:4]))
+    if strict or fact_problems or not isinstance(data.get("script"), list) or not data["script"]:
+        raise RuntimeError(f"Editorial quality gate failed; inspect {report_path}: "
+                           + "; ".join((fact_problems or problems)[:4]))
+    report["published_with_warnings"] = True
+    data["editorial_review"] = report
+    for problem in problems[:6]:
+        print(f"::warning::editorial review (not blocking): {problem}", flush=True)
+    return data

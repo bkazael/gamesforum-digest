@@ -224,7 +224,13 @@ def from_email(source: dict) -> list[dict]:
         # A downstream failure or a dry run must never consume a newsletter.
         since = dt.date.today() - dt.timedelta(days=source.get("max_age_days", 7))
         imap_date = f"{since.day:02d}-{('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')[since.month-1]}-{since.year}"
-        status, data = conn.search(None, "SINCE", imap_date)
+        # `sender` narrows a shared inbox (e.g. a personal-assistant address
+        # that also gets other mail) to this newsletter only. IMAP FROM is a
+        # case-insensitive substring match on the From header.
+        criteria = ["SINCE", imap_date]
+        if source.get("sender"):
+            criteria += ["FROM", f'"{source["sender"]}"']
+        status, data = conn.search(None, *criteria)
         if status != "OK":
             raise EmailFetchError(f"IMAP SEARCH failed: {status}")
     except EmailFetchError:

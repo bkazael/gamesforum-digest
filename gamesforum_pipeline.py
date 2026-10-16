@@ -643,8 +643,13 @@ def write_intro(data: dict, prep: dict | None) -> tuple[list[dict], str]:
             facts += f"\n- Through-line: {prep['through_line']}"
 
     if LANG == "he":
-        lang_inst = ("Spoken Hebrew, as Israeli industry people talk. English terms "
-                     "(UA, CPI, LTV, IAP, ROAS, web shop, webstore) and all company and product names stay in English.")
+        # Same term policy as the script prompt: the editorial gate rejects a
+        # spoken D2C/IAP/MENA, and the intro is written after the script, so a
+        # mismatch here put them straight back in (2026-10-16 preview).
+        lang_inst = ("Spoken Hebrew, as Israeli industry people talk. Say 'מכירה ישירה לצרכן' "
+                     "rather than D2C, 'רכישות בתוך האפליקציה' rather than IAP, and "
+                     "'המזרח התיכון וצפון אפריקה' rather than MENA. Familiar terms (UA, CPI, "
+                     "LTV, ROAS, web shop, webstore) and all company and product names stay in English.")
     else:
         lang_inst = "Natural spoken English."
 
@@ -1394,11 +1399,18 @@ def review_episode(data: dict, articles: list[dict], today: str) -> dict:
     config = runtime.load_profile().get("editorial", {})
     if not config.get("enabled", True):
         raise RuntimeError("Editorial review is disabled; production publication requires it")
+    # Free, deterministic, before any review call: a spoken D2C/IAP/MENA is a
+    # wording fix, not a reason to spend a revision or to block the episode.
+    if isinstance(data.get("script"), list):
+        data["script"], replaced = speech_tools.translate_hebrew_terms(data["script"], LANG)
+        if replaced:
+            log(f"  translated {replaced} English acronym(s) in Hebrew speech (D2C/IAP/MENA)")
     return editorial.review_and_revise(data, articles, ROOT / "reports" / f"{today}-editorial.json",
         gemini_json, PODCAST_SCHEMA, GEMINI_SCORING_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
         minimum=config.get("minimum_rating", 4),
         save_draft=lambda draft: checkpoint.save_content(today, articles, draft),
-        revision_model=GEMINI_CREATIVE_MODEL)
+        revision_model=GEMINI_CREATIVE_MODEL,
+        strict=bool(config.get("strict", False)))
 
 
 def preflight(audio: bool = True) -> None:

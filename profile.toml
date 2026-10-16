@@ -117,6 +117,9 @@ kind = "email"
 enabled = false
 urls = ["https://gamigion.substack.com/feed"]  # domain only; never fetched
 mailbox = "INBOX"
+# The inbox (emilycar.pa@gmail.com) is a general assistant address, not a
+# dedicated one, so only messages from Gamigion's Substack are read.
+sender = "gamigion"
 weight = 1.0
 max_per_episode = 2
 block = [
@@ -240,3 +243,7 @@ remainder_share = 0.50
 # One review and at most one revision, before spending on speech synthesis.
 enabled = true
 minimum_rating = 4
+# false: only FACT/ATTRIBUTION errors that survive the revision stop an
+# episode; other problems publish with a warning and the saved report.
+# true: any remaining problem stops publication.
+strict = false
