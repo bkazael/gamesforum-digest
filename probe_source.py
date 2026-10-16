@@ -68,6 +68,13 @@ def main() -> int:
             for p in posts[:5]:
                 if not isinstance(p, dict):
                     continue
+                if isinstance(p.get("content"), dict):        # WordPress REST
+                    wp_title = (p.get("title") or {}).get("rendered") if isinstance(p.get("title"), dict) else p.get("title")
+                    print(f"   wp post: {wp_title!r} | {p.get('date')} | "
+                          f"content ~{words(p['content'].get('rendered') or ''):,} words | {p.get('link')}")
+                    if p.get("link"):
+                        post_links.append(p["link"])
+                    continue
                 body_html = p.get("body_html") or ""
                 print(f"   post: {p.get('title')!r} | audience={p.get('audience')} | "
                       f"body_html ~{words(body_html):,} words | {p.get('canonical_url')}")
