@@ -192,6 +192,23 @@ _FOOTER_MARKERS = re.compile(
     r"you.re receiving this (?:email|because)|©\s*20\d\d"
 )
 
+# A real Gamigion email (2026-10-15, "Smash Fest Level Deconstruction") showed
+# what the synthetic fixture didn't: Substack sends a PREVIEW of the post --
+# about 600 words of real analysis, then "Continue reading this post for free
+# in the Substack app / Claim my free post / Upgrade to paid" before the usual
+# Like/Comment/Restack footer. Everything from that prompt on is chrome.
+_PREVIEW_CUT = re.compile(
+    r"(?i)(?:user.s avatar\s*)?continue reading this post|claim my free post|"
+    r"upgrade to paid|this post is for (?:paid )?subscribers"
+)
+_PREVIEW_NOTE = ("\n\n[This is the email preview of a longer post: the rest of it "
+                 "(for a Deconstruction, the level-by-level breakdown) is not included here.]")
+# Masthead/chrome lines Substack puts above the post body.
+_HEADER_CHROME = re.compile(
+    r"(?im)^\s*(?:forwarded this email\?.*|read in app|preview|"
+    r"thanks to our .*|created by .*)\s*$"
+)
+
 
 def from_email(source: dict) -> list[dict]:
     """Pull recent "new post" emails from a dedicated inbox, read-only.
@@ -274,25 +291,39 @@ def from_email(source: dict) -> list[dict]:
                 log(f"  [{source['name']}] message {msg_id!r} has no HTML part, skipping")
                 continue
 
-            link_match = link_re.search(body_html)
-            if not link_match:
-                log(f"  [{source['name']}] message {msg_id!r}: no {base_host}/p/... "
-                    "link found, skipping (template may have changed -- see README)")
-                continue
-            url = link_match.group(0)
-
-            title = str(email_lib.header.make_header(
+            subject = str(email_lib.header.make_header(
                 email_lib.header.decode_header(msg.get("Subject", ""))
-            )) or url.rsplit("/", 1)[-1].replace("-", " ")
+            ))
+            link_match = link_re.search(body_html)
+            if link_match:
+                url = link_match.group(0)
+            else:
+                # Substack emails often carry only tracking redirects, or the
+                # "Read in app" link on open.substack.com/pub/<pub>/p/<slug>.
+                app = re.search(r"https?://open\.substack\.com/pub/[^/\"'\s]+/p/([a-z0-9-]+)", body_html, re.I)
+                slug = app.group(1) if app else re.sub(r"[^a-z0-9]+", "-", subject.lower()).strip("-")
+                if not slug:
+                    log(f"  [{source['name']}] message {msg_id!r}: no post link and no subject, skipping")
+                    continue
+                url = f"https://{base_host}/p/{slug}"
+                log(f"  [{source['name']}] message {msg_id!r}: no direct {base_host}/p/... link; "
+                    f"using {url}")
+
+            title = subject or url.rsplit("/", 1)[-1].replace("-", " ")
 
             body = body_html
             h1 = re.search(r"(?is)<h1[^>]*>.*?</h1>", body)
             if h1:
                 body = body[h1.end():]
+            previewed = False
+            preview = _PREVIEW_CUT.search(body)
+            if preview:
+                body = body[: preview.start()]
+                previewed = True
             cut = _FOOTER_MARKERS.search(body)
             if cut:
                 body = body[: cut.start()]
-            text = strip_tags(body)
+            text = _HEADER_CHROME.sub("", strip_tags(body)).strip()
             if len(text) < 400:
                 log(f"  [{source['name']}] message {msg_id!r}: body too short "
                     f"after extraction ({len(text)} chars), skipping -- "
@@ -313,7 +344,7 @@ def from_email(source: dict) -> list[dict]:
                 "source": source["name"],
                 "published": published,
                 "summary": text[:600],
-                "text": text[:14000],
+                "text": text[:14000] + (_PREVIEW_NOTE if previewed else ""),
             })
             # Only mark read once everything above succeeded -- a crash or
             # a "skip" above leaves the message UNSEEN for next run's retry.

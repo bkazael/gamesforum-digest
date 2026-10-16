@@ -30,6 +30,14 @@
   `full_text_in_feed`: הטקסט נלקח מהפיד ו-discovery מדלג על הורדת הדף. מקור
   חדש "Gamigion" ב-profile.toml. מקור המייל נשאר כבוי, ואין צורך בהגדרת
   ה-Gmail בשביל החדשות. כתבות העומק (Deconstruction) עדיין רק ב-Substack.
+* **מייל אמיתי של Gamigion (Smash Fest Deconstruction, 15.10):** התברר שהמייל
+  הוא *תצוגה מקדימה*: כ-600 מילים של ניתוח אמיתי (הורדות, הכנסות, RpD מול
+  Royal Smash), ואחריהן "Continue reading this post for free in the Substack
+  app / Claim my free post". פירוק 100 השלבים עצמו (בעיקר תמונות) לא כלול.
+  הקורא תוקן לפי המייל האמיתי: חיתוך בנקודת "Continue reading", ניקוי שורות
+  הכותרת (Forwarded this email / READ IN APP / Preview), קישור הכתבה מ-"Read
+  in app" (או מה-subject אם יש רק קישורי מעקב), והערה למודל שזו תצוגה מקדימה
+  בלבד. מקור המייל עדיין `enabled = false` עד שיתווספו ה-secrets.
 * **רצפת אורך:** הרצת האימות השנייה נעצרה על תסריט של 1,175 מילים (שבוע עם
   6 סיפורים; הסף הקשיח היה 1,250). 1,250 נשאר הסף לניסיון חוזר, והעצירה
   הקשיחה היא עכשיו מתחת ל-800 מילים (`SCRIPT_HARD_FLOOR_WORDS`). ביניהם הפרק

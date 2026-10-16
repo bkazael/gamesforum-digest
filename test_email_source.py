@@ -207,6 +207,66 @@ _gamigion = [x for x in _profile["sources"] if x.get("kind") == "email"]
 check("profile.toml's Gamigion source is narrowed to its sender (the inbox is shared)",
       bool(_gamigion) and _gamigion[0].get("sender") == "gamigion")
 
+# ---------------------------------------------------------------- 2c. the REAL shape: a Substack preview (2026-10-15 Smash Fest email)
+
+def _real_shape_email(app_link: bool = True) -> bytes:
+    link = ('<a href="https://open.substack.com/pub/gamigion/p/smash-fest-level-deconstruction'
+            '?utm_source=email">READ IN APP</a>') if app_link else \
+           '<a href="https://substack.com/redirect/2/abc123?j=xyz">READ IN APP</a>'
+    html_body = f"""<html><body>
+<p>Forwarded this email? <a href="https://substack.com/redirect/1/x">Subscribe here</a> for more</p>
+<h1>Smash Fest Level Deconstruction (1-100)</h1>
+<p>100-Level FULL Breakdown with Raw Data</p>
+<p>Gamigion and Yagiz Gur</p><p>Preview</p>
+<p>{link}</p>
+<p>Created by Yagiz Gur, with Ceyda Malkoc</p>
+<p>Our Deconstructions are now FREE!</p>
+<p>THANKS TO OUR MARKET INTELLIGENCE PARTNER</p>
+<p>Smash Fest made 24.7M downloads and $6.2M in IAP revenue. Overall, Smash Fest has an
+IAP RpD of $0.25. About 85% of its IAP comes from the US, with an IAP RpD of $0.84. In the
+rest of the world it has 18.4M downloads, $951K in IAP and $0.05 IAP RpD.</p>
+<p>Royal Smash has 17.5M downloads and $6.25M in IAP. That gives it a worldwide IAP RpD that is
+44 percent higher than Smash Fest, and its US IAP RpD is 75 percent higher.</p>
+<p>Smash Fest has no in-game boosters. Only a pre-level booster and a fail offer, just like the
+early days of Pixel Flow. It is not fighting other five-person teams but teams of fifty to a
+hundred people, with more developers, more creatives, more tests and deeper UA experience.</p>
+<p>Smash Fest and Royal Smash have almost nothing in common on their levels. They are built
+around completely different level design approaches, compared side by side below.</p>
+<p>User's avatar</p>
+<p>Continue reading this post for free in the Substack app</p>
+<p>Claim my free post</p><p>Or upgrade your subscription. Upgrade to paid</p>
+<p>Like Comment Restack</p>
+<p>&copy; 2026 Gamigion contact@gamigion.com</p><p>Unsubscribe</p>
+</body></html>"""
+    msg = f"""From: Gamigion <gamigion@substack.com>
+Subject: Smash Fest Level Deconstruction (1-100)
+Date: {email.utils.format_datetime(__import__("datetime").datetime.now(__import__("datetime").timezone.utc))}
+MIME-Version: 1.0
+Content-Type: text/html; charset="utf-8"
+
+{html_body}"""
+    return msg.encode("utf-8")
+
+_install_fake({b"5": _real_shape_email()}, {b"5"})
+items = S.from_email(SOURCE)
+check("a real-shaped Substack preview yields one item", len(items) == 1, str(items))
+if items:
+    t = items[0]["text"]
+    check("...with the real analysis in it", "24.7M downloads" in t and "RpD" in t and "Pixel Flow" in t)
+    check("...and none of the paywall/preview chrome",
+          not any(x in t for x in ("Continue reading", "Claim my free post", "Upgrade to paid",
+                                   "Forwarded this email", "READ IN APP", "Unsubscribe", "Restack")), t[:300])
+    check("...and the model is told this is only a preview", "email preview of a longer post" in t)
+    check("the permalink comes from the Read-in-app link",
+          items[0]["url"] == "https://gamigion.substack.com/p/smash-fest-level-deconstruction", items[0]["url"])
+    check("title is the Subject", items[0]["title"] == "Smash Fest Level Deconstruction (1-100)")
+
+_install_fake({b"6": _real_shape_email(app_link=False)}, {b"6"})
+items = S.from_email(SOURCE)
+check("with only tracking redirects, the permalink falls back to the subject slug",
+      len(items) == 1 and items[0]["url"] == "https://gamigion.substack.com/p/smash-fest-level-deconstruction-1-100",
+      str([i["url"] for i in items]))
+
 # ---------------------------------------------------------------- 3. a message with no discoverable permalink is skipped, not crashed
 
 bad = b"""From: Gamigion <newsletter@mail.gamigion.com>
