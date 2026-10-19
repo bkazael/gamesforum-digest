@@ -1,0 +1,481 @@
+{
+  "naturalness": 4,
+  "focus": 4,
+  "covered_article_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "source_assessments": [
+    {
+      "article_id": 1,
+      "type": "REPORTING",
+      "basis": "The article reports on the JamBus SandFall game, its mechanics, revenue, and the 'Torture Sort' category trend. It cites specific figures and observations from its own review and other games in the category.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 2,
+      "type": "REPORTING",
+      "basis": "The article details Google Play's new AI-powered discovery features (Game Finder, Gamer DNA) and related AI initiatives. It describes the features and their potential impact on game discovery and developer strategies.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 3,
+      "type": "REPORTING",
+      "basis": "This is a market update report from Aream & Co. It presents data on mobile game IAPs, console game revenue, PC games, and M&A activity, attributing the data to the Aream & Co report.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 4,
+      "type": "REPORTING",
+      "basis": "This article presents a digest of various data points from the mobile gaming industry, including funding rounds (Flow Games, Spill Games, Gardens Interactive), publisher growth (Scopely Explore), game revenue and downloads, and ASO trends. It cites other sources like PocketGamer.biz and AppMagic.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 5,
+      "type": "REPORTING",
+      "basis": "The article announces the launch of AdSurge, a new ad network by Miniclip, detailing its features, backing from Tencent, and its focus on publisher yield. It includes quotes from the AdSurge boss and Miniclip.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 6,
+      "type": "EVENT_PROMOTION",
+      "basis": "This article is a speaker spotlight for PG Connects Nordics, focusing on Daria Berdnikova's talk about D2C. While it contains insights into D2C strategy, its primary purpose is to promote the event and the speaker's session.",
+      "independent_context": false,
+      "listener_value": true,
+      "treatment": "BRIEF"
+    }
+  ],
+  "summary": "הפרק דן במגמות האחרונות בתעשיית משחקי המובייל. הוא מתחיל בסקירה של משחק ה-'Torture Sort' JamBus SandFall, המדגים כיצד מנגנונים איטיים במכוון ומונעי-פרסומות יכולים להוביל להכנסות גבוהות, למרות פגיעה פוטנציאלית בשימור שחקנים. לאחר מכן, הפרק מתעמק במנוע הגילוי החדש של Google Play, 'Gamer DNA', המבוסס על AI, וכיצד הוא צפוי לשנות את אסטרטגיות ה-ASO וה-UA על ידי התמקדות בהתאמה אישית לשחקן. בהמשך, נסקרת ירידה גלובלית ברכישות בתוך האפליקציה, אך עם צמיחה בולטת בשווקים כמו טורקיה, מה שמצביע על שינויים דמוגרפיים בהכנסות. הפרק מסתיים בסיקור ההשקה של AdSurge, רשת הפרסום החדשה של Miniclip, ובדיון על חשיבותה הגוברת של אסטרטגיית מכירה ישירה לצרכן (D2C) להשגת צמיחה גלובלית והתמודדות עם מורכבות מסחרית.",
+  "issues": [
+    {
+      "turn": 1,
+      "kind": "STYLE",
+      "blocking": false,
+      "problem": "The introduction to the episode's topics feels slightly repetitive in structure. The host lists the topics and then the co-host reacts with 'This sounds counter-intuitive' to the first topic, and then the host says 'Let's dive into the world of Torture Sort'. This creates a slight loop instead of a direct dive.",
+      "fix": "Streamline the intro: Dana can list the topics, and then immediately transition into the first topic without the co-host's interjection or the host's confirmation."
+    },
+    {
+      "turn": 3,
+      "kind": "STYLE",
+      "blocking": false,
+      "problem": "Yoni's line 'זה נשמע לי מנוגד לאינטואיציה לחלוטין.' (This sounds completely counter-intuitive to me.) is repeated verbatim from turn 1. While the topic might indeed be counter-intuitive, the repetition feels unnatural.",
+      "fix": "Rephrase Yoni's response in turn 3 to express a similar sentiment without repeating the exact phrase. For example: 'That's a really surprising approach' or 'I'm struggling to see how that works.'"
+    },
+    {
+      "turn": 6,
+      "kind": "ATTRIBUTION",
+      "blocking": false,
+      "problem": "Dana attributes the $120K/day revenue to Nova Games and mentions the game is 'slow as hell' and takes 17 minutes per level. However, Article 1 states the revenue is $120K/day and one level takes 17 minutes, but it also mentions the game makes $1M/month and that the source claims $80K/day in its title. There's a slight discrepancy in the exact revenue figure presented versus the source's title/content.",
+      "fix": "Clarify the revenue figure. Dana should state the figure directly from the article content ($120K/day) and acknowledge the title's figure ($80K/day) if necessary, or simply stick to the article's main cited figure."
+    },
+    {
+      "turn": 11,
+      "kind": "FACT",
+      "blocking": false,
+      "problem": "Dana states that 95% of their ads are from AppLovin, which is directly from Article 1. However, Article 1 says '95% AppLovin' in the context of UA and Felix's category strategy, implying the *creatives* are mostly sourced through AppLovin or that AppLovin is their primary UA channel. It's not necessarily about the ads *in the game* itself being 95% AppLovin, but their user acquisition strategy.",
+      "fix": "Rephrase the sentence to clarify it refers to their user acquisition (UA) strategy or ad network usage for acquiring users, not necessarily the ad inventory within the game. For example: 'Their user acquisition strategy heavily relies on AppLovin, with 95% of their ads coming through that network.'"
+    },
+    {
+      "turn": 12,
+      "kind": "STYLE",
+      "blocking": false,
+      "problem": "Yoni's line 'זה מעלה שאלה לגבי האתיקה של קריאייטיבים שמציגים חוויה שונה מהמשחק האמיתי.' (This raises a question about the ethics of creatives showing an experience different from the actual game.) is a bit of a leading question and slightly judgmental for a podcast segment focused on reporting facts. While valid, it can sound like the host is taking a strong stance rather than reporting.",
+      "fix": "Rephrase to be more neutral. For example: 'That raises an interesting point about the difference between ad creatives and actual gameplay.'"
+    },
+    {
+      "turn": 16,
+      "kind": "STYLE",
+      "blocking": false,
+      "problem": "Yoni's question 'ואם AI מחליט אילו משחקים יתגלו, מי מנצח – המשחקים הטובים ביותר או האלגוריתמים הטובים ביותר?' (And if AI decides which games get discovered, who wins - the best games or the best algorithms?) is a good question, but Dana's response is quite broad and doesn't directly address the 'who wins' aspect, instead listing other Google features.",
+      "fix": "Dana should acknowledge Yoni's question more directly. For example: 'That's the million-dollar question, Yoni. The article itself poses this dilemma. It suggests a potential shift where optimizing for algorithms might overshadow game quality, but it leaves the answer open.'"
+    },
+    {
+      "turn": 17,
+      "kind": "FACT",
+      "blocking": false,
+      "problem": "Dana mentions 'No new mobile game launched in 2026 has broken into the global top-grossing charts.' This is accurate based on Article 3. However, later in the same segment (turn 23), Dana says 'No 2026 launches have broken into the chart, according to the report.' This is a repetition of the same fact from the same source, making it slightly redundant.",
+      "fix": "Combine the information about the lack of new 2026 launches into a single point or elaborate on other aspects from Article 3 (like console game revenue decline, PC growth, or M&A) rather than restating the same fact."
+    },
+    {
+      "turn": 22,
+      "kind": "FACT",
+      "blocking": false,
+      "problem": "Dana states that 'publishers in Asia saw an 11% increase in revenue, and Turkey grew by 17%'. Article 3 says 'Asian mobile-first companies up 11% overall' and 'only Türkiye (up 17% to $4.6bn) grew'. Article 4 also mentions 'publishers in Asia and Turkiye have continued to see a growing share' and lists Flow Games as Turkish. The distinction between 'Asia' and 'Asian mobile-first companies' and 'publishers' in general might be lost, and the 'growing share' for Turkey is more specific than just general growth.",
+      "fix": "Clarify the statement to reflect the nuances. For example: 'While global mobile IAPs are down, Asian mobile-first companies overall saw an 11% rise in revenue, and specifically, Turkey experienced significant growth, up 17% to $4.6 billion in gross in-app purchase revenue over the last 12 months.'"
+    },
+    {
+      "turn": 24,
+      "kind": "STYLE",
+      "blocking": false,
+      "problem": "Yoni's question 'מה הייחוד שלה?' (What's unique about it?) after introducing AdSurge is a good prompt, but Dana's answer, while informative, could be slightly more direct in highlighting the 'uniqueness' compared to other ad networks mentioned implicitly (those prioritizing their own yield).",
+      "fix": "Dana could begin her response by directly stating the key differentiator. For example: 'The main distinction, according to Miniclip, is its focus on partner yield over network yield. Unlike other ad networks that prioritize their own revenue, AdSurge aims to deliver results specifically for its publishing partners.'"
+    },
+    {
+      "turn": 32,
+      "kind": "STYLE",
+      "blocking": false,
+      "problem": "The concluding remarks by Dana and Yoni feel a bit like a summary of summaries, repeating points already made without adding much new synthesis or a final, strong takeaway for the listener. Dana's 'For our developers...' point is good, but the overall wrap-up could be more impactful.",
+      "fix": "Consolidate the concluding thoughts. Dana could provide a more concise summary of the main themes (e.g., innovation in monetization, AI's growing role, market diversification) and Yoni could offer a final actionable piece of advice or a thought-provoking statement on the future, rather than a re-hash of points."
+    }
+  ],
+  "fingerprint": "3bab56d8a42ed7e9e1e3124d5f7d89535b1559e0e27e879b830b0d00ea384246",
+  "passed": true,
+  "problems": [],
+  "model": "gemini-2.5-flash-lite",
+  "review_version": 2,
+  "attempts": [
+    {
+      "naturalness": 4,
+      "focus": 4,
+      "covered_article_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "source_assessments": [
+        {
+          "article_id": 1,
+          "type": "REPORTING",
+          "basis": "The article reports on a specific mobile game, Jam Bus SandFall, its developer (Nova Games), revenue figures, gameplay mechanics, and UA strategies. It includes quotes from individuals like 'Jakub' and 'Felix' and discusses the 'Torture Sort' category.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 2,
+          "type": "REPORTING",
+          "basis": "The article announces and describes new features on Google Play, specifically 'Game Finder' and 'Gamer DNA', detailing their AI-powered approach to game discovery, personalized recommendations, and social discovery features. It also mentions other AI-related initiatives by Google.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 3,
+          "type": "REPORTING",
+          "basis": "This article is a market update report from Aream & Co. about the video game market in Q3 2026. It details mobile game in-app purchase revenue, console game revenue, PC game revenue, and M&A activity. It is authored by Aaron Astle for PocketGamer.biz.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 4,
+          "type": "REPORTING",
+          "basis": "This article is a data digest that breaks down recent financial results and data in the mobile gaming industry. It covers funding rounds for Flow Games and Spill Games, mobile game spending trends, publisher revenue growth, top-grossing games, and ASO data. It explicitly states it is sponsored by Xsolla.",
+          "independent_context": false,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 5,
+          "type": "COMPANY_ANNOUNCEMENT",
+          "basis": "The article announces the launch of AdSurge, a new mobile advertising platform by Tencent-owned Miniclip. It details the platform's features, its development history, and its goals, quoting Miniclip's Paul Bugryniec. The information is directly from the company.",
+          "independent_context": false,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        },
+        {
+          "article_id": 6,
+          "type": "EVENT_PROMOTION",
+          "basis": "This article promotes the upcoming PG Connects Nordics event and features a speaker, Daria Berdnikova from Coda, discussing direct-to-consumer strategies. While it contains insights from Berdnikova, its primary purpose is to promote the event and her talk.",
+          "independent_context": false,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        }
+      ],
+      "summary": "הפרק דן במספר התפתחויות מרכזיות בתעשיית המשחקים למובייל. הוא מתחיל בסקירה של ז'אנר ה-'Torture Sort' והמודלים העסקיים המפתיעים שלו, כפי שבא לידי ביטוי במשחק JamBus SandFall, המייצר הכנסות גבוהות למרות לולאת משחק איטית במכוון. לאחר מכן, הפרק סוקר את השקת 'Gamer DNA' של Google Play, מערכת גילוי משחקים חדשה מבוססת AI, הצפויה לשנות את אסטרטגיות ה-ASO וה-UA של מפתחים. בנוסף, מוצג ניתוח של נתוני שוק המצביעים על ירידה כוללת ברכישות בתוך האפליקציה, אך עם צמיחה משמעותית בשווקים מתפתחים כמו טורקיה. לבסוף, הפרק מסקר את השקת AdSurge, רשת פרסום חדשה מבית Miniclip, ואת החשיבות הגוברת של אסטרטגיות מכירה ישירה לצרכן (D2C) עבור מפתחים המתמודדים עם מסחר גלובלי.",
+      "issues": [
+        {
+          "turn": 5,
+          "kind": "FACT",
+          "blocking": true,
+          "problem": "The draft claims JamBus SandFall makes $120K/day, while source 1 states it makes $120K/day and also mentions ~$1M/month. It also claims one level takes 17 minutes, which is in source 1, but the headline in source 1 says $80K/Day.",
+          "fix": "Verify the exact daily revenue figure. Source 1 mentions both $80K/Day in the title and $120K/Day in the text, and also ~$1M/month. The draft should use the most consistently reported or highest figure, noting any discrepancies if significant, or clarifying if the $80K was an older figure."
+        },
+        {
+          "turn": 5,
+          "kind": "FACT",
+          "blocking": true,
+          "problem": "The draft states JamBus SandFall is by Nova Games (Hong Kong) and makes $120K/Day. Source 1 confirms Nova Games (Hong Kong) and states the game makes $120K/day in the text, but the headline states $80K/day. The draft uses $120K/day.",
+          "fix": "The draft should reflect the reported revenue accurately. Source 1's title says $80K/day and the body says $120K/day and also ~$1M/month. The draft uses $120K/day and $1M/month in the digest. For the script, it uses $120K/day. It's best to be consistent and perhaps clarify if there are multiple figures or if the headline figure was updated. The current figure of $120K/day is supported by the text, but the headline discrepancy is notable."
+        },
+        {
+          "turn": 10,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft claims the Torture Sort category generates ~$120M/month. Source 1 states 'sort is ~$120M a month with ads'. This is correctly attributed.",
+          "fix": "No fix needed, the figure is correctly attributed and stated."
+        },
+        {
+          "turn": 27,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft states that Google Play's new AI-powered discovery engine will shift focus from chart dominance to player fit. This is consistent with Source 2's description of 'Game Finder' and 'Gamer DNA'.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 32,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft discusses the shift towards personalized game suggestions via AI and mentions 'Gamer DNA' analyzing gameplay habits. Source 2 confirms this. The draft also mentions AI Vibe Coding, Ask Play, and Play in Gemini.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 38,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft mentions that mobile game in-app purchases fell to $19.6 billion in Q3 2026, a 7% year-over-year decrease. This is directly supported by Source 3 and Source 4.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 38,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft states no new mobile game launched in 2026 has broken into the top-grossing charts. This is supported by Source 3 and Source 4.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 41,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft highlights growth in emerging markets like Turkey (up 17% to $4.6bn) while US publishers saw a 13% drop to $10.2bn. Source 3 and Source 4 confirm these figures.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 43,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft mentions Flow Games securing $46m funding from Tencent and Smash Fest seeing a 343% increase in downloads. Source 4 confirms this.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 45,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft introduces Miniclip's new ad network, AdSurge. Source 5 details this, stating it's built with help from Tencent and Easybrain.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 46,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft states AdSurge aims to deliver results for partners and reclaim value lost due to platform fees, contrasting with networks that prioritize their own yield. Source 5 supports this.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 47,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft mentions AdSurge captured a low single-digit share of wallet and delivered double-digit margin for Miniclip. Source 5 confirms this.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 49,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft states D2C is the fastest-growing layer in mobile gaming and requires an integrated strategy of web stores, link-outs, and distribution. Source 6, discussing Coda's Daria Berdnikova, strongly supports this.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 51,
+          "kind": "ATTRIBUTION",
+          "blocking": false,
+          "problem": "The draft mentions working with local marketplaces and commerce partners to reach new audiences, especially in markets where publishers lack a strong presence. This aligns with the principles discussed by Daria Berdnikova in Source 6 regarding distribution as complementary to D2C.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 52,
+          "kind": "ATTRIBUTION",
+          "blocking": false,
+          "problem": "The draft emphasizes the need for a relevant and localized buying experience that integrates all channels, moving beyond just web stores. This reflects the emphasis on local relevance and integrated strategy in Source 6.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 55,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft mentions the 'Torture Sort' genre and its ad-monetization models. Source 1 details this phenomenon.",
+          "fix": "No fix needed."
+        },
+        {
+          "turn": 56,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft notes potential AI costs from third-party services. While not explicitly detailed in the provided sources for this specific episode, it was a point discussed previously (as mentioned in turn 37). This callback relies on external information not directly provided in these sources for this context.",
+          "fix": "Remove the callback to external information or explicitly state it's a reference to a previous discussion if it cannot be substantiated by the current sources."
+        },
+        {
+          "turn": 56,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "The draft mentions new ad networks like AdSurge promising better yields and the importance of D2C strategies. Sources 5 and 6 cover these topics.",
+          "fix": "No fix needed."
+        }
+      ],
+      "fingerprint": "ceaabdd5ff31b86b75e25dc4c4883b050648ec9a6b11787e401e94d237ebb1af",
+      "passed": false,
+      "problems": [
+        "The draft claims JamBus SandFall makes $120K/day, while source 1 states it makes $120K/day and also mentions ~$1M/month. It also claims one level takes 17 minutes, which is in source 1, but the headline in source 1 says $80K/Day.",
+        "The draft states JamBus SandFall is by Nova Games (Hong Kong) and makes $120K/Day. Source 1 confirms Nova Games (Hong Kong) and states the game makes $120K/day in the text, but the headline states $80K/day. The draft uses $120K/day."
+      ],
+      "model": "gemini-2.5-flash-lite",
+      "review_version": 2
+    },
+    {
+      "naturalness": 4,
+      "focus": 4,
+      "covered_article_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "source_assessments": [
+        {
+          "article_id": 1,
+          "type": "REPORTING",
+          "basis": "The article reports on the JamBus SandFall game, its mechanics, revenue, and the 'Torture Sort' category trend. It cites specific figures and observations from its own review and other games in the category.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 2,
+          "type": "REPORTING",
+          "basis": "The article details Google Play's new AI-powered discovery features (Game Finder, Gamer DNA) and related AI initiatives. It describes the features and their potential impact on game discovery and developer strategies.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 3,
+          "type": "REPORTING",
+          "basis": "This is a market update report from Aream & Co. It presents data on mobile game IAPs, console game revenue, PC games, and M&A activity, attributing the data to the Aream & Co report.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 4,
+          "type": "REPORTING",
+          "basis": "This article presents a digest of various data points from the mobile gaming industry, including funding rounds (Flow Games, Spill Games, Gardens Interactive), publisher growth (Scopely Explore), game revenue and downloads, and ASO trends. It cites other sources like PocketGamer.biz and AppMagic.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 5,
+          "type": "REPORTING",
+          "basis": "The article announces the launch of AdSurge, a new ad network by Miniclip, detailing its features, backing from Tencent, and its focus on publisher yield. It includes quotes from the AdSurge boss and Miniclip.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 6,
+          "type": "EVENT_PROMOTION",
+          "basis": "This article is a speaker spotlight for PG Connects Nordics, focusing on Daria Berdnikova's talk about D2C. While it contains insights into D2C strategy, its primary purpose is to promote the event and the speaker's session.",
+          "independent_context": false,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        }
+      ],
+      "summary": "הפרק דן במגמות האחרונות בתעשיית משחקי המובייל. הוא מתחיל בסקירה של משחק ה-'Torture Sort' JamBus SandFall, המדגים כיצד מנגנונים איטיים במכוון ומונעי-פרסומות יכולים להוביל להכנסות גבוהות, למרות פגיעה פוטנציאלית בשימור שחקנים. לאחר מכן, הפרק מתעמק במנוע הגילוי החדש של Google Play, 'Gamer DNA', המבוסס על AI, וכיצד הוא צפוי לשנות את אסטרטגיות ה-ASO וה-UA על ידי התמקדות בהתאמה אישית לשחקן. בהמשך, נסקרת ירידה גלובלית ברכישות בתוך האפליקציה, אך עם צמיחה בולטת בשווקים כמו טורקיה, מה שמצביע על שינויים דמוגרפיים בהכנסות. הפרק מסתיים בסיקור ההשקה של AdSurge, רשת הפרסום החדשה של Miniclip, ובדיון על חשיבותה הגוברת של אסטרטגיית מכירה ישירה לצרכן (D2C) להשגת צמיחה גלובלית והתמודדות עם מורכבות מסחרית.",
+      "issues": [
+        {
+          "turn": 1,
+          "kind": "STYLE",
+          "blocking": false,
+          "problem": "The introduction to the episode's topics feels slightly repetitive in structure. The host lists the topics and then the co-host reacts with 'This sounds counter-intuitive' to the first topic, and then the host says 'Let's dive into the world of Torture Sort'. This creates a slight loop instead of a direct dive.",
+          "fix": "Streamline the intro: Dana can list the topics, and then immediately transition into the first topic without the co-host's interjection or the host's confirmation."
+        },
+        {
+          "turn": 3,
+          "kind": "STYLE",
+          "blocking": false,
+          "problem": "Yoni's line 'זה נשמע לי מנוגד לאינטואיציה לחלוטין.' (This sounds completely counter-intuitive to me.) is repeated verbatim from turn 1. While the topic might indeed be counter-intuitive, the repetition feels unnatural.",
+          "fix": "Rephrase Yoni's response in turn 3 to express a similar sentiment without repeating the exact phrase. For example: 'That's a really surprising approach' or 'I'm struggling to see how that works.'"
+        },
+        {
+          "turn": 6,
+          "kind": "ATTRIBUTION",
+          "blocking": false,
+          "problem": "Dana attributes the $120K/day revenue to Nova Games and mentions the game is 'slow as hell' and takes 17 minutes per level. However, Article 1 states the revenue is $120K/day and one level takes 17 minutes, but it also mentions the game makes $1M/month and that the source claims $80K/day in its title. There's a slight discrepancy in the exact revenue figure presented versus the source's title/content.",
+          "fix": "Clarify the revenue figure. Dana should state the figure directly from the article content ($120K/day) and acknowledge the title's figure ($80K/day) if necessary, or simply stick to the article's main cited figure."
+        },
+        {
+          "turn": 11,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "Dana states that 95% of their ads are from AppLovin, which is directly from Article 1. However, Article 1 says '95% AppLovin' in the context of UA and Felix's category strategy, implying the *creatives* are mostly sourced through AppLovin or that AppLovin is their primary UA channel. It's not necessarily about the ads *in the game* itself being 95% AppLovin, but their user acquisition strategy.",
+          "fix": "Rephrase the sentence to clarify it refers to their user acquisition (UA) strategy or ad network usage for acquiring users, not necessarily the ad inventory within the game. For example: 'Their user acquisition strategy heavily relies on AppLovin, with 95% of their ads coming through that network.'"
+        },
+        {
+          "turn": 12,
+          "kind": "STYLE",
+          "blocking": false,
+          "problem": "Yoni's line 'זה מעלה שאלה לגבי האתיקה של קריאייטיבים שמציגים חוויה שונה מהמשחק האמיתי.' (This raises a question about the ethics of creatives showing an experience different from the actual game.) is a bit of a leading question and slightly judgmental for a podcast segment focused on reporting facts. While valid, it can sound like the host is taking a strong stance rather than reporting.",
+          "fix": "Rephrase to be more neutral. For example: 'That raises an interesting point about the difference between ad creatives and actual gameplay.'"
+        },
+        {
+          "turn": 16,
+          "kind": "STYLE",
+          "blocking": false,
+          "problem": "Yoni's question 'ואם AI מחליט אילו משחקים יתגלו, מי מנצח – המשחקים הטובים ביותר או האלגוריתמים הטובים ביותר?' (And if AI decides which games get discovered, who wins - the best games or the best algorithms?) is a good question, but Dana's response is quite broad and doesn't directly address the 'who wins' aspect, instead listing other Google features.",
+          "fix": "Dana should acknowledge Yoni's question more directly. For example: 'That's the million-dollar question, Yoni. The article itself poses this dilemma. It suggests a potential shift where optimizing for algorithms might overshadow game quality, but it leaves the answer open.'"
+        },
+        {
+          "turn": 17,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "Dana mentions 'No new mobile game launched in 2026 has broken into the global top-grossing charts.' This is accurate based on Article 3. However, later in the same segment (turn 23), Dana says 'No 2026 launches have broken into the chart, according to the report.' This is a repetition of the same fact from the same source, making it slightly redundant.",
+          "fix": "Combine the information about the lack of new 2026 launches into a single point or elaborate on other aspects from Article 3 (like console game revenue decline, PC growth, or M&A) rather than restating the same fact."
+        },
+        {
+          "turn": 22,
+          "kind": "FACT",
+          "blocking": false,
+          "problem": "Dana states that 'publishers in Asia saw an 11% increase in revenue, and Turkey grew by 17%'. Article 3 says 'Asian mobile-first companies up 11% overall' and 'only Türkiye (up 17% to $4.6bn) grew'. Article 4 also mentions 'publishers in Asia and Turkiye have continued to see a growing share' and lists Flow Games as Turkish. The distinction between 'Asia' and 'Asian mobile-first companies' and 'publishers' in general might be lost, and the 'growing share' for Turkey is more specific than just general growth.",
+          "fix": "Clarify the statement to reflect the nuances. For example: 'While global mobile IAPs are down, Asian mobile-first companies overall saw an 11% rise in revenue, and specifically, Turkey experienced significant growth, up 17% to $4.6 billion in gross in-app purchase revenue over the last 12 months.'"
+        },
+        {
+          "turn": 24,
+          "kind": "STYLE",
+          "blocking": false,
+          "problem": "Yoni's question 'מה הייחוד שלה?' (What's unique about it?) after introducing AdSurge is a good prompt, but Dana's answer, while informative, could be slightly more direct in highlighting the 'uniqueness' compared to other ad networks mentioned implicitly (those prioritizing their own yield).",
+          "fix": "Dana could begin her response by directly stating the key differentiator. For example: 'The main distinction, according to Miniclip, is its focus on partner yield over network yield. Unlike other ad networks that prioritize their own revenue, AdSurge aims to deliver results specifically for its publishing partners.'"
+        },
+        {
+          "turn": 32,
+          "kind": "STYLE",
+          "blocking": false,
+          "problem": "The concluding remarks by Dana and Yoni feel a bit like a summary of summaries, repeating points already made without adding much new synthesis or a final, strong takeaway for the listener. Dana's 'For our developers...' point is good, but the overall wrap-up could be more impactful.",
+          "fix": "Consolidate the concluding thoughts. Dana could provide a more concise summary of the main themes (e.g., innovation in monetization, AI's growing role, market diversification) and Yoni could offer a final actionable piece of advice or a thought-provoking statement on the future, rather than a re-hash of points."
+        }
+      ],
+      "fingerprint": "3bab56d8a42ed7e9e1e3124d5f7d89535b1559e0e27e879b830b0d00ea384246",
+      "passed": true,
+      "problems": [],
+      "model": "gemini-2.5-flash-lite",
+      "review_version": 2
+    }
+  ]
+}
