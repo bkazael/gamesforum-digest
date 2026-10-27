@@ -42,6 +42,11 @@ GEMINI_SCORING_MODEL = os.environ.get("GEMINI_SCORING_MODEL") or "gemini-2.5-fla
 # can use a model with more suitable throughput/cost characteristics.
 GEMINI_CREATIVE_MODEL = os.environ.get("GEMINI_CREATIVE_MODEL") or GEMINI_TEXT_MODEL
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
+# Tried in order when the creative model stays unavailable (503 overload,
+# retired, quota). The scoring model is last because it is known to answer
+# this key; it writes plainer Hebrew, but an episode beats no episode.
+CREATIVE_FALLBACKS = [m.strip() for m in (os.environ.get("GEMINI_CREATIVE_FALLBACKS")
+    or f"gemini-3.5-flash,{GEMINI_SCORING_MODEL}").split(",") if m.strip()]
 
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
 LANG = os.environ.get("DIGEST_LANG", "he")
@@ -310,6 +315,38 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
 
 class GeminiQuotaExhausted(RuntimeError):
     """A provider daily quota is exhausted; retrying the same run won't help."""
+
+
+def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None = None) -> dict:
+    """gemini_json on the creative model, moving down CREATIVE_FALLBACKS when it stays down.
+
+    2026-10-27: gemini-3.8-flash answered 503 "high demand" for seven
+    straight minutes, twice; waiting longer does not fix an overloaded
+    model. A model that answers is kept for the rest of the run (via
+    _MODEL_SWAPS), so the intro and revisions don't queue on it again.
+    """
+    chain = list(dict.fromkeys([live_model(GEMINI_CREATIVE_MODEL), *CREATIVE_FALLBACKS]))
+    for i, model in enumerate(chain):
+        last = i == len(chain) - 1
+        try:
+            result = gemini_json(prompt, schema, tries=tries if last else min(tries, 3),
+                                 timeout=timeout, model=model)
+        except GeminiQuotaExhausted:
+            if last:
+                raise
+        except RuntimeError:
+            raise                       # out of run budget: no time for another model
+        except Exception as e:          # noqa: BLE001
+            permanent = isinstance(e, urllib.error.HTTPError) and e.code not in (404, 429, 500, 502, 503, 504)
+            if last or permanent:
+                raise
+        else:
+            if model != live_model(GEMINI_CREATIVE_MODEL):
+                _MODEL_SWAPS[GEMINI_CREATIVE_MODEL] = model
+            return result
+        print(f"::warning::{model} stayed unavailable; writing with {chain[i + 1]} instead "
+              "(GEMINI_CREATIVE_FALLBACKS).", flush=True)
+    raise RuntimeError("unreachable")
 
 # ---------------------------------------------------------------- JSON Schema & Prompt
 
@@ -795,8 +832,7 @@ hosts again.
     turns: list[dict] = []
     for attempt in (1, 2):
         try:
-            raw = gemini_json(attempt_prompt, INTRO_SCHEMA, tries=2, timeout=150,
-                              model=GEMINI_CREATIVE_MODEL)
+            raw = creative_json(attempt_prompt, INTRO_SCHEMA, tries=2, timeout=150)
         except Exception as e:                              # noqa: BLE001
             log(f"  intro attempt {attempt} failed ({type(e).__name__}: {e})")
             break
@@ -1047,7 +1083,7 @@ Do not add specific facts from your own knowledge or from the style example.
     best_data = None
     best_rank = None
     for attempt in (1, 2):
-        data = gemini_json(attempt_prompt, PODCAST_SCHEMA, tries=4, model=GEMINI_CREATIVE_MODEL)
+        data = creative_json(attempt_prompt, PODCAST_SCHEMA, tries=4)
         data["script"], repairs = script_quality.repair_script(data.get("script", []))
         for note in repairs:
             log(f"  script repair: {note}")

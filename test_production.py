@@ -191,6 +191,33 @@ class ProductionTests(unittest.TestCase):
                 p.gemini_json("x", model="gemini-x")
             self.assertEqual(call.call_count, 1)
 
+    def test_overloaded_creative_model_falls_back_and_sticks(self):
+        busy = urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
+        calls = []
+        def fake(prompt, schema, tries, timeout, model):
+            calls.append(model)
+            if model == "primary":
+                raise busy
+            return {"ok": model}
+        with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
+                patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
+                patch.object(p, "CREATIVE_FALLBACKS", ["backup", "last"]):
+            self.assertEqual(p.creative_json("x", {}), {"ok": "backup"})
+            self.assertEqual(p.creative_json("y", {}), {"ok": "backup"})
+        self.assertEqual(calls, ["primary", "backup", "backup"])
+
+    def test_creative_fallback_does_not_hide_bad_requests_or_budget(self):
+        bad = urllib.error.HTTPError("https://api.test", 400, "bad", {}, io.BytesIO())
+        for error, expected in ((bad, urllib.error.HTTPError),
+                                (RuntimeError("Insufficient run budget"), RuntimeError)):
+            with patch.object(p, "gemini_json", side_effect=error) as call, \
+                    patch.dict(p._MODEL_SWAPS, clear=True), \
+                    patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
+                    patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
+                with self.assertRaises(expected):
+                    p.creative_json("x", {})
+                self.assertEqual(call.call_count, 1)
+
     def test_overloaded_model_waits_longer_than_other_errors(self):
         self.assertGreaterEqual(p.retry_delay(503, 0), 45)
         self.assertLessEqual(p.retry_delay(503, 9), 120)

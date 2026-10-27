@@ -93,6 +93,9 @@ jobs:
           # Relevance scoring is high-volume classification; Flash-Lite is
           # the default in code. Override if model/project quota requires it.
           GEMINI_SCORING_MODEL: ${{ vars.GEMINI_SCORING_MODEL }}
+          # Comma-separated models to write with when the creative one stays
+          # unavailable; empty means the default chain in the pipeline.
+          GEMINI_CREATIVE_FALLBACKS: ${{ vars.GEMINI_CREATIVE_FALLBACKS }}
           # Used only by enabled kind=email sources. Gamigion is configured
           # but disabled in profile.toml until these secrets are added and
           # the source is explicitly enabled there.
