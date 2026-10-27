@@ -199,6 +199,10 @@ P.gemini_json = fake_floor
 d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
 check("a script under the word floor gets exactly one retry", len(prompts) == 2, f"{len(prompts)} calls")
 check("the retry prompt says it was too short", "only" in prompts[1] and "words" in prompts[1])
+check("a short but well-formed draft is expanded, not regenerated blind",
+      "PREVIOUS DRAFT:" in prompts[1] and words(200)[:40] in prompts[1])
+check("the first prompt states the length as a minimum",
+      f"at least {P.SCRIPT_TARGET_WORDS[0]:,} words" in prompts[0])
 check("the longer second attempt is what comes back", P.script_quality.count_words(d["script"]) >= P.SCRIPT_FLOOR_WORDS)
 
 prompts.clear()

@@ -895,10 +895,14 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
         # and adds roughly 200 words, so the finished episode still lands in
         # the old 1,500-1,900 range. SCRIPT_FLOOR_WORDS is where a short
         # script earns a retry (2026-09-28 came out at 1,301 words total).
-        length_inst = (f"Aim for {SCRIPT_TARGET_WORDS[0]:,} to "
-                       f"{SCRIPT_TARGET_WORDS[1]:,} words for the stories and outro "
-                       "(the intro is recorded separately), but this is a target, "
-                       "not a ceiling. If the selected stories contain enough "
+        # "Aim for" was enough for 2.5-flash; 3.8-flash read it as optional
+        # and wrote 1,137-1,189 words twice (2026-10-27), an 11-minute
+        # episode. The minimum is now stated as a hard requirement.
+        length_inst = (f"LENGTH: at least {SCRIPT_TARGET_WORDS[0]:,} words for the stories "
+                       f"and outro, up to about {SCRIPT_TARGET_WORDS[1]:,} (the intro is "
+                       "recorded separately). Scripts under "
+                       f"{SCRIPT_FLOOR_WORDS:,} words are rejected. Each article's word "
+                       "budget below is a minimum to reach with substance, not a ceiling. If the selected stories contain enough "
                        "important, interesting evidence to deserve more time, go "
                        "longer and explain it clearly; never omit useful context "
                        "just to fit the range. Do not pad with repetition.")
@@ -1112,7 +1116,22 @@ Do not add specific facts from your own knowledge or from the style example.
             break
         for p in problems:
             log(f"  script problem (attempt {attempt}): {p}")
-        if attempt == 1:
+        if attempt == 1 and short and not non_length_problems:
+            # Regenerating from scratch came back the same length (1,189 then
+            # 1,137 on 2026-10-27). Expanding the draft keeps what was good
+            # and only adds depth where the airtime asks for it.
+            draft = "\n".join(f"{t.get('speaker')}: {t.get('text')}" for t in data["script"])
+            attempt_prompt = prompt + (
+                f"\n\nA PREVIOUS DRAFT OF THIS SCRIPT WAS ONLY {words} WORDS; it must reach "
+                f"at least {SCRIPT_TARGET_WORDS[0]:,}. Return the FULL script again, keeping "
+                "its order, facts and good turns, and expanding it: give each story the "
+                "word budget in its ARTICLE header, using more of the article's specifics, "
+                "the reason behind each number, and the practical implication for "
+                "operators. No new facts outside the articles, no repetition or filler."
+                + (" Write every turn in Hebrew." if LANG == "he" else "")
+                + "\n\nPREVIOUS DRAFT:\n" + draft
+            )
+        elif attempt == 1:
             attempt_prompt = prompt + (
                 "\n\nA PREVIOUS ATTEMPT AT THIS SCRIPT WAS REJECTED because: "
                 + "; ".join(problems[:3])
