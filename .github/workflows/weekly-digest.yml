@@ -81,7 +81,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
           DIGEST_LANG: he
-          TTS_MODEL: gemini-2.5-flash-preview-tts
+          # Override with the repo variable TTS_MODEL; a key from a new project
+          # may not reach the default (see swap_retired_model in the pipeline).
+          TTS_MODEL: ${{ vars.TTS_MODEL || 'gemini-2.5-flash-preview-tts' }}
           # Optional: the model used for script, intro, and editorial review.
           # Set the repo variable
           # GEMINI_CREATIVE_MODEL (Settings -> Secrets and variables -> Actions

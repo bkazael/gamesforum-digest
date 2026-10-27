@@ -233,9 +233,13 @@ Two industry colleagues talking. Measured, unhurried, genuinely interested. Stra
 לא שידור, לא הרצאה, לא מכירה. שיחה בין אנשים שמכירים אחד את השני.
 הטון: מיושב וענייני. מתעניינים בחומר כי הוא מעניין. קצב טבעי, לא ממהר. משפטים נגמרים בירידה, לא בעלייה.
 מה לא לעשות: לא התלהבות של רדיו בוקר. לא הפתעה מוגזמת. לא חיוך בקול. אמצע החיים.
+Pacing: leave a clear pause whenever the speaker changes, and a short beat after every number and every key point, so the listener can absorb it. Never rush to the next sentence.
 """
 
 [speech]
+# Speech speed after synthesis (1.0 = as generated; 0.94 = 6% slower, same
+# pitch). Lowered because the hosts sounded rushed. Range 0.8-1.2.
+tempo = 0.94
 # Replacements affect only audio synthesis, never the readable transcript.
 # Add/edit entries after listening to a short preview of the actual voice.
 [speech.replacements]

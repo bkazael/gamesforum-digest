@@ -164,6 +164,56 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(call.call_count, 1)
             sleep.assert_not_called()
 
+    def test_retired_model_switches_to_googles_replacement(self):
+        # The exact 404 a new project's key got on 2026-10-27.
+        body = json.dumps({"error": {"status": "NOT_FOUND", "message":
+            "This model models/gemini-2.5-flash is no longer available to new users. "
+            "Please update your code to use models/gemini-3.8-flash for the latest features."}}).encode()
+        retired = urllib.error.HTTPError("https://api.test", 404, "gone", {}, io.BytesIO(body))
+        ok = Mock()
+        ok.__enter__ = Mock(return_value=io.BytesIO(json.dumps({"candidates": [{"finishReason": "STOP",
+            "content": {"parts": [{"text": "{\"a\": 1}"}]}}]}).encode()))
+        ok.__exit__ = Mock(return_value=False)
+        with patch.object(p, "GEMINI_API_KEY", "test"), patch.dict(p._MODEL_SWAPS, clear=True), \
+                patch("urllib.request.urlopen", side_effect=[retired, ok]) as call, \
+                patch.object(p, "_retry_sleep") as sleep:
+            self.assertEqual(p.gemini_json("x", tries=1, model="gemini-2.5-flash"), {"a": 1})
+            self.assertIn("models/gemini-3.8-flash:", call.call_args_list[1].args[0].full_url)
+            self.assertEqual(p.live_model("gemini-2.5-flash"), "gemini-3.8-flash")
+            sleep.assert_not_called()
+
+    def test_404_without_a_named_replacement_still_fails(self):
+        error = urllib.error.HTTPError("https://api.test", 404, "gone", {},
+                                       io.BytesIO(b'{"error": {"message": "not found"}}'))
+        with patch.object(p, "GEMINI_API_KEY", "test"), patch.dict(p._MODEL_SWAPS, clear=True), \
+                patch("urllib.request.urlopen", side_effect=error) as call:
+            with self.assertRaises(urllib.error.HTTPError):
+                p.gemini_json("x", model="gemini-x")
+            self.assertEqual(call.call_count, 1)
+
+    def test_overloaded_model_waits_longer_than_other_errors(self):
+        self.assertGreaterEqual(p.retry_delay(503, 0), 45)
+        self.assertLessEqual(p.retry_delay(503, 9), 120)
+        self.assertEqual(p.retry_delay(500, 0), 10)
+
+    def test_speech_tempo_is_applied_and_bounded(self):
+        captured = {}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(p, "gemini_tts_chunk", return_value=b"\0\0" * 2400), \
+                patch.object(p.runtime, "load_profile", return_value={"speech": {"tempo": 0.94}}), \
+                patch.object(p, "ASSETS_DIR", pathlib.Path(tmp)), \
+                patch.object(p.subprocess, "run", side_effect=lambda cmd, **k: (
+                    captured.setdefault("cmd", cmd), pathlib.Path(cmd[-1]).write_bytes(b"mp3"))):
+            p.synthesize_audio([{"speaker": "Dana", "text": "שלום"}],
+                               pathlib.Path(tmp) / "e.wav", pathlib.Path(tmp) / "e.mp3")
+        self.assertIn("atempo=0.94,loudnorm", " ".join(captured["cmd"]))
+        with patch.object(p.runtime, "load_profile", return_value={"speech": {"tempo": 0.5}}), \
+                patch.object(p, "gemini_tts_chunk", return_value=b"\0\0"), \
+                tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                p.synthesize_audio([{"speaker": "Dana", "text": "x"}],
+                                   pathlib.Path(tmp) / "e.wav", pathlib.Path(tmp) / "e.mp3")
+
     def test_request_timeout_cannot_outlive_run_budget(self):
         with patch.object(p, "_run_started", 100), patch.object(p.time, "monotonic", return_value=155), \
                 patch.object(p, "RUN_DEADLINE_SEC", 60):

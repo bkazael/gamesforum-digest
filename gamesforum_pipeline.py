@@ -138,6 +138,49 @@ def _retry_sleep(seconds: float) -> None:
         raise RuntimeError("Insufficient run budget for retry; resume from checkpoint")
     time.sleep(seconds)
 
+
+# Google retires models per API key: a key from a newly created project gets
+# 404 "models/X is no longer available to new users. Please update your code
+# to use models/Y" for models older keys still reach (2026-10-27: a fresh key
+# hit this for 2.5-flash-lite, then 2.5-flash, one run apiece). The error
+# names the replacement, so take it for the rest of the run instead of
+# failing, and say so loudly enough that someone sets the variable.
+_MODEL_SWAPS: dict[str, str] = {}
+_SUGGESTED_MODEL_RE = re.compile(r"\buse models/([\w.\-]+)")
+
+
+def live_model(model: str) -> str:
+    return _MODEL_SWAPS.get(model, model)
+
+
+def swap_retired_model(model: str, code: int, detail: str, variable: str) -> bool:
+    """Switch `model` to Google's suggested replacement after a 404. True if switched."""
+    if code != 404 or model in _MODEL_SWAPS:
+        return False
+    m = _SUGGESTED_MODEL_RE.search(detail)
+    if not m or m.group(1) == model:
+        return False
+    _MODEL_SWAPS[model] = m.group(1)
+    print(f"::warning::{model} is not available to this API key; using {m.group(1)}, "
+          f"the replacement Google named. Set {variable} to make this explicit.", flush=True)
+    return True
+
+
+def explain_billing_error(code: int) -> None:
+    if code == 402:
+        print("::error::Gemini returned 402: the API key's project is on prepaid billing "
+              "and has no credit left. Top up in AI Studio, or use a key from a project "
+              "without billing (free tier).", flush=True)
+
+
+def retry_delay(code: int | None, attempt: int) -> float:
+    # 503 is Google saying the model is overloaded right now; 10-20s retries
+    # just hit the same spike (2026-10-27: four 503s inside a minute).
+    if code == 503:
+        return min(45 * (attempt + 1), 120)
+    return 10 * (attempt + 1)
+
+
 def http_get(url: str, tries: int = 3) -> str:
     for attempt in range(tries):
         try:
@@ -186,8 +229,7 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required.")
     attempt_timeout = timeout or HTTP_TIMEOUT
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model or GEMINI_TEXT_MODEL}:generateContent"
+    requested = model or GEMINI_TEXT_MODEL
 
     gen_config = {"responseMimeType": "application/json"}
     if schema:
@@ -199,8 +241,12 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
     }
 
     body = json.dumps(payload).encode()
-    for attempt in range(tries):
+    attempt = -1
+    while attempt < tries - 1:
+        attempt += 1
         _check_deadline()
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+               f"{live_model(requested)}:generateContent")
         req = urllib.request.Request(
             url, data=body,
             headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
@@ -244,12 +290,16 @@ def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
             except Exception:                              # noqa: BLE001
                 pass
             log(f"    Gemini API attempt {attempt + 1}/{tries} failed: HTTP {e.code}{detail}")
+            if swap_retired_model(requested, e.code, detail, "GEMINI_*_MODEL"):
+                tries += 1                      # the switch itself costs no attempt
+                continue
+            explain_billing_error(e.code)
             if e.code == 429 and re.search(
                     r"per.?day|daily|requestsperday|free.?tier.?requests", detail, re.I):
                 raise GeminiQuotaExhausted(detail or "daily quota exhausted") from e
             if e.code not in (408, 429, 500, 502, 503, 504) or attempt == tries - 1:
                 raise
-            _retry_sleep(10 * (attempt + 1))
+            _retry_sleep(retry_delay(e.code, attempt))
         except Exception as e:
             log(f"    Gemini API attempt {attempt + 1}/{tries} failed: {e}")
             if attempt == tries - 1:
@@ -1098,7 +1148,6 @@ Do not read any instructions aloud.
 TRANSCRIPT:
 {script_chunk_text}"""
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{TTS_MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -1116,8 +1165,12 @@ TRANSCRIPT:
 
     body = json.dumps(payload).encode()
 
-    for attempt in range(tries):
+    attempt = -1
+    while attempt < tries - 1:
+        attempt += 1
         _check_deadline()
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+               f"{live_model(TTS_MODEL)}:generateContent")
         req = urllib.request.Request(
             url, data=body,
             headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
@@ -1151,7 +1204,15 @@ TRANSCRIPT:
             else:
                 log(f"    TTS chunk returned no audio data (attempt {attempt + 1}/{tries}); retrying...")
         except urllib.error.HTTPError as e:
-            log(f"    TTS HTTP {e.code} (attempt {attempt + 1}/{tries})")
+            try:
+                detail = e.read().decode("utf-8", "replace")[:700]
+            except Exception:                              # noqa: BLE001
+                detail = ""
+            log(f"    TTS HTTP {e.code} (attempt {attempt + 1}/{tries}) {detail[:300]}")
+            if swap_retired_model(TTS_MODEL, e.code, detail, "TTS_MODEL"):
+                tries += 1
+                continue
+            explain_billing_error(e.code)
             if e.code not in (429, 500, 502, 503, 504) or attempt == tries - 1:
                 raise
         except TTSTruncatedError:
@@ -1181,6 +1242,13 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
     # Preserve the editorial transcript; pronunciation substitutions apply to
     # synthesized speech only and are configurable in profile.toml.
     glossary = runtime.load_profile().get("speech", {}).get("replacements", {})
+    # Listeners found the hosts rushed (2026-10-27): the model's own pace,
+    # even when told "unhurried", leaves no room between points. atempo
+    # slows the speech without changing pitch; 1.0 turns it off.
+    tempo = float(runtime.load_profile().get("speech", {}).get("tempo", 1.0))
+    if not 0.8 <= tempo <= 1.2:
+        raise ValueError(f"[speech] tempo must be between 0.8 and 1.2, got {tempo}")
+    slow = f"atempo={tempo:g}," if tempo != 1.0 else ""
     spoken_turns = speech_tools.prepare_turns(script_turns, glossary)
     chunks = audio_tools.chunks_for_turns(spoken_turns, TTS_CHUNK_CHAR_LIMIT)
 
@@ -1247,7 +1315,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
         log(f"found jingle asset ({jingle_file.name}), applying radio ducking & outro fade...")
         filter_complex = (
             "[0:a]atrim=duration=4.5,afade=t=out:st=2.0:d=2.5,volume=0.30[jingle_fade];"
-            "[1:a]adelay=2200|2200[speech_delayed];"
+            f"[1:a]{slow}adelay=2200|2200[speech_delayed];"
             "[jingle_fade][speech_delayed]amix=inputs=2:normalize=0:duration=longest[intro_mixed];"
             "[2:a]atrim=duration=5,afade=t=out:st=2:d=3,volume=0.30[outro];"
             "[intro_mixed][outro]concat=n=2:v=0:a=1,loudnorm=I=-19:TP=-1.5:LRA=9[outa]"
@@ -1267,7 +1335,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
         cmd = [
             "ffmpeg", "-y", "-loglevel", "error",
             "-i", str(wav_path),
-            "-af", "loudnorm=I=-19:TP=-1.5:LRA=9", "-ar", "24000", "-ac", "1",
+            "-af", f"{slow}loudnorm=I=-19:TP=-1.5:LRA=9", "-ar", "24000", "-ac", "1",
             "-codec:a", "libmp3lame", "-b:a", "96k",
             str(mp3_path)
         ]
@@ -1601,9 +1669,9 @@ def main() -> int:
                        DIGESTS / f"{today}-script.md", ROOT / "feed.xml"]
     runtime.atomic_write(ROOT / "reports" / f"{today}-run.json", json.dumps({
         "status": "complete", "date": today, "words": words, "duration_seconds": duration,
-        "words_per_minute": wpm, "models": {"text": GEMINI_TEXT_MODEL,
-        "scoring": GEMINI_SCORING_MODEL, "creative": GEMINI_CREATIVE_MODEL,
-        "tts": TTS_MODEL}, "usage": USAGE_LOG,
+        "words_per_minute": wpm, "models": {"text": live_model(GEMINI_TEXT_MODEL),
+        "scoring": live_model(GEMINI_SCORING_MODEL), "creative": live_model(GEMINI_CREATIVE_MODEL),
+        "tts": live_model(TTS_MODEL)}, "usage": USAGE_LOG,
         "elapsed_seconds": round(time.monotonic() - _run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),
         "editorial": data.get("editorial_review"),
