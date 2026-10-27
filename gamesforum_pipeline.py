@@ -463,9 +463,9 @@ INTRO_SCHEMA = {
 MAX_QUESTIONS = 6
 MAX_OPEN_QUESTIONS = 2
 
-# Stories + outro only; the intro adds ~200 words on top, which keeps the
-# finished episode in the show's long-standing 1,500-1,900 range.
-SCRIPT_TARGET_WORDS = (1400, 1800)
+# There is no length target (see length_inst in generate_podcast_content):
+# the material decides, from ~1,200 words on a thin week to 3,000+ on a rich
+# one. Below this floor a script is presumed lazy or cut off, not concise.
 SCRIPT_FLOOR_WORDS = 1250
 # Below SCRIPT_FLOOR_WORDS a script earns its one retry; only below this is it
 # unusable and the run stops. A 1,175-word script (about ten minutes) was
@@ -891,22 +891,21 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
         length_inst = f"Target Script Length: about {target_words} words. This is a short smoke-test run -- keep it brief."
         budget_words = target_words
     else:
-        # Stories + outro only: the intro is written separately afterwards
-        # and adds roughly 200 words, so the finished episode still lands in
-        # the old 1,500-1,900 range. SCRIPT_FLOOR_WORDS is where a short
-        # script earns a retry (2026-09-28 came out at 1,301 words total).
-        # "Aim for" was enough for 2.5-flash; 3.8-flash read it as optional
-        # and wrote 1,137-1,189 words twice (2026-10-27), an 11-minute
-        # episode. The minimum is now stated as a hard requirement.
-        length_inst = (f"LENGTH: at least {SCRIPT_TARGET_WORDS[0]:,} words for the stories "
-                       f"and outro, up to about {SCRIPT_TARGET_WORDS[1]:,} (the intro is "
-                       "recorded separately). Scripts under "
-                       f"{SCRIPT_FLOOR_WORDS:,} words are rejected. Each article's word "
-                       "budget below is a minimum to reach with substance, not a ceiling. If the selected stories contain enough "
-                       "important, interesting evidence to deserve more time, go "
-                       "longer and explain it clearly; never omit useful context "
-                       "just to fit the range. Do not pad with repetition.")
-        budget_words = sum(SCRIPT_TARGET_WORDS) // 2
+        # No word target: the material decides. A fixed range made thin weeks
+        # padded and rich ones cut, and a stricter "at least 1,400" (tried
+        # 2026-10-27) only trades one for the other. The model is asked to
+        # judge what in the articles is worth the listener's time.
+        # SCRIPT_FLOOR_WORDS stays as a safety net for a lazy or cut-off
+        # answer, not as a target.
+        length_inst = ("LENGTH FOLLOWS THE MATERIAL. There is no word target and no ceiling. "
+                       "Read the articles and decide what is genuinely interesting: the "
+                       "mechanism behind a result, what the numbers mean, where sources "
+                       "disagree, what an operator should do differently. Give that the "
+                       "time it needs to be understood by ear. A thin week may need about "
+                       "1,200 words; a week with rich, important evidence may need 3,000 "
+                       "or more. Never drop a selected story's substance to stay short; "
+                       "never pad, repeat, or stretch a story that has little to say.")
+        budget_words = 0
 
     # Airtime was computed by discovery.assign_airtime() and printed in the
     # ledger ("40% זמן אוויר") but never reached this prompt -- which said
@@ -916,7 +915,9 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
         share = a.get("_airtime")
         note = ""
         if share:
-            note = f"  [airtime: ~{int(share * 100)}% of the episode, about {int(share * budget_words)} words]"
+            note = f"  [airtime: ~{int(share * 100)}% of the episode"
+            note += f", about {int(share * budget_words)} words]" if budget_words else \
+                " -- its depth relative to the other stories, not a word count]"
         if a.get("partial"):
             note += ("  [PARTIAL: only the newsletter preview was available -- report what it "
                      "states, attribute it to the preview, draw no conclusion about the rest of the post]")
@@ -1101,8 +1102,8 @@ Do not add specific facts from your own knowledge or from the style example.
         short = (not target_words) and words < SCRIPT_FLOOR_WORDS
         if short:
             problems.append(
-                f"the script is only {words} words; the target is "
-                f"{SCRIPT_TARGET_WORDS[0]:,}-{SCRIPT_TARGET_WORDS[1]:,}"
+                f"the script is only {words} words, under the "
+                f"{SCRIPT_FLOOR_WORDS:,}-word safety floor"
             )
         # A retry can itself be truncated. Keep the best complete-ish draft
         # rather than letting a 20-word retry overwrite a 900-word first
@@ -1118,16 +1119,15 @@ Do not add specific facts from your own knowledge or from the style example.
             log(f"  script problem (attempt {attempt}): {p}")
         if attempt == 1 and short and not non_length_problems:
             # Regenerating from scratch came back the same length (1,189 then
-            # 1,137 on 2026-10-27). Expanding the draft keeps what was good
-            # and only adds depth where the airtime asks for it.
+            # 1,137 on 2026-10-27). Expanding the draft keeps what was good;
+            # how much to add is still the model's call, not a number.
             draft = "\n".join(f"{t.get('speaker')}: {t.get('text')}" for t in data["script"])
             attempt_prompt = prompt + (
-                f"\n\nA PREVIOUS DRAFT OF THIS SCRIPT WAS ONLY {words} WORDS; it must reach "
-                f"at least {SCRIPT_TARGET_WORDS[0]:,}. Return the FULL script again, keeping "
-                "its order, facts and good turns, and expanding it: give each story the "
-                "word budget in its ARTICLE header, using more of the article's specifics, "
-                "the reason behind each number, and the practical implication for "
-                "operators. No new facts outside the articles, no repetition or filler."
+                f"\n\nA PREVIOUS DRAFT OF THIS SCRIPT CAME BACK AT ONLY {words} WORDS, which "
+                "skims material that has more to say. Return the FULL script again, keeping "
+                "its order, facts and good turns, and go deeper wherever the articles support "
+                "it: the specifics, the reason behind each number, the practical implication "
+                "for operators. No new facts outside the articles, no repetition or filler."
                 + (" Write every turn in Hebrew." if LANG == "he" else "")
                 + "\n\nPREVIOUS DRAFT:\n" + draft
             )
@@ -1161,7 +1161,7 @@ Do not add specific facts from your own knowledge or from the style example.
         )
     if not target_words and total_words < SCRIPT_FLOOR_WORDS:
         print(f"::warning::short episode script: {total_words} words "
-              f"(target {SCRIPT_TARGET_WORDS[0]:,}+); publishing it anyway", flush=True)
+              f"(safety floor {SCRIPT_FLOOR_WORDS:,}); publishing it anyway", flush=True)
 
     return data
 

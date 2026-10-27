@@ -177,8 +177,8 @@ check("a vendor/company source must be attributed, not endorsed", "ATTRIBUTED, n
 check("open questions must be said to be open, never invented", "OPEN" in sp and "never answered with something invented" in sp)
 check("the hype ban and the agreement-opener limit are in the prompt",
       "no stacked" in sp.lower() or "stacked" in sp.lower())
-check("the word range is a target, not a ceiling on useful coverage",
-      "not a ceiling" in sp and "go longer" in sp)
+check("length is the material's call: no target, no ceiling, no padding",
+      "no word target and no ceiling" in sp and "never pad" in sp)
 check("a question may not be left hanging", "never left" in sp and "hanging" in sp)
 
 prompts.clear()
@@ -201,8 +201,10 @@ check("a script under the word floor gets exactly one retry", len(prompts) == 2,
 check("the retry prompt says it was too short", "only" in prompts[1] and "words" in prompts[1])
 check("a short but well-formed draft is expanded, not regenerated blind",
       "PREVIOUS DRAFT:" in prompts[1] and words(200)[:40] in prompts[1])
-check("the first prompt states the length as a minimum",
-      f"at least {P.SCRIPT_TARGET_WORDS[0]:,} words" in prompts[0])
+check("the first prompt lets the material decide the length, with no ceiling",
+      "no word target and no ceiling" in prompts[0] and "3,000" in prompts[0])
+check("airtime is described as relative depth, not a word count",
+      "not a word count" in prompts[0] and "words]" not in prompts[0])
 check("the longer second attempt is what comes back", P.script_quality.count_words(d["script"]) >= P.SCRIPT_FLOOR_WORDS)
 
 prompts.clear()
