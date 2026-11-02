@@ -1,0 +1,156 @@
+{
+  "naturalness": 4,
+  "focus": 4,
+  "covered_article_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "source_assessments": [
+    {
+      "article_id": 1,
+      "type": "REPORTING",
+      "basis": "Industry analysis on casual game features driving revenue.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "BRIEF"
+    },
+    {
+      "article_id": 2,
+      "type": "REPORTING",
+      "basis": "Sensor Tower data analysis of liveops scheduling in Township.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 3,
+      "type": "REPORTING",
+      "basis": "Financial reporting on PlayStudios layoffs and game closure.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "BRIEF"
+    },
+    {
+      "article_id": 4,
+      "type": "REPORTING",
+      "basis": "Coverage of Unity and PvX partnership for user acquisition financing.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "BRIEF"
+    },
+    {
+      "article_id": 5,
+      "type": "REPORTING",
+      "basis": "News report on South Korean regulatory fines against Google and Apple.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "DEEP"
+    },
+    {
+      "article_id": 6,
+      "type": "REPORTING",
+      "basis": "Interview with Hyper Hippo's Alexandre Denault on rebuilding AdVenture Capitalist.",
+      "independent_context": true,
+      "listener_value": true,
+      "treatment": "BRIEF"
+    }
+  ],
+  "summary": "The episode covers six mobile gaming stories, focusing on feature monetization in casual games, Township liveops slot scheduling, PlayStudios' studio restructurings and game closures, Unity's new UA financing partnership with PvX, South Korea's regulatory fines against Google and Apple for app payment restrictions, and Hyper Hippo's complete codebase rewrite of AdVenture Capitalist.",
+  "issues": [
+    {
+      "turn": 9,
+      "kind": "ATTRIBUTION",
+      "blocking": false,
+      "problem": "Dana states the data is based on 'hardware estimates' (הערכות חומרה), which is a mistranslation or distortion of Sensor Tower app store market data.",
+      "fix": "Replace 'הערכות חומרה' with 'נתוני חברת המחקר Sensor Tower'."
+    }
+  ],
+  "fingerprint": "8cea8e4ce9fa4417169a7fcc77e7e4984b901e56026844d4118579a27f65e01b",
+  "passed": true,
+  "problems": [],
+  "model": "gemini-3.5-flash-lite",
+  "review_version": 2,
+  "attempts": [
+    {
+      "naturalness": 4,
+      "focus": 4,
+      "covered_article_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "source_assessments": [
+        {
+          "article_id": 1,
+          "type": "REPORTING",
+          "basis": "Industry analysis on casual game features driving revenue.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        },
+        {
+          "article_id": 2,
+          "type": "REPORTING",
+          "basis": "Sensor Tower data analysis of liveops scheduling in Township.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 3,
+          "type": "REPORTING",
+          "basis": "Financial reporting on PlayStudios layoffs and game closure.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        },
+        {
+          "article_id": 4,
+          "type": "REPORTING",
+          "basis": "Coverage of Unity and PvX partnership for user acquisition financing.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        },
+        {
+          "article_id": 5,
+          "type": "REPORTING",
+          "basis": "News report on South Korean regulatory fines against Google and Apple.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "DEEP"
+        },
+        {
+          "article_id": 6,
+          "type": "REPORTING",
+          "basis": "Interview with Hyper Hippo's Alexandre Denault on rebuilding AdVenture Capitalist.",
+          "independent_context": true,
+          "listener_value": true,
+          "treatment": "BRIEF"
+        }
+      ],
+      "summary": "The episode covers six mobile gaming stories, focusing on feature monetization in casual games, Township liveops slot scheduling, PlayStudios' studio restructurings and game closures, Unity's new UA financing partnership with PvX, South Korea's regulatory fines against Google and Apple for app payment restrictions, and Hyper Hippo's complete codebase rewrite of AdVenture Capitalist.",
+      "issues": [
+        {
+          "turn": 9,
+          "kind": "ATTRIBUTION",
+          "blocking": false,
+          "problem": "Dana states the data is based on 'hardware estimates' (הערכות חומרה), which is a mistranslation or distortion of Sensor Tower app store market data.",
+          "fix": "Replace 'הערכות חומרה' with 'נתוני חברת המחקר Sensor Tower'."
+        }
+      ],
+      "fingerprint": "8cea8e4ce9fa4417169a7fcc77e7e4984b901e56026844d4118579a27f65e01b",
+      "passed": true,
+      "problems": [],
+      "model": "gemini-3.5-flash-lite",
+      "review_version": 2
+    }
+  ]
+}

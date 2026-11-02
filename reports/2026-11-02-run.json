@@ -1,0 +1,149 @@
+{
+  "status": "complete",
+  "date": "2026-11-02",
+  "words": 902,
+  "duration_seconds": 468,
+  "words_per_minute": 117.4,
+  "models": {
+    "text": "gemini-2.5-flash",
+    "scoring": "gemini-3.5-flash-lite",
+    "creative": "gemini-3.5-flash",
+    "tts": "gemini-2.5-flash-preview-tts"
+  },
+  "usage": {
+    "input_tokens": 34441,
+    "output_tokens": 9620,
+    "tts_chunks": 2,
+    "thinking_tokens": 9101
+  },
+  "elapsed_seconds": 1394.3,
+  "profile_fingerprint": "47654937ae98aadedf010229be298cdfd50fd5d7eaf98939d45e274f460bce7b",
+  "editorial": {
+    "naturalness": 4,
+    "focus": 4,
+    "covered_article_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "source_assessments": [
+      {
+        "article_id": 1,
+        "type": "REPORTING",
+        "basis": "Industry analysis on casual game features driving revenue.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "BRIEF"
+      },
+      {
+        "article_id": 2,
+        "type": "REPORTING",
+        "basis": "Sensor Tower data analysis of liveops scheduling in Township.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 3,
+        "type": "REPORTING",
+        "basis": "Financial reporting on PlayStudios layoffs and game closure.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "BRIEF"
+      },
+      {
+        "article_id": 4,
+        "type": "REPORTING",
+        "basis": "Coverage of Unity and PvX partnership for user acquisition financing.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "BRIEF"
+      },
+      {
+        "article_id": 5,
+        "type": "REPORTING",
+        "basis": "News report on South Korean regulatory fines against Google and Apple.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 6,
+        "type": "REPORTING",
+        "basis": "Interview with Hyper Hippo's Alexandre Denault on rebuilding AdVenture Capitalist.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "BRIEF"
+      }
+    ],
+    "summary": "The episode covers six mobile gaming stories, focusing on feature monetization in casual games, Township liveops slot scheduling, PlayStudios' studio restructurings and game closures, Unity's new UA financing partnership with PvX, South Korea's regulatory fines against Google and Apple for app payment restrictions, and Hyper Hippo's complete codebase rewrite of AdVenture Capitalist.",
+    "issues": [
+      {
+        "turn": 9,
+        "kind": "ATTRIBUTION",
+        "blocking": false,
+        "problem": "Dana states the data is based on 'hardware estimates' (הערכות חומרה), which is a mistranslation or distortion of Sensor Tower app store market data.",
+        "fix": "Replace 'הערכות חומרה' with 'נתוני חברת המחקר Sensor Tower'."
+      }
+    ],
+    "fingerprint": "8cea8e4ce9fa4417169a7fcc77e7e4984b901e56026844d4118579a27f65e01b",
+    "passed": true,
+    "problems": [],
+    "model": "gemini-3.5-flash-lite",
+    "review_version": 2
+  },
+  "artifacts": {
+    "episodes/2026-11-02.mp3": "4e77ce618af571f3f92baf10bd46b65bb075b8d113b236368069e604f34098a4",
+    "episodes/2026-11-02.json": "973138582058dd90bd475e82c2a33d35fdfc4214bda28a4d6fe47fd1a77d0397",
+    "digests/2026-11-02.md": "925fc72647179fa15a504a37a68a4e7f1e541eb4da730969a2eeb72a40bf06c1",
+    "digests/2026-11-02-script.md": "aae2a20f19c3f55cb0711da482708caa5c35709eb4a9c4edb303cff848698ebf",
+    "feed.xml": "aeeae44bd3a5e7df818b74fb829c4bd9a2e2414f3b272e2bb7d065502bcd7bfc"
+  },
+  "sources": [
+    {
+      "title": "New Features That Moved Revenue?",
+      "url": "https://www.gamigion.com/new-features-that-moved-revenue",
+      "published": "2026-10-29",
+      "score": 9.0,
+      "airtime": 0.3
+    },
+    {
+      "title": "Township: Two Tournaments, One Slot, Opposite Metrics!",
+      "url": "https://www.gamigion.com/township-two-tournaments-one-slot-opposite-metrics",
+      "published": "2026-10-29",
+      "score": 9.0,
+      "airtime": 0.2
+    },
+    {
+      "title": "PlayStudios closes Tetris Block Party after cutting 177 jobs and shuttering four studios",
+      "url": "https://mobilegamer.biz/playstudios-closes-tetris-block-party-after-cutting-177-jobs-and-closing-four-studios",
+      "published": "2026-11-02",
+      "score": 8.0,
+      "airtime": 0.125
+    },
+    {
+      "title": "Unity partners with PvX to offer UA financing to mobile studios",
+      "url": "https://mobilegamer.biz/unity-partners-with-pvx-to-offer-ua-financing-to-mobile-studios",
+      "published": "2026-10-28",
+      "score": 8.0,
+      "airtime": 0.125
+    },
+    {
+      "title": "South Korea fines Google and Apple $47.6m over app payments",
+      "url": "https://www.pocketgamer.biz/south-korea-fines-google-and-apple-476m-over-app-payments",
+      "published": "2026-10-29",
+      "score": 8.0,
+      "airtime": 0.125
+    },
+    {
+      "title": "“It was like playing whack-a-mole”: Hyper Hippo’s Alexandre Denault on burning down AdVenture Capitalist",
+      "url": "https://www.pocketgamer.biz/hyper-hippo-alexandre-denault-adventure-capitalist-rewrite",
+      "published": "2026-11-02",
+      "score": 7.0,
+      "airtime": 0.125
+    }
+  ]
+}

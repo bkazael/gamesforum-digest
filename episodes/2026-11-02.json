@@ -1,0 +1,38 @@
+{
+  "title": "מנופי צמיחה סמויים: מריקון משאבים ועד ניהול LiveOps מדויק | Ben's Weekly Digest",
+  "summary": "תכנון מנגנונים לריקון יתרות מטבע פרימיום ופריטים כפולים מייצר דרייב מחודש לרכישות בתוך האפליקציה.",
+  "notes": "<p>תכנון מנגנונים לריקון יתרות מטבע פרימיום ופריטים כפולים מייצר דרייב מחודש לרכישות בתוך האפליקציה.</p><p><strong>Sources (6):</strong></p><ol><li><a href=\"https://www.gamigion.com/new-features-that-moved-revenue\">New Features That Moved Revenue?</a> <em>(Gamigion)</em></li><li><a href=\"https://www.gamigion.com/township-two-tournaments-one-slot-opposite-metrics\">Township: Two Tournaments, One Slot, Opposite Metrics!</a> <em>(Gamigion)</em></li><li><a href=\"https://mobilegamer.biz/playstudios-closes-tetris-block-party-after-cutting-177-jobs-and-closing-four-studios\">PlayStudios closes Tetris Block Party after cutting 177 jobs and shuttering four studios</a> <em>(MobileGamer.biz)</em></li><li><a href=\"https://mobilegamer.biz/unity-partners-with-pvx-to-offer-ua-financing-to-mobile-studios\">Unity partners with PvX to offer UA financing to mobile studios</a> <em>(MobileGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/south-korea-fines-google-and-apple-476m-over-app-payments\">South Korea fines Google and Apple $47.6m over app payments</a> <em>(PocketGamer.biz)</em></li><li><a href=\"https://www.pocketgamer.biz/hyper-hippo-alexandre-denault-adventure-capitalist-rewrite\">“It was like playing whack-a-mole”: Hyper Hippo’s Alexandre Denault on burning down AdVenture Capitalist</a> <em>(PocketGamer.biz)</em></li></ol>",
+  "duration": 468,
+  "sources": [
+    {
+      "title": "New Features That Moved Revenue?",
+      "url": "https://www.gamigion.com/new-features-that-moved-revenue",
+      "source": "Gamigion"
+    },
+    {
+      "title": "Township: Two Tournaments, One Slot, Opposite Metrics!",
+      "url": "https://www.gamigion.com/township-two-tournaments-one-slot-opposite-metrics",
+      "source": "Gamigion"
+    },
+    {
+      "title": "PlayStudios closes Tetris Block Party after cutting 177 jobs and shuttering four studios",
+      "url": "https://mobilegamer.biz/playstudios-closes-tetris-block-party-after-cutting-177-jobs-and-closing-four-studios",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "Unity partners with PvX to offer UA financing to mobile studios",
+      "url": "https://mobilegamer.biz/unity-partners-with-pvx-to-offer-ua-financing-to-mobile-studios",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "South Korea fines Google and Apple $47.6m over app payments",
+      "url": "https://www.pocketgamer.biz/south-korea-fines-google-and-apple-476m-over-app-payments",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "“It was like playing whack-a-mole”: Hyper Hippo’s Alexandre Denault on burning down AdVenture Capitalist",
+      "url": "https://www.pocketgamer.biz/hyper-hippo-alexandre-denault-adventure-capitalist-rewrite",
+      "source": "PocketGamer.biz"
+    }
+  ]
+}
