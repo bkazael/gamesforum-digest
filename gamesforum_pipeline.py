@@ -896,7 +896,11 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
         # 2026-10-27) only trades one for the other. The model is asked to
         # judge what in the articles is worth the listener's time.
         # SCRIPT_FLOOR_WORDS stays as a safety net for a lazy or cut-off
-        # answer, not as a target.
+        # answer, not as a target. With no number at all, though, the
+        # fallback model (3.5-flash, 2026-11-09) read "follows the material"
+        # as license to write 527 then 684 words for six stories -- under
+        # the hard floor, no episode. The COVERAGE STANDARD below keeps the
+        # freedom (no total, no ceiling) but defines what "covered" means.
         length_inst = ("LENGTH FOLLOWS THE MATERIAL. There is no word target and no ceiling. "
                        "Read the articles and decide what is genuinely interesting: the "
                        "mechanism behind a result, what the numbers mean, where sources "
@@ -904,7 +908,13 @@ def generate_podcast_content(articles: list[dict], today_date: str, memory_conte
                        "time it needs to be understood by ear. A thin week may need about "
                        "1,200 words; a week with rich, important evidence may need 3,000 "
                        "or more. Never drop a selected story's substance to stay short; "
-                       "never pad, repeat, or stretch a story that has little to say.")
+                       "never pad, repeat, or stretch a story that has little to say. "
+                       "COVERAGE STANDARD: a story is not covered until a listener could "
+                       "explain it to a colleague -- what happened, the specific numbers, why "
+                       "it happened, and what an operator should do about it. That usually "
+                       "takes 6 to 12 exchanges, more for the lead story; a story handled in "
+                       "2 or 3 exchanges is a headline, not coverage. This is a standard of "
+                       "depth, not a word count: a story with little to say may need fewer.")
         budget_words = 0
 
     # Airtime was computed by discovery.assign_airtime() and printed in the
@@ -1139,7 +1149,8 @@ Do not add specific facts from your own knowledge or from the style example.
                 "complete punctuation and no ASCII double quotes anywhere."
                 + (" Write every turn in Hebrew." if LANG == "he" else "")
                 + (" Go deeper on the highest-airtime stories -- more specifics, "
-                   "and every question answered in full; do not pad." if short else "")
+                   "and every question answered in full; do not pad. Any story handled "
+                   "in 2-3 exchanges is a headline: give it the full coverage standard." if short else "")
             )
     else:
         data = best_data or data

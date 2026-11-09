@@ -203,6 +203,8 @@ check("a short but well-formed draft is expanded, not regenerated blind",
       "PREVIOUS DRAFT:" in prompts[1] and words(200)[:40] in prompts[1])
 check("the first prompt lets the material decide the length, with no ceiling",
       "no word target and no ceiling" in prompts[0] and "3,000" in prompts[0])
+check("depth is defined per story (a headline is not coverage), without a total word count",
+      "COVERAGE STANDARD" in prompts[0] and "a headline, not coverage" in prompts[0])
 check("airtime is described as relative depth, not a word count",
       "not a word count" in prompts[0] and "words]" not in prompts[0])
 check("the longer second attempt is what comes back", P.script_quality.count_words(d["script"]) >= P.SCRIPT_FLOOR_WORDS)
