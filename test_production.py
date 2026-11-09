@@ -330,6 +330,35 @@ class ProductionTests(unittest.TestCase):
             self.assertFalse(data["editorial_review"]["passed"])
             self.assertFalse(json.loads(path.read_text())["passed"])
 
+    def test_revision_outage_publishes_unrevised_draft_with_warning(self):
+        # 2026-11-09 run 67: both models 503'd on the revision call, which
+        # ended a run with a finished script. A non-factual problem now just
+        # publishes the unrevised draft with a warning.
+        call = Mock(side_effect=[self.review(naturalness=2), urllib.error.URLError("503")])
+        with tempfile.TemporaryDirectory() as tmp:
+            data = self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
+        self.assertTrue(data["editorial_review"]["published_with_warnings"])
+        self.assertEqual(call.call_count, 2)
+
+    def test_revision_outage_still_blocks_a_factual_error(self):
+        issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Invented number", "fix": "Remove it"}
+        call = Mock(side_effect=[self.review(issues=[issue]), urllib.error.URLError("503")])
+        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "Invented number"):
+            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
+
+    def test_editorial_calls_fall_back_like_the_script_does(self):
+        busy = urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
+        calls = []
+        def fake(prompt, schema, tries, timeout, model):
+            calls.append(model)
+            if model != "backup":
+                raise busy
+            return {"ok": 1}
+        with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
+                patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
+            self.assertEqual(p._editorial_call("x", {}, tries=2, timeout=10, model="reviewer"), {"ok": 1})
+        self.assertEqual(calls, ["reviewer", "backup"])
+
     def test_persistent_factual_error_still_blocks_by_default(self):
         issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Invented number", "fix": "Remove it"}
         call = Mock(side_effect=[self.review(issues=[issue]), self.draft(), self.review(issues=[issue])])

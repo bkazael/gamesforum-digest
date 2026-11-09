@@ -212,7 +212,8 @@ DRAFT: {json.dumps(draft, ensure_ascii=False)}"""
             data["editorial_review"] = report
             return data
         if attempt == 0:
-            revision = call(f"""Revise this complete podcast draft using the editor's audit.
+            try:
+              revision = call(f"""Revise this complete podcast draft using the editor's audit.
 Output the complete title, summary and script, including ONE welcome and outro.
 Keep the two speakers {speakers}, the language {lang}, and roughly the existing
 word count. Fix all blocking issues; remove unsupported claims, do not invent
@@ -227,6 +228,13 @@ SOURCES: {corpus}
 DRAFT: {json.dumps(draft, ensure_ascii=False)}
 AUDIT: {json.dumps(report, ensure_ascii=False)}""", schema, tries=2, timeout=210,
                 model=revision_model)
+            except Exception as exc:                        # noqa: BLE001
+                # No revision is not a reason to lose the episode: the gate
+                # below still blocks on FACT/ATTRIBUTION problems, and
+                # everything else publishes with a warning.
+                print(f"::warning::editorial revision unavailable ({type(exc).__name__}: {exc}); "
+                      "judging the unrevised draft", flush=True)
+                break
             for key in ("script", "episode_title", "digest_summary"):
                 data[key] = revision.get(key)
             if isinstance(data.get("script"), list):

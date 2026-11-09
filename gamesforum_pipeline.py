@@ -317,7 +317,8 @@ class GeminiQuotaExhausted(RuntimeError):
     """A provider daily quota is exhausted; retrying the same run won't help."""
 
 
-def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None = None) -> dict:
+def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None = None,
+                  model: str | None = None) -> dict:
     """gemini_json on the creative model, moving down CREATIVE_FALLBACKS when it stays down.
 
     2026-10-27: gemini-3.8-flash answered 503 "high demand" for seven
@@ -325,7 +326,8 @@ def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None
     model. A model that answers is kept for the rest of the run (via
     _MODEL_SWAPS), so the intro and revisions don't queue on it again.
     """
-    chain = list(dict.fromkeys([live_model(GEMINI_CREATIVE_MODEL), *CREATIVE_FALLBACKS]))
+    requested = model or GEMINI_CREATIVE_MODEL
+    chain = list(dict.fromkeys([live_model(requested), *CREATIVE_FALLBACKS]))
     for i, model in enumerate(chain):
         last = i == len(chain) - 1
         try:
@@ -341,8 +343,8 @@ def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None
             if last or permanent:
                 raise
         else:
-            if model != live_model(GEMINI_CREATIVE_MODEL):
-                _MODEL_SWAPS[GEMINI_CREATIVE_MODEL] = model
+            if model != chain[0]:
+                _MODEL_SWAPS[requested] = model
             return result
         print(f"::warning::{model} stayed unavailable; writing with {chain[i + 1]} instead "
               "(GEMINI_CREATIVE_FALLBACKS).", flush=True)
@@ -1540,6 +1542,15 @@ def show_title(episode_title: str) -> str:
     return f"{title} | {SHOW_NAME}" if title else SHOW_NAME
 
 
+def _editorial_call(prompt: str, schema: dict, tries: int = 2, timeout: int | None = None,
+                    model: str | None = None) -> dict:
+    # The review and its revision used to call gemini_json directly: one
+    # 503 spell there ended a run that had already written, voiced-ready
+    # script and intro (2026-11-09, run 67). They now fall back like the
+    # script does.
+    return creative_json(prompt, schema, tries=tries, timeout=timeout, model=model)
+
+
 def review_episode(data: dict, articles: list[dict], today: str) -> dict:
     config = runtime.load_profile().get("editorial", {})
     if not config.get("enabled", True):
@@ -1551,7 +1562,7 @@ def review_episode(data: dict, articles: list[dict], today: str) -> dict:
         if replaced:
             log(f"  translated {replaced} English acronym(s) in Hebrew speech (D2C/IAP/MENA)")
     return editorial.review_and_revise(data, articles, ROOT / "reports" / f"{today}-editorial.json",
-        gemini_json, PODCAST_SCHEMA, GEMINI_SCORING_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
+        _editorial_call, PODCAST_SCHEMA, GEMINI_SCORING_MODEL, (SPEAKER_A, SPEAKER_B), LANG,
         minimum=config.get("minimum_rating", 4),
         save_draft=lambda draft: checkpoint.save_content(today, articles, draft),
         revision_model=GEMINI_CREATIVE_MODEL,
