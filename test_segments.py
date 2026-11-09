@@ -220,6 +220,15 @@ check("a fragment that survives the rewrite is closed with a full stop", r["scri
 # Hebrew acronyms are translated in the segment
 r = seg(stub(script=turns(20, "41 מיליון מ-D2C."), key_points=["41"]))
 check("D2C is replaced by its Hebrew form in the segment", "D2C" not in " ".join(t["text"] for t in r["script"]))
+# one English turn inside a Hebrew story is a problem (a lite model did this)
+english = turns(19, "41 מיליון.") + [{"speaker": B, "text": "The host speaks English entirely unrelated to the article."}]
+log = []
+r = seg(stub(scripts_seq=[english, turns(20, "41 מיליון.")], log=log))
+check("a turn written in English inside a Hebrew story triggers the one rewrite",
+      len([k for k, *_ in log if k == "story"]) == 2 and "is not in Hebrew" in [p for k, p, _ in log if k == "story"][1])
+r = seg(stub(script=turns(19, "41 מיליון.") + [{"speaker": B, "text": "AppLovin ו-Unity הציגו נתוני ROAS ו-CPI חדשים."}]))
+check("a Hebrew sentence full of English names and terms is not mistaken for English",
+      "is not in Hebrew" not in " ".join(r["problems"]))
 # a BRIEF has a lower floor
 r_brief = seg(stub(script=turns(5, "41.")), role="BRIEF")
 check("a short item may be short: 5 turns is fine for a BRIEF", r_brief["status"] == "ok" and len(r_brief["script"]) == 5)

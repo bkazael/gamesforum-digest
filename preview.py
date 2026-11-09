@@ -56,6 +56,21 @@ def main():
             data = p.add_intro(data)
             checkpoint.save_content(today, articles, data)
         data = p.finalize_episode(data, today)
+        # What a reviewer needs from the log without downloading anything.
+        from script_quality import count_words
+        print("::group::episode summary", flush=True)
+        for k, s in sorted((data.get("segments") or {}).items(), key=lambda kv: int(kv[0])):
+            print(f"story {int(k) + 1}: {s.get('status')} {len(s.get('script', []))} turns, "
+                  f"{count_words(s.get('script', []))} words, {len(s.get('key_points', []))} key points"
+                  + (f", cut: {s.get('reason')}" if s.get("status") == "dropped" else "")
+                  + f" | {s.get('headline')}", flush=True)
+        total = count_words(data["script"])
+        print(f"total: {len(data['script'])} turns, {total} words, about {total / 140:.0f} min", flush=True)
+        print("::endgroup::", flush=True)
+        print("::group::script", flush=True)
+        for t in data["script"]:
+            print(f"{t['speaker']}: {t['text']}", flush=True)
+        print("::endgroup::", flush=True)
         runtime.atomic_write(output / "digests" / f"{today}-script.md",
             "\n".join(f"{t['speaker']}: {t['text']}" for t in data["script"]))
         return 0
