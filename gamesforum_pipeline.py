@@ -325,6 +325,11 @@ class GeminiQuotaExhausted(RuntimeError):
 # again. The owner prefers a later episode to a short one (2026-11-09).
 _FELL_BACK = False
 PATIENT_TRIES = 6
+# The script is the longest generation in the run. gemini-3.8-flash needed
+# ~230s for it on 2026-10-27; on 2026-11-09 all six attempts hit the 300s
+# HTTP_TIMEOUT and the run spent half an hour timing out on a model that was
+# likely still working. A generation that is slow but alive gets room to finish.
+SCRIPT_TIMEOUT_SEC = int(os.environ.get("SCRIPT_TIMEOUT_SEC", "600"))
 
 
 def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None = None,
@@ -1114,7 +1119,8 @@ Do not add specific facts from your own knowledge or from the style example.
     best_data = None
     best_rank = None
     for attempt in (1, 2):
-        data = creative_json(attempt_prompt, PODCAST_SCHEMA, tries=4, patient=True)
+        data = creative_json(attempt_prompt, PODCAST_SCHEMA, tries=4, patient=True,
+                             timeout=SCRIPT_TIMEOUT_SEC)
         data["script"], repairs = script_quality.repair_script(data.get("script", []))
         for note in repairs:
             log(f"  script repair: {note}")
@@ -1568,7 +1574,10 @@ def _editorial_call(prompt: str, schema: dict, tries: int = 2, timeout: int | No
     # 503 spell there ended a run that had already written, voiced-ready
     # script and intro (2026-11-09, run 67). They now fall back like the
     # script does.
-    return creative_json(prompt, schema, tries=tries, timeout=timeout, model=model, patient=True)
+    # A full-draft revision is as long as the script itself: 210s was too
+    # short for the creative model on a slow day.
+    return creative_json(prompt, schema, tries=tries, timeout=max(timeout or 0, 420),
+                         model=model, patient=True)
 
 
 def review_episode(data: dict, articles: list[dict], today: str) -> dict:

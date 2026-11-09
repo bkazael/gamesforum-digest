@@ -192,12 +192,16 @@ short = dict(script_resp, script=[{"speaker": A, "text": words(200)}, {"speaker"
 long_ = script_resp
 queue = [short, long_]
 prompts.clear()
+seen_timeouts = []
 def fake_floor(prompt, schema=None, **kw):
+    seen_timeouts.append(kw.get("timeout"))
     prompts.append(prompt)
     return copy.deepcopy(queue[min(len(prompts), len(queue)) - 1])
 P.gemini_json = fake_floor
 d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
 check("a script under the word floor gets exactly one retry", len(prompts) == 2, f"{len(prompts)} calls")
+check("the script call gets a long per-attempt timeout (a slow generation is not a hung one)",
+      seen_timeouts[0] == P.SCRIPT_TIMEOUT_SEC and P.SCRIPT_TIMEOUT_SEC >= 600, str(seen_timeouts))
 check("the retry prompt says it was too short", "only" in prompts[1] and "words" in prompts[1])
 check("a short but well-formed draft is expanded, not regenerated blind",
       "PREVIOUS DRAFT:" in prompts[1] and words(200)[:40] in prompts[1])
