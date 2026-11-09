@@ -73,7 +73,9 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 # _check_deadline() could never fire first -- the step was always killed
 # mid-flight instead of exiting cleanly, losing everything it had already
 # built. The budget now reads: one attempt (TTS_TIMEOUT) < the whole run
-# (RUN_DEADLINE_SEC = 25 min) < the step (30 min) < the job (35 min).
+# (RUN_DEADLINE_SEC = 45 min) < the step (50 min) < the job (55 min). Raised
+# from 25/30/35 on 2026-11-09, when the show's owner chose to wait longer for
+# the strong model rather than publish a short episode from a weaker one.
 HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 
 # TTS gets its own, shorter per-attempt ceiling. Real successful chunks in
@@ -82,7 +84,7 @@ HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 # *successful* call comfortably inside the window while capping a hung one.
 TTS_TIMEOUT = int(os.environ.get("TTS_TIMEOUT_SEC", "270"))
 
-RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "1500"))
+RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2700"))
 
 # One source of truth for the TTS chunk split, so test_episode.py's chunking
 # test can import this instead of hand-copying the number -- a copy is
@@ -317,8 +319,16 @@ class GeminiQuotaExhausted(RuntimeError):
     """A provider daily quota is exhausted; retrying the same run won't help."""
 
 
+# True once any creative call was answered by a fallback model because the
+# primary stayed unavailable. A script written that way and still short is
+# not published: the next scheduled run (three each Monday) tries the primary
+# again. The owner prefers a later episode to a short one (2026-11-09).
+_FELL_BACK = False
+PATIENT_TRIES = 6
+
+
 def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None = None,
-                  model: str | None = None) -> dict:
+                  model: str | None = None, patient: bool = False) -> dict:
     """gemini_json on the creative model, moving down CREATIVE_FALLBACKS when it stays down.
 
     2026-10-27: gemini-3.8-flash answered 503 "high demand" for seven
@@ -326,13 +336,16 @@ def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None
     model. A model that answers is kept for the rest of the run (via
     _MODEL_SWAPS), so the intro and revisions don't queue on it again.
     """
+    global _FELL_BACK
     requested = model or GEMINI_CREATIVE_MODEL
     chain = list(dict.fromkeys([live_model(requested), *CREATIVE_FALLBACKS]))
     for i, model in enumerate(chain):
         last = i == len(chain) - 1
+        # patient: a stage that must succeed waits out the primary's 503
+        # spells (45/90/120s apart) before settling for a weaker model.
+        n = max(tries, PATIENT_TRIES) if (patient and i == 0) else (tries if last else min(tries, 3))
         try:
-            result = gemini_json(prompt, schema, tries=tries if last else min(tries, 3),
-                                 timeout=timeout, model=model)
+            result = gemini_json(prompt, schema, tries=n, timeout=timeout, model=model)
         except GeminiQuotaExhausted:
             if last:
                 raise
@@ -345,6 +358,7 @@ def creative_json(prompt: str, schema: dict, tries: int = 4, timeout: int | None
         else:
             if model != chain[0]:
                 _MODEL_SWAPS[requested] = model
+                _FELL_BACK = True
             return result
         print(f"::warning::{model} stayed unavailable; writing with {chain[i + 1]} instead "
               "(GEMINI_CREATIVE_FALLBACKS).", flush=True)
@@ -1100,7 +1114,7 @@ Do not add specific facts from your own knowledge or from the style example.
     best_data = None
     best_rank = None
     for attempt in (1, 2):
-        data = creative_json(attempt_prompt, PODCAST_SCHEMA, tries=4)
+        data = creative_json(attempt_prompt, PODCAST_SCHEMA, tries=4, patient=True)
         data["script"], repairs = script_quality.repair_script(data.get("script", []))
         for note in repairs:
             log(f"  script repair: {note}")
@@ -1172,6 +1186,12 @@ Do not add specific facts from your own knowledge or from the style example.
             f"Refusing to continue with a {total_words}-word episode script; "
             f"minimum is {SCRIPT_HARD_FLOOR_WORDS}. The next scheduled retry can try again."
         )
+    if not target_words and total_words < SCRIPT_FLOOR_WORDS and _FELL_BACK:
+        raise RuntimeError(
+            f"The {total_words}-word script was written by a fallback model because "
+            f"{GEMINI_CREATIVE_MODEL} stayed unavailable, and it is under the "
+            f"{SCRIPT_FLOOR_WORDS:,}-word floor. Not publishing a short episode; the next "
+            "scheduled run will try the primary model again.")
     if not target_words and total_words < SCRIPT_FLOOR_WORDS:
         print(f"::warning::short episode script: {total_words} words "
               f"(safety floor {SCRIPT_FLOOR_WORDS:,}); publishing it anyway", flush=True)
@@ -1548,7 +1568,7 @@ def _editorial_call(prompt: str, schema: dict, tries: int = 2, timeout: int | No
     # 503 spell there ended a run that had already written, voiced-ready
     # script and intro (2026-11-09, run 67). They now fall back like the
     # script does.
-    return creative_json(prompt, schema, tries=tries, timeout=timeout, model=model)
+    return creative_json(prompt, schema, tries=tries, timeout=timeout, model=model, patient=True)
 
 
 def review_episode(data: dict, articles: list[dict], today: str) -> dict:

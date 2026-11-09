@@ -241,6 +241,24 @@ except RuntimeError as e:
     check("a malformed retry falls back to the longer complete first draft",
           "400-word episode script" in str(e), str(e))
 
+# The owner prefers a later episode to a short one (2026-11-09): a short script
+# written by a fallback model is refused, so a later scheduled run retries the
+# primary. The same short script from the primary itself still publishes.
+prompts.clear()
+queue = [medium]
+P.gemini_json = fake_floor
+P._FELL_BACK = True
+try:
+    P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+    check("a short script from a fallback model is not published", False, "no exception")
+except RuntimeError as e:
+    check("a short script from a fallback model is not published", "fallback model" in str(e), str(e))
+P._FELL_BACK = False
+prompts.clear()
+d = P.generate_podcast_content(ARTICLES, "2026-10-05", prep=prep)
+check("the same short script from the primary model still publishes with a warning",
+      P.script_quality.count_words(d["script"]) == 1100)
+
 prompts.clear()
 queue = [short]
 P.gemini_json = fake_floor

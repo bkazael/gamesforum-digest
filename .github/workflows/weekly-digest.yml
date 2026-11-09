@@ -36,7 +36,7 @@ jobs:
     # the final (smallest) TTS chunk when it was cancelled -- both
     # "Commit episode" and "Check source health" got skipped entirely, so
     # neither the episode nor even an alert about it went out that week.
-    timeout-minutes: 35
+    timeout-minutes: 55   # was 35; see RUN_DEADLINE_SEC in gamesforum_pipeline.py
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +76,7 @@ jobs:
       # exactly what left a real run silent with no episode and no alert.
       - name: Run pipeline
         id: run_pipeline
-        timeout-minutes: 30
+        timeout-minutes: 50   # was 30
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}

@@ -200,18 +200,34 @@ class ProductionTests(unittest.TestCase):
                 raise busy
             return {"ok": model}
         with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
+                patch.object(p, "_FELL_BACK", False), \
                 patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
                 patch.object(p, "CREATIVE_FALLBACKS", ["backup", "last"]):
             self.assertEqual(p.creative_json("x", {}), {"ok": "backup"})
             self.assertEqual(p.creative_json("y", {}), {"ok": "backup"})
+            self.assertTrue(p._FELL_BACK)
         self.assertEqual(calls, ["primary", "backup", "backup"])
+
+    def test_patient_stage_waits_on_the_primary_before_any_fallback(self):
+        tries_seen = []
+        busy = urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
+        def fake(prompt, schema, tries, timeout, model):
+            tries_seen.append((model, tries))
+            if model == "primary":
+                raise busy
+            return {"ok": 1}
+        with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
+                patch.object(p, "_FELL_BACK", False), patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
+                patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
+            p.creative_json("x", {}, tries=4, patient=True)
+        self.assertEqual(tries_seen[0], ("primary", p.PATIENT_TRIES))
 
     def test_creative_fallback_does_not_hide_bad_requests_or_budget(self):
         bad = urllib.error.HTTPError("https://api.test", 400, "bad", {}, io.BytesIO())
         for error, expected in ((bad, urllib.error.HTTPError),
                                 (RuntimeError("Insufficient run budget"), RuntimeError)):
             with patch.object(p, "gemini_json", side_effect=error) as call, \
-                    patch.dict(p._MODEL_SWAPS, clear=True), \
+                    patch.dict(p._MODEL_SWAPS, clear=True), patch.object(p, "_FELL_BACK", False), \
                     patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
                     patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
                 with self.assertRaises(expected):
