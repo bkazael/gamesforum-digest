@@ -68,6 +68,12 @@ parallel, each from its own article only:
 4. A small call writes the title and outro (a plain fallback if it fails),
    and the intro is written last from the finished stories.
 
+On the free tier each model allows about 20 requests a day: a normal episode
+uses 8-15 of the creative model's, so every extra preview or manual run that
+day spends the rest. When a model's daily quota is gone its calls move to the
+next in `GEMINI_QUOTA_FALLBACKS` (a `::warning::` says so). A paid tier removes
+the limit.
+
 Each finished story is checkpointed immediately. Model calls retry patiently
 (30s, 1, 2, 4, then 5 minutes between attempts) because an overloaded model
 recovers in minutes; a story that still cannot be written fails the run and
