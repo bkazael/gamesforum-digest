@@ -43,8 +43,9 @@ publication manifest, not just an MP3 on disk.
 | --- | --- |
 | `sources.py`, `article_parser.py` | RSS/Atom, HTML and read-only email; article text and publication dates |
 | `discovery.py` | Bounded retrieval, freshness, relevance scoring, dedupe, source mix and airtime |
-| `gamesforum_pipeline.py` | Evidence preparation, dialogue, intro, speech, audio mixing and RSS |
-| `editorial.py`, `script_quality.py` | Final evidence/coverage/naturalness gate and deterministic text checks |
+| `segments.py` | The script, one story at a time: write, check coverage and numbers, fact-review, then title and outro |
+| `gamesforum_pipeline.py` | Intro, speech, audio mixing and RSS; wires the stages together |
+| `script_quality.py` | Deterministic text checks and repairs |
 | `audio_tools.py` | Bounded text chunks and strict audio-format decoding |
 | `checkpoint.py`, `runtime.py` | Verified speech reuse, crash-safe writes, paths and validated configuration |
 | `memory.py`, `source_health.py` | Episode continuity and source diagnostics |
@@ -56,7 +57,7 @@ Current settings select at most six stories: 30% planned airtime for the lead,
 
 Inspect `ledger/`, `digests/`, `reports/<date>-editorial.json` and
 `reports/<date>-run.json` to understand selection, the exact spoken text,
-review decisions, models, duration and usage. A reviewer model can miss errors;
+the per-story review (what was cut and why), models, duration and usage. A reviewer model can miss errors;
 listen to the preview before approving a major prompt, voice or model change.
 
 [OPERATIONS.md](OPERATIONS.md) documents all environment variables, tuning,

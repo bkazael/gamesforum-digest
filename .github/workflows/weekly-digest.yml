@@ -84,18 +84,15 @@ jobs:
           # Override with the repo variable TTS_MODEL; a key from a new project
           # may not reach the default (see swap_retired_model in the pipeline).
           TTS_MODEL: ${{ vars.TTS_MODEL || 'gemini-2.5-flash-preview-tts' }}
-          # Optional: the model used for script, intro, and editorial review.
+          # Optional: the model that writes the stories and the intro.
           # Set the repo variable
           # GEMINI_CREATIVE_MODEL (Settings -> Secrets and variables -> Actions
           # -> Variables) to try a stronger one; unset or empty means the
-          # default, i.e. nothing changes. See compare_models.py.
+          # default, i.e. nothing changes.
           GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
           # Relevance scoring is high-volume classification; Flash-Lite is
           # the default in code. Override if model/project quota requires it.
           GEMINI_SCORING_MODEL: ${{ vars.GEMINI_SCORING_MODEL }}
-          # Comma-separated models to write with when the creative one stays
-          # unavailable; empty means the default chain in the pipeline.
-          GEMINI_CREATIVE_FALLBACKS: ${{ vars.GEMINI_CREATIVE_FALLBACKS }}
           # Used only by enabled kind=email sources. Gamigion is configured
           # but disabled in profile.toml until these secrets are added and
           # the source is explicitly enabled there.

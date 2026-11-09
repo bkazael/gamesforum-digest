@@ -98,7 +98,9 @@ def load_content(date: str) -> tuple[list[dict], dict] | None:
         # A checkpoint missing the one field the whole rest of the run is
         # built on is worse than no checkpoint -- treat it as absent rather
         # than half-resuming into a confusing failure further downstream.
-        if not data.get("script"):
+        # Either the assembled script, or the finished stories of an episode that
+        # was interrupted mid-way (segments.py saves each one as it completes).
+        if not data.get("script") and not data.get("segments"):
             return None
         return articles, data
     except Exception:

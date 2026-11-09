@@ -15,7 +15,6 @@ import article_parser
 import audio_tools
 import checkpoint
 import discovery
-import editorial
 import gamesforum_pipeline as p
 import memory
 import runtime
@@ -191,53 +190,11 @@ class ProductionTests(unittest.TestCase):
                 p.gemini_json("x", model="gemini-x")
             self.assertEqual(call.call_count, 1)
 
-    def test_overloaded_creative_model_falls_back_and_sticks(self):
-        busy = urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
-        calls = []
-        def fake(prompt, schema, tries, timeout, model):
-            calls.append(model)
-            if model == "primary":
-                raise busy
-            return {"ok": model}
-        with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
-                patch.object(p, "_FELL_BACK", False), \
-                patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
-                patch.object(p, "CREATIVE_FALLBACKS", ["backup", "last"]):
-            self.assertEqual(p.creative_json("x", {}), {"ok": "backup"})
-            self.assertEqual(p.creative_json("y", {}), {"ok": "backup"})
-            self.assertTrue(p._FELL_BACK)
-        self.assertEqual(calls, ["primary", "backup", "backup"])
-
-    def test_patient_stage_waits_on_the_primary_before_any_fallback(self):
-        tries_seen = []
-        busy = urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
-        def fake(prompt, schema, tries, timeout, model):
-            tries_seen.append((model, tries))
-            if model == "primary":
-                raise busy
-            return {"ok": 1}
-        with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
-                patch.object(p, "_FELL_BACK", False), patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
-                patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
-            p.creative_json("x", {}, tries=4, patient=True)
-        self.assertEqual(tries_seen[0], ("primary", p.PATIENT_TRIES))
-
-    def test_creative_fallback_does_not_hide_bad_requests_or_budget(self):
-        bad = urllib.error.HTTPError("https://api.test", 400, "bad", {}, io.BytesIO())
-        for error, expected in ((bad, urllib.error.HTTPError),
-                                (RuntimeError("Insufficient run budget"), RuntimeError)):
-            with patch.object(p, "gemini_json", side_effect=error) as call, \
-                    patch.dict(p._MODEL_SWAPS, clear=True), patch.object(p, "_FELL_BACK", False), \
-                    patch.object(p, "GEMINI_CREATIVE_MODEL", "primary"), \
-                    patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
-                with self.assertRaises(expected):
-                    p.creative_json("x", {})
-                self.assertEqual(call.call_count, 1)
-
-    def test_overloaded_model_waits_longer_than_other_errors(self):
-        self.assertGreaterEqual(p.retry_delay(503, 0), 45)
-        self.assertLessEqual(p.retry_delay(503, 9), 120)
-        self.assertEqual(p.retry_delay(500, 0), 10)
+    def test_retries_wait_minutes_not_seconds_and_are_capped(self):
+        delays = [p.retry_delay(503, n) for n in range(8)]
+        self.assertEqual(delays[:4], [30, 60, 120, 240])
+        self.assertEqual(max(delays), 300)
+        self.assertEqual(p.retry_delay(None, 0), p.retry_delay(503, 0))
 
     def test_speech_tempo_is_applied_and_bounded(self):
         captured = {}
@@ -263,123 +220,6 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(p._remaining_timeout(300), 5)
             with self.assertRaises(RuntimeError):
                 p._retry_sleep(10)
-
-    def draft(self):
-        return {"episode_title": "Weekly news", "digest_summary": [
-            {"title": "A", "key_takeaway": "A result", "metrics_mentioned": []}],
-            "script": [{"speaker": "Dana", "text": "The studio reported growth."},
-                       {"speaker": "Yoni", "text": "Their report does not explain the cause."}]}
-
-    def review(self, **updates):
-        result = {"naturalness": 4, "focus": 4, "covered_article_ids": [1],
-                  "source_assessments": [{"article_id": 1, "type": "REPORTING",
-                    "basis": "Bylined report", "independent_context": True,
-                    "listener_value": True, "treatment": "DEEP"}],
-                  "summary": "Ready", "issues": []}
-        result.update(updates)
-        return result
-
-    def run_review(self, data, call, path, strict=False):
-        return editorial.review_and_revise(data, [{"title": "A", "text": "The studio reported growth."}],
-            path, call, p.PODCAST_SCHEMA, "test-model", ("Dana", "Yoni"), "en", strict=strict)
-
-    def test_review_revises_unsupported_claim_then_rechecks(self):
-        issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Unsupported number", "fix": "Remove it"}
-        call = Mock(side_effect=[self.review(issues=[issue]), self.draft(), self.review()])
-        with tempfile.TemporaryDirectory() as tmp:
-            data = self.run_review(self.draft(), call, pathlib.Path(tmp) / "review.json")
-            self.assertTrue(data["editorial_review"]["passed"])
-            self.assertEqual(call.call_count, 3)
-            cached = Mock(side_effect=AssertionError("Paid twice"))
-            self.run_review(data, cached, pathlib.Path(tmp) / "review.json")
-            cached.assert_not_called()
-
-    def test_persistent_failed_review_blocks_and_keeps_report(self):
-        call = Mock(side_effect=[self.review(naturalness=2), self.draft(), self.review(naturalness=2)])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = pathlib.Path(tmp) / "report.json"
-            with self.assertRaisesRegex(RuntimeError, "quality gate failed"):
-                self.run_review(self.draft(), call, path, strict=True)
-            self.assertFalse(json.loads(path.read_text())["passed"])
-            self.assertEqual(call.call_count, 3)
-
-    def test_review_cannot_pass_with_missing_story_or_unknown_speaker(self):
-        draft = self.draft()
-        draft["script"][0]["speaker"] = "Stranger"
-        self.assertTrue(editorial.structural_problems(draft, ("Dana", "Yoni"), "en"))
-        call = Mock(side_effect=[self.review(covered_article_ids=[]), self.draft(),
-                                 self.review(covered_article_ids=[])])
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "absent"):
-            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json", strict=True)
-
-    def test_promotional_event_without_listener_value_fails_editorial_gate(self):
-        promotional = {"article_id": 1, "type": "EVENT_PROMOTION", "basis": "Speaker promo",
-                       "independent_context": False, "listener_value": False, "treatment": "EXCLUDE"}
-        reporting = {"article_id": 2, "type": "REPORTING", "basis": "Independent report",
-                     "independent_context": True, "listener_value": True, "treatment": "DEEP"}
-        call = Mock(return_value=self.review(covered_article_ids=[2],
-                                             source_assessments=[promotional, reporting]))
-        with tempfile.TemporaryDirectory() as tmp:
-            data = editorial.review_and_revise(self.draft(), [
-                {"title": "Event", "text": "Promo details."},
-                {"title": "Reporting", "text": "The studio reported growth."}],
-                pathlib.Path(tmp) / "r.json", call, p.PODCAST_SCHEMA, "test-model",
-                ("Dana", "Yoni"), "en")
-            self.assertTrue(data["editorial_review"]["passed"])
-
-    def test_announcement_without_independent_context_cannot_be_deep(self):
-        announcement = {"article_id": 1, "type": "COMPANY_ANNOUNCEMENT", "basis": "Partnership",
-                        "independent_context": False, "listener_value": True, "treatment": "DEEP"}
-        call = Mock(side_effect=[self.review(source_assessments=[announcement]), self.draft(),
-                                 self.review(source_assessments=[announcement])])
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "must be brief"):
-            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json", strict=True)
-
-    def test_non_factual_problems_publish_with_warnings_by_default(self):
-        # 2026-10-16 preview: a correct episode was rejected over wording and
-        # coverage; without strict, that publishes and says why, loudly.
-        call = Mock(side_effect=[self.review(naturalness=2), self.draft(), self.review(naturalness=2)])
-        with tempfile.TemporaryDirectory() as tmp:
-            path = pathlib.Path(tmp) / "report.json"
-            data = self.run_review(self.draft(), call, path)
-            self.assertTrue(data["editorial_review"]["published_with_warnings"])
-            self.assertFalse(data["editorial_review"]["passed"])
-            self.assertFalse(json.loads(path.read_text())["passed"])
-
-    def test_revision_outage_publishes_unrevised_draft_with_warning(self):
-        # 2026-11-09 run 67: both models 503'd on the revision call, which
-        # ended a run with a finished script. A non-factual problem now just
-        # publishes the unrevised draft with a warning.
-        call = Mock(side_effect=[self.review(naturalness=2), urllib.error.URLError("503")])
-        with tempfile.TemporaryDirectory() as tmp:
-            data = self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
-        self.assertTrue(data["editorial_review"]["published_with_warnings"])
-        self.assertEqual(call.call_count, 2)
-
-    def test_revision_outage_still_blocks_a_factual_error(self):
-        issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Invented number", "fix": "Remove it"}
-        call = Mock(side_effect=[self.review(issues=[issue]), urllib.error.URLError("503")])
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "Invented number"):
-            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
-
-    def test_editorial_calls_fall_back_like_the_script_does(self):
-        busy = urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
-        calls = []
-        def fake(prompt, schema, tries, timeout, model):
-            calls.append(model)
-            if model != "backup":
-                raise busy
-            return {"ok": 1}
-        with patch.object(p, "gemini_json", side_effect=fake), patch.dict(p._MODEL_SWAPS, clear=True), \
-                patch.object(p, "CREATIVE_FALLBACKS", ["backup"]):
-            self.assertEqual(p._editorial_call("x", {}, tries=2, timeout=10, model="reviewer"), {"ok": 1})
-        self.assertEqual(calls, ["reviewer", "backup"])
-
-    def test_persistent_factual_error_still_blocks_by_default(self):
-        issue = {"turn": 1, "kind": "FACT", "blocking": True, "problem": "Invented number", "fix": "Remove it"}
-        call = Mock(side_effect=[self.review(issues=[issue]), self.draft(), self.review(issues=[issue])])
-        with tempfile.TemporaryDirectory() as tmp, self.assertRaisesRegex(RuntimeError, "Invented number"):
-            self.run_review(self.draft(), call, pathlib.Path(tmp) / "r.json")
 
     def test_hebrew_acronyms_are_translated_before_review(self):
         turns = [{"speaker": "Dana", "text": "ה-D2C עולה ב-MENA, ו-IAP יורד."}]
@@ -448,8 +288,8 @@ class ProductionTests(unittest.TestCase):
         import struct
         pcm = b"".join(struct.pack("<h", int(2500 * math.sin(2 * math.pi * 200 * i / 24000)))
                        for i in range(48000))
-        turns = self.draft()["script"]
-        turns[0]["text"] = "Tamatem reported growth across MENA."
+        turns = [{"speaker": "Dana", "text": "Tamatem reported growth across MENA."},
+                 {"speaker": "Yoni", "text": "Their report does not explain the cause."}]
         tts = Mock(return_value=pcm)
         with tempfile.TemporaryDirectory() as tmp, patch.object(p, "gemini_tts_chunk", tts):
             root = pathlib.Path(tmp)

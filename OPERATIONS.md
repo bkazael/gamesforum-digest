@@ -45,18 +45,35 @@ alternative TOML profile. Set these before starting Python.
 | --- | --- |
 | `ledger/<date>.md` | Every candidate's selection or rejection reason, including stale/undated articles |
 | `digests/<date>-script.md` | The exact text sent to speech synthesis |
-| `reports/<date>-editorial.json` | Evidence, attribution, coverage and naturalness review; both attempts if revised |
+| `reports/<date>-editorial.json` | Per story: kept or cut (and why), key points, caution, the fact reviewer's notes |
 | `reports/<date>-run.json` | Completion marker, models, duration, speech rate, text-token usage, source dates and scores |
 | `source_alerts.json` | Sources that failed or returned no items in this run |
 | `.checkpoint/<date>-content.json` | Selected source text and the paid draft for recovery; never committed |
 | `.checkpoint/<date>-chunk-*` | PCM chunks and identity/integrity metadata |
 
-Editorial review performs one review, at most one whole-draft revision, and a
-second review. An unresolved material factual error, missing selected story or
-rating below `[editorial].minimum_rating` stops the run **before TTS**. This is
-a model-assisted check, not independent verification of a publisher's claims.
-Inspect the saved report when it fails; do not solve factual failures by simply
-lowering the threshold. The reviewer uses the configured creative model.
+## How an episode is written
+
+The script is written one story at a time (`segments.py`), three stories in
+parallel, each from its own article only:
+
+1. The model lists the story's key points (figures with their comparison base,
+   parties, status), then writes the conversation covering every one.
+2. Free checks: every number among the key points must be said; a story far
+   below the minimum for its role, or with a cut-off turn, is rewritten once.
+   There is no word target: a rich week is long, a thin one short.
+3. A small fact review against that article alone (the scoring model). A
+   blocking FACT/ATTRIBUTION problem is rewritten once; if it persists the
+   story is **cut** and the rest of the episode publishes. Fewer than three
+   surviving stories stops the run.
+4. A small call writes the title and outro (a plain fallback if it fails),
+   and the intro is written last from the finished stories.
+
+Each finished story is checkpointed immediately. Model calls retry patiently
+(30s, 1, 2, 4, then 5 minutes between attempts) because an overloaded model
+recovers in minutes; a story that still cannot be written fails the run and
+the next scheduled run resumes with the missing stories only. This is a
+model-assisted check, not independent verification of a publisher's claims;
+inspect `reports/<date>-editorial.json` when a story was cut.
 
 The run's token counters cover text responses received in that process, not
 previous attempts restored from checkpoints and not TTS billing. They are
@@ -88,27 +105,23 @@ checks; they do not prove pronunciation or perfect transcript adherence.
   not to the readable script, source links or evidence. Add a term with the
   spelling used by the model and the Hebrew form that sounds right; for
   example, `Tamatem = "טאמאטם"`. Check a short audio preview before treating a
-  new pronunciation as correct. The editorial gate also catches MENA, D2C and
-  IAP left untranslated in Hebrew dialogue.
+  new pronunciation as correct. MENA, D2C and IAP left untranslated in Hebrew
+  dialogue are replaced deterministically.
 
-Every source now receives an editorial classification (reporting, company
-announcement, sponsored, event promotion, opinion or unclear), an assessment
-of independent context and listener value, and a DEEP / BRIEF / EXCLUDE
-treatment. A no-value sponsored/event item must be excluded; a company
-announcement without independent context cannot be a deep dive. Its byline and
-page content label are passed through when the publisher exposes them. The
-classification is a review aid, not a claim that a publisher's disclosure is
-always complete; unclear status stays unclear. Review the report before
-publishing when a source's commercial relationship matters.
+Every story is written with a stance (neutral reporting, company claims, vendor
+marketing); company claims and vendor marketing are attributed, never endorsed.
+A story that is pure promotion with no listener value is cut. The stance is a
+writing aid, not a claim that a publisher's disclosure is always complete;
+review the report when a source's commercial relationship matters.
 
 The intro targets 60–100 words and previews two or three stories. The script
 prompt favors 15–55-word turns, with no obligatory interview question in every
-item. Editorial review checks the complete script including intro and summary.
+item.
 
 Model environment variables are `GEMINI_TEXT_MODEL`, `GEMINI_SCORING_MODEL`,
 `GEMINI_CREATIVE_MODEL`, and `TTS_MODEL`. Relevance scoring defaults to
-`gemini-2.5-flash-lite`; writing and editorial review remain on the existing
-creative/text model. Changing a model is not automatically an improvement:
+`gemini-2.5-flash-lite` and also does the per-story fact review and the title
+and outro; the stories and the intro use the creative model. Changing a model is not automatically an improvement:
 run a script preview and full audio preview before publishing.
 
 ## Add a source

@@ -255,11 +255,3 @@ lead_share = 0.30
 second_share = 0.20
 remainder_share = 0.50
 
-[editorial]
-# One review and at most one revision, before spending on speech synthesis.
-enabled = true
-minimum_rating = 4
-# false: only FACT/ATTRIBUTION errors that survive the revision stop an
-# episode; other problems publish with a warning and the saved report.
-# true: any remaining problem stops publication.
-strict = false

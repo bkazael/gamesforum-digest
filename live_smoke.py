@@ -9,18 +9,17 @@ change in production -- not routinely, and never on a schedule. It is
 triggered only by the "Live smoke test (manual, small cost)" workflow
 (.github/workflows/manual_test.yaml), which is workflow_dispatch-only.
 
-Five real API calls, kept deliberately cheap:
+A handful of real API calls, kept deliberately cheap:
   1. discovery.score_all() against ONE fixture candidate, with a fixture
      "already covered" topic -- this is the call that uses SCORE_SCHEMA, and
      it also exercises the scoring prompt's ALREADY COVERED section.
-  2. prepare_episode() on two fixture articles -- round-trips PREP_SCHEMA.
-  3. generate_podcast_content(..., prep=..., target_words=250) -- the
-     stories-and-outro script, built from the prep, with no intro.
-  4. write_intro() -- round-trips INTRO_SCHEMA. A *fallback* here is treated
+  2. produce_script() on two fixture articles -- round-trips the segment,
+     review and frame schemas (a story, its fact review, the title and outro).
+  3. write_intro() -- round-trips INTRO_SCHEMA. A *fallback* here is treated
      as a failure: it means the real model's answer did not pass the
      validators (or the call failed), which is exactly what this test exists
      to surface before a Monday does.
-  5. One TTS call over intro + script (short enough for a single chunk).
+  4. One TTS call over intro + script (short enough for a single chunk).
   Every schema the pipeline sends has to be accepted by the live API at least
   once before it ships -- SCORE_SCHEMA's lowercase type names were the
   reason this test exists.
@@ -81,7 +80,7 @@ def main() -> int:
     OUTPUT_DIR.mkdir(exist_ok=True)
     P.log("=== Tier 2 live smoke test: this spends real Gemini tokens ===")
 
-    P.log("1/5: discovery scoring (SCORE_SCHEMA + ALREADY COVERED section, real API call)...")
+    P.log("1/4: discovery scoring (SCORE_SCHEMA + ALREADY COVERED section, real API call)...")
     profile = D.load_profile()
     profile["_recent_topics"] = ["2026-09-28: Fixture topic that was covered last week"]
     fixture_candidate = {
@@ -104,29 +103,17 @@ def main() -> int:
 
     articles = [FIXTURE_ARTICLE, SECOND_ARTICLE]
 
-    P.log("2/5: editorial prep (PREP_SCHEMA, real API call)...")
-    prep = P.prepare_episode(articles, memory_context="")
-    if not prep or not prep["articles"] or not prep["questions"]:
-        sys.exit(
-            "PREP_SCHEMA did not round-trip against the real API (prepare_episode "
-            f"returned {prep!r}). In production this would silently fall back to "
-            "writing the script without the editorial prep."
-        )
-    P.log(f"  PREP_SCHEMA round-trip OK: {len(prep['articles'])} articles, "
-          f"{len(prep['questions'])} questions")
-
-    P.log("3/5: script from the prep (target_words=250, no intro)...")
-    data = P.generate_podcast_content(
-        articles, "smoke-test", memory_context="", target_words=250, prep=prep
-    )
+    P.log("2/4: the stories (SEGMENT/REVIEW/FRAME schemas, real API calls)...")
+    data = P.produce_script(articles, "smoke-test", "", None, min_segments=1)
+    prep = data["prep"]
     words = P.script_quality.count_words(data.get("script", []))
-    P.log(f"  got {len(data.get('script', []))} turns, {words} words")
+    P.log(f"  got {len(data.get('script', []))} turns, {words} words, "
+          f"{len(data['kept'])} stories kept, {len(data['dropped'])} cut")
     leftovers = P.script_quality.script_problems(data["script"])
     if leftovers or any('"' in t.get("text", "") for t in data["script"]):
         P.log(f"  WARNING: script still has problems after repair: {leftovers}")
 
-    P.log("4/5: intro, written last (INTRO_SCHEMA, real API call)...")
-    data["prep"] = prep
+    P.log("3/4: intro, written last (INTRO_SCHEMA, real API call)...")
     intro, source = P.write_intro(data, prep)
     if source != "model":
         sys.exit(
@@ -143,7 +130,7 @@ def main() -> int:
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    P.log("5/5: TTS synthesis (should be a single chunk)...")
+    P.log("4/4: TTS synthesis (should be a single chunk)...")
     wav_path = OUTPUT_DIR / "smoke.wav"
     mp3_path = OUTPUT_DIR / "smoke.mp3"
     P.synthesize_audio(data["script"], wav_path, mp3_path)

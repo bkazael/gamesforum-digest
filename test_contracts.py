@@ -94,7 +94,12 @@ def schema_problems(node, path="root") -> list[str]:
             problems.extend(schema_problems(v, f"{path}[{i}]"))
     return problems
 
-for schema_name, schema in (("PODCAST_SCHEMA", P.PODCAST_SCHEMA),
+import segments as SEG
+_schemas = SEG.schemas((P.SPEAKER_A, P.SPEAKER_B))
+for schema_name, schema in (("segments.SEGMENT_SCHEMA", _schemas["segment"]),
+                            ("segments.REVIEW_SCHEMA", _schemas["review"]),
+                            ("segments.FRAME_SCHEMA", _schemas["frame"]),
+                            ("INTRO_SCHEMA", P.INTRO_SCHEMA),
                             ("discovery.SCORE_SCHEMA", D.SCORE_SCHEMA)):
     problems = schema_problems(schema, schema_name)
     check(f"{schema_name} uses only valid Gemini type names",
@@ -187,36 +192,44 @@ check("the already-fetched (email) candidate survived stage 3 without a re-fetch
       email_survivor is not None and email_survivor["text"] == FIXTURE_TEXT,
       f"got {email_survivor}")
 
-# ---------------------------------------------------------------- 4. select() -> generate_podcast_content()
+# ---------------------------------------------------------------- 4. select() -> produce_script()
 
-def fake_gemini_json_script(prompt, schema=None, **kw):
-    return {
-        "episode_title": "Fixture Episode",
-        "digest_summary": [
-            {"title": c["title"], "key_takeaway": c["summary"], "metrics_mentioned": []}
-            for c in FIXTURE_CANDIDATES
-        ],
-        # Properly terminated, like real healthy output: a turn that stopped
-        # on a bare Hebrew letter is exactly what script_quality.py flags as
-        # a cut-off fragment and spends a retry on (see section 4b).
-        #
-        # Long enough to clear generate_podcast_content()'s word floor too
-        # (1,250): 4 turns x 330 words. A short fixture would spend the
-        # one retry on "too short" and blur what each test below is about.
-        # Each turn stays well under the TTS chunk limit (3,800 chars).
-        "script": [
-            {"speaker": P.SPEAKER_A if i % 2 == 0 else P.SPEAKER_B,
-             "text": (("פתיחה " if i % 2 == 0 else "תגובה ") * 330).strip() + "."}
-            for i in range(4)
-        ],
-    }
+def turns(n, text="פתיחה"):
+    """A well-formed, terminated conversation of n turns."""
+    return [{"speaker": P.SPEAKER_A if i % 2 == 0 else P.SPEAKER_B,
+             "text": f"{text} מספר {i} בשיחה על הכתבה."} for i in range(n)]
+
+def model_stub(script=None, key_points=None, issues=None, log=None):
+    """gemini_json stand-in that answers each kind of call by its schema:
+    a story (key_points), its review (issues), or the frame (episode_title)."""
+    def fn(prompt, schema=None, **kw):
+        props = (schema or {}).get("properties", {})
+        if log is not None:
+            log.append((sorted(props)[0] if props else "", prompt))
+        if "key_points" in props:
+            return {"publishable": True, "stance": "NEUTRAL_REPORTING", "headline": "כותרת",
+                    "key_points": key_points if key_points is not None else ["נקודה אחת", "נקודה שנייה"],
+                    "caution": "", "takeaway": "משהו לבדוק.",
+                    "script": script if script is not None else turns(16)}
+        if "issues" in props:
+            return {"issues": issues or []}
+        if "episode_title" in props:
+            return {"episode_title": "פרק לדוגמה", "outro": [
+                {"speaker": P.SPEAKER_A, "text": "זה היה הפרק, תודה שהאזנתם."}]}
+        raise AssertionError(f"unexpected schema {sorted(props)}")
+    return fn
 
 if chosen:
-    P.gemini_json = fake_gemini_json_script
+    P.gemini_json = model_stub()
     try:
-        data = P.generate_podcast_content(chosen, "2026-08-31-test", memory_context="")
-        check("generate_podcast_content() runs on select()'s real output",
+        data = P.produce_script(chosen, "2026-08-31-test", "", None, min_segments=1)
+        check("produce_script() runs on select()'s real output",
               bool(data.get("script")), "empty script")
+        check("every selected story becomes a segment of the script",
+              len(data["kept"]) == len(chosen) and not data["dropped"],
+              f"kept {data['kept']}, dropped {data['dropped']}")
+        check("the title and outro come from the frame", data["episode_title"] == "פרק לדוגמה"
+              and "תודה שהאזנתם" in data["script"][-1]["text"])
 
         md = P.render_digest_md(data, chosen, "2026-08-31-test", data["episode_title"])
         check("render_digest_md() includes every source article",
@@ -229,7 +242,7 @@ if chosen:
         check("no single script turn alone exceeds the TTS chunk limit",
               not over_limit, f"{len(over_limit)} oversized turn(s)")
     except Exception as e:
-        check("generate_podcast_content() + render_digest_md() run on select()'s output",
+        check("produce_script() + render_digest_md() run on select()'s output",
               False, f"{type(e).__name__}: {e}")
 
 # ---------------------------------------------------------------- 4b. a cut-off turn (Hebrew acronym quote bug)
@@ -237,79 +250,64 @@ if chosen:
 # script_quality.py explains the bug: 13 turns across 6 of 11 real episodes
 # stop mid-word at ארה"ב / מנכ"ל. Three behaviours matter, and each costs
 # real money if wrong: a repairable cut must cost NO extra Gemini request, an
-# unrecognisable one must cost exactly ONE retry, and if the retry is also
-# broken the run must still produce a script instead of failing.
+# unrecognisable one must cost exactly ONE rewrite of that story, and if the
+# rewrite is also broken the run must still produce a script instead of failing.
 
-def _scripted(responses):
-    """gemini_json stand-in that returns each response in turn and records
-    every prompt it was called with."""
-    calls = []
-    def fn(prompt, schema=None, **kw):
-        calls.append(prompt)
-        return responses[min(len(calls), len(responses)) - 1]
-    return fn, calls
-
-# A body long enough to clear the word floor, so a test about a cut-off turn
-# isn't also (silently) a test about length.
-PAD = {"speaker": P.SPEAKER_A, "text": ("מילה " * 1300).strip() + "."}
-
-def _resp(script, pad=True):
-    return {"episode_title": "T", "digest_summary": [],
-            "script": script + ([PAD] if pad else [])}
-
-GOOD = {"speaker": P.SPEAKER_B, "text": "זה נתון חשוב."}
+def story_calls(log):
+    return [p for kind, p in log if kind == "caution"]
 
 if chosen:
-    # (a) repairable: restored locally, one request.
-    fn, calls = _scripted([_resp([
-        {"speaker": P.SPEAKER_A, "text": "ההוצאות ירדו בארה"},
-        GOOD,
-    ])])
-    P.gemini_json = fn
-    d = P.generate_podcast_content(chosen, "2026-10-05-test")
-    check("a repairable cut-off acronym costs no retry", len(calls) == 1, f"{len(calls)} calls")
+    one = chosen[:1]
+    # (a) repairable: restored locally, one request for the story.
+    broken = turns(15) + [{"speaker": P.SPEAKER_A, "text": "ההוצאות ירדו בארה"}]
+    log = []
+    P.gemini_json = model_stub(script=broken, log=log)
+    d = P.produce_script(one, "2026-10-05-test", "", None, min_segments=1)
+    check("a repairable cut-off acronym costs no rewrite", len(story_calls(log)) == 1, f"{len(story_calls(log))} story calls")
     check("...and the acronym is restored in the output",
-          d["script"][0]["text"] == "ההוצאות ירדו בארה״ב.", d["script"][0]["text"])
+          any(t["text"] == "ההוצאות ירדו בארה״ב." for t in d["script"]))
 
-    # (b) unrecognisable on attempt 1, clean on attempt 2: exactly one retry,
-    # and the retry prompt says why.
-    fn, calls = _scripted([
-        _resp([{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות עם חברת פלונ"}, GOOD]),
-        _resp([{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות."}, GOOD]),
-    ])
-    P.gemini_json = fn
-    d = P.generate_podcast_content(chosen, "2026-10-05-test")
-    check("an unrecognised cut-off turn costs exactly one retry", len(calls) == 2, f"{len(calls)} calls")
-    check("the retry prompt names what was wrong", "REJECTED because" in calls[1])
-    check("the first attempt's prompt has no rejection note", "REJECTED because" not in calls[0])
-    check("the clean second attempt is what is returned",
-          d["script"][0]["text"] == "הם הכריזו על שותפות.")
+    # (b) unrecognisable on attempt 1, clean on attempt 2: exactly one rewrite,
+    # and the rewrite prompt says why and includes the draft.
+    bad = turns(15) + [{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות עם חברת פלונ"}]
+    good = turns(16, "טוב")
+    seq, log = [bad, good], []
+    inner = model_stub(log=log)
+    def two_drafts(prompt, schema=None, **kw):
+        out = inner(prompt, schema, **kw)
+        if "key_points" in (schema or {}).get("properties", {}):
+            out["script"] = seq.pop(0)
+        return out
+    P.gemini_json = two_drafts
+    d = P.produce_script(one, "2026-10-05-test", "", None, min_segments=1)
+    calls = story_calls(log)
+    check("an unrecognised cut-off turn costs exactly one rewrite", len(calls) == 2, f"{len(calls)} story calls")
+    check("the rewrite prompt names what was wrong and carries the draft",
+          "NOT ACCEPTED because" in calls[1] and "PREVIOUS DRAFT:" in calls[1])
+    check("the first prompt has no rejection note", "NOT ACCEPTED" not in calls[0])
+    check("the clean second draft is what is returned", any("טוב" in t["text"] for t in d["script"]))
 
-    # (c) broken both times: never a third request, never an exception.
-    broken = _resp([{"speaker": P.SPEAKER_A, "text": "הם הכריזו על שותפות עם חברת פלונ"}, GOOD])
-    fn, calls = _scripted([broken, broken])
-    P.gemini_json = fn
-    d = P.generate_podcast_content(chosen, "2026-10-05-test")
-    check("a script that stays broken is capped at two requests", len(calls) == 2, f"{len(calls)} calls")
+    # (c) broken both times: never a third story request, never an exception.
+    log = []
+    P.gemini_json = model_stub(script=bad, log=log)
+    d = P.produce_script(one, "2026-10-05-test", "", None, min_segments=1)
+    check("a story that stays broken is capped at two requests", len(story_calls(log)) == 2, f"{len(story_calls(log))} calls")
     check("...and still ships, with the fragment closed instead of left hanging",
-          d["script"][0]["text"].endswith("."), d["script"][0]["text"])
+          any(t["text"].endswith(".") and t["text"].startswith("הם הכריזו") for t in d["script"]))
 
 # ---------------------------------------------------------------- 5. memory_context actually reaches the prompt
 
 if chosen:
-    captured_prompt = {}
-    def capture_prompt(prompt, schema=None, **kw):
-        captured_prompt["text"] = prompt
-        return fake_gemini_json_script(prompt, schema)
-    P.gemini_json = capture_prompt
-    P.generate_podcast_content(chosen, "2026-08-31-test",
-                               memory_context="- פרק מ-2026-08-24 (Fixture Prior): כלום.")
+    log = []
+    P.gemini_json = model_stub(log=log)
+    P.produce_script(chosen[:1], "2026-08-31-test", "- פרק מ-2026-08-24 (Fixture Prior): כלום.", None, min_segments=1)
     check("a non-empty memory_context is inserted into the actual prompt sent to Gemini",
-          "Fixture Prior" in captured_prompt.get("text", ""))
-    P.gemini_json = capture_prompt
-    P.generate_podcast_content(chosen, "2026-08-31-test", memory_context="")
+          any("Fixture Prior" in p for p in story_calls(log)))
+    log = []
+    P.gemini_json = model_stub(log=log)
+    P.produce_script(chosen[:1], "2026-08-31-test", "", None, min_segments=1)
     check("an empty memory_context adds no PREVIOUS EPISODES section",
-          "PREVIOUS EPISODES" not in captured_prompt.get("text", ""))
+          not any("PREVIOUS EPISODES" in p for p in story_calls(log)))
 
 # ---------------------------------------------------------------- 6. resuming must not re-buy anything
 #
@@ -323,9 +321,6 @@ if chosen:
 # that actually matters: that those functions are never called at all.
 
 import checkpoint as CP
-# Editorial behavior is tested independently in test_production.py. These
-# historical contracts isolate orchestration of the pre-existing stages.
-P.review_episode = lambda data, *_args: data
 
 with tempfile.TemporaryDirectory() as tmp:
     tmp_path = pathlib.Path(tmp)
@@ -339,7 +334,9 @@ with tempfile.TemporaryDirectory() as tmp:
     today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
     CP.save_content(today, FIXTURE_CANDIDATES,
                     {"episode_title": "Resumed", "digest_summary": [],
-                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום חברים."}]})
+                     "intro_done": True,
+                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום חברים."},
+                                {"speaker": P.SPEAKER_B, "text": "שלום."}]})
 
     def boom(*_a, **_k):
         raise AssertionError("resumed run made a Gemini text call")

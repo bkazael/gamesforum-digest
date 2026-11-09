@@ -3,7 +3,7 @@
 
 python preview.py --discovery-only  # live sources, no model calls
 python preview.py                   # complete paid preview
-python preview.py --script-only     # paid editorial pipeline, no audio
+python preview.py --script-only     # paid script pipeline (stories, intro), no audio
 """
 from __future__ import annotations
 
@@ -44,22 +44,18 @@ def main():
         import runtime
         today = dt.datetime.now(dt.timezone.utc).date().isoformat()
         resumed = checkpoint.load_content(today)
-        if resumed:
-            articles, data = resumed
-        else:
-            articles = discovery.select()
-            if not articles:
-                raise RuntimeError("No new stories qualify for a preview")
-            context = p.memory.load_recent_context()
-            prep = p.prepare_episode(articles, context)
-            data = p.generate_podcast_content(articles, today, context, prep=prep)
-            data.update(prep=prep, intro_done=False)
+        articles, data = resumed if resumed else (discovery.select(), {})
+        if not articles:
+            raise RuntimeError("No new stories qualify for a preview")
+        if not data.get("script"):
+            built = p.produce_script(articles, today, p.memory.load_recent_context(),
+                                     data.get("segments"))
+            data = {**built, "intro_done": False}
             checkpoint.save_content(today, articles, data)
         if data.get("intro_done") is False:
             data = p.add_intro(data)
             checkpoint.save_content(today, articles, data)
-        data = p.review_episode(data, articles, today)
-        checkpoint.save_content(today, articles, data)
+        data = p.finalize_episode(data, today)
         runtime.atomic_write(output / "digests" / f"{today}-script.md",
             "\n".join(f"{t['speaker']}: {t['text']}" for t in data["script"]))
         return 0
