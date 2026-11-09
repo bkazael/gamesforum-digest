@@ -190,6 +190,36 @@ class ProductionTests(unittest.TestCase):
                 p.gemini_json("x", model="gemini-x")
             self.assertEqual(call.call_count, 1)
 
+    def test_a_spent_daily_quota_moves_to_the_next_model_and_stays_there(self):
+        seen = []
+        def fake(prompt, schema, tries, timeout, model):
+            seen.append(model)
+            if model == "primary":
+                raise p.GeminiQuotaExhausted("per day")
+            return {"ok": model}
+        with patch.object(p, "gemini_json", side_effect=fake), patch.object(p, "_QUOTA_SPENT", set()), \
+                patch.object(p, "QUOTA_FALLBACKS", ["second", "third"]):
+            self.assertEqual(p.gemini_json_quota("x", {}, model="primary"), {"ok": "second"})
+            self.assertEqual(p.gemini_json_quota("y", {}, model="primary"), {"ok": "second"})
+        self.assertEqual(seen, ["primary", "second", "second"])
+
+    def test_overload_is_waited_out_on_the_same_model_not_swapped(self):
+        def fake(prompt, schema, tries, timeout, model):
+            raise urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
+        with patch.object(p, "gemini_json", side_effect=fake) as call, patch.object(p, "_QUOTA_SPENT", set()), \
+                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+            with self.assertRaises(urllib.error.HTTPError):
+                p.gemini_json_quota("x", {}, model="primary")
+        self.assertEqual(call.call_count, 1)
+
+    def test_every_model_out_of_quota_raises_the_quota_error(self):
+        def fake(prompt, schema, tries, timeout, model):
+            raise p.GeminiQuotaExhausted("per day")
+        with patch.object(p, "gemini_json", side_effect=fake), patch.object(p, "_QUOTA_SPENT", set()), \
+                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+            with self.assertRaises(p.GeminiQuotaExhausted):
+                p.gemini_json_quota("x", {}, model="primary")
+
     def test_retries_wait_minutes_not_seconds_and_are_capped(self):
         delays = [p.retry_delay(503, n) for n in range(8)]
         self.assertEqual(delays[:4], [30, 60, 120, 240])

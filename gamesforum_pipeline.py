@@ -316,6 +316,35 @@ class GeminiQuotaExhausted(RuntimeError):
     """A provider daily quota is exhausted; retrying the same run won't help."""
 
 
+# The free tier allows ~20 requests a day PER MODEL (2026-11-09: "limit: 20,
+# model: gemini-3.8-flash ... Please retry in 15h48m"), and a day with several
+# manual runs spends it. Waiting cannot fix that, so when -- and only when --
+# a model's daily quota is gone, its calls move to the next model in this
+# list for the rest of the run. Overload (503) and slowness are not handled
+# here: those are waited out on the same model. Each story is checked for
+# coverage whichever model wrote it, so a different model does not mean a
+# shorter episode.
+QUOTA_FALLBACKS = [m.strip() for m in (os.environ.get("GEMINI_QUOTA_FALLBACKS")
+                   or "gemini-3.5-flash,gemini-3.5-flash-lite").split(",") if m.strip()]
+_QUOTA_SPENT: set[str] = set()
+
+
+def gemini_json_quota(prompt: str, schema: dict | None = None, *, model: str,
+                      tries: int = 6, timeout: int | None = None) -> dict:
+    """gemini_json that moves to the next model only when `model`'s daily quota is spent."""
+    chain = [m for m in dict.fromkeys([model, *QUOTA_FALLBACKS]) if m not in _QUOTA_SPENT]
+    for i, m in enumerate(chain):
+        try:
+            return gemini_json(prompt, schema, tries=tries, timeout=timeout, model=m)
+        except GeminiQuotaExhausted:
+            _QUOTA_SPENT.add(m)
+            if i == len(chain) - 1:
+                raise
+            print(f"::warning::{m}: daily request quota is spent; using {chain[i + 1]} "
+                  "for the rest of this run.", flush=True)
+    raise GeminiQuotaExhausted("every configured model's daily quota is spent")
+
+
 
 
 
@@ -554,8 +583,8 @@ hosts again.
     turns: list[dict] = []
     for attempt in (1, 2):
         try:
-            raw = gemini_json(attempt_prompt, INTRO_SCHEMA, tries=4, timeout=150,
-                              model=GEMINI_CREATIVE_MODEL)
+            raw = gemini_json_quota(attempt_prompt, INTRO_SCHEMA, tries=4, timeout=150,
+                                    model=GEMINI_CREATIVE_MODEL)
         except Exception as e:                              # noqa: BLE001
             log(f"  intro attempt {attempt} failed ({type(e).__name__}: {e})")
             break
@@ -1013,7 +1042,7 @@ def produce_script(articles: list[dict], today: str, memory_context: str,
     import segments
 
     def call(prompt, schema, *, model, tries, timeout):
-        return gemini_json(prompt, schema, tries=tries, timeout=timeout, model=model)
+        return gemini_json_quota(prompt, schema, model=model, tries=tries, timeout=timeout)
 
     def save(done: dict) -> None:
         checkpoint.save_content(today, articles, {"segments": done})
