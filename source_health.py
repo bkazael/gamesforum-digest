@@ -35,8 +35,9 @@ from __future__ import annotations
 
 import json
 import pathlib
+import runtime
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = runtime.OUTPUT_ROOT
 ALERTS_FILE = ROOT / "source_alerts.json"
 
 
@@ -51,6 +52,7 @@ def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
     it fetched cleanly and found nothing -- that always alerts, whatever
     the kind, with wording that says so plainly.
     """
+    sources = [s for s in sources if s.get("enabled", True)]
     kind_by_name = {s["name"]: s.get("kind", "rss") for s in sources}
     rss_names = [s["name"] for s in sources if s.get("kind", "rss") == "rss"]
     rss_ok = [n for n in rss_names if raw_item_counts.get(n, 0) > 0]
@@ -104,9 +106,7 @@ def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
 
 def record(alerts: list[str]) -> None:
     """Persist this run's alerts so the workflow's later step can read them."""
-    ALERTS_FILE.write_text(
-        json.dumps(alerts, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    runtime.atomic_write(ALERTS_FILE, json.dumps(alerts, ensure_ascii=False, indent=2))
 
 
 def pending_alerts() -> list[str]:

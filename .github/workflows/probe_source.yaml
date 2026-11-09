@@ -1,0 +1,31 @@
+name: Probe a source from GitHub Actions (manual, no Gemini quota)
+
+# Manual only. Answers "can the pipeline's runner reach this source's full
+# article text, and by which route?" from the runner itself -- a source can
+# be reachable from a laptop and still blocked here (Gamigion's Substack RSS
+# returns 403 to GitHub Actions). See probe_source.py. Writes nothing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "Comma-separated URLs to try (empty = the built-in Gamigion list)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe
+        env:
+          URLS: ${{ inputs.urls }}
+        run: python probe_source.py

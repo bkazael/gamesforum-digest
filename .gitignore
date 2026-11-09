@@ -10,3 +10,7 @@ source_alerts.json
 # re-run resume instead of re-paying Gemini for identical work. Deleted
 # automatically once an episode publishes -- never project history.
 .checkpoint/
+preview_output/
+smoke_output/
+*.part.mp3
+*.wav

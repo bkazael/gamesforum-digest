@@ -42,6 +42,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 
 from gamesforum_pipeline import http_get, log, strip_tags
+from runtime import canonical_url
 
 # RSS dates are RFC-822; some feeds emit ISO-8601 anyway.
 _RFC822 = "%a, %d %b %Y %H:%M:%S"
@@ -92,25 +93,38 @@ def from_rss(source: dict) -> list[dict]:
                  if n.tag.rsplit("}", 1)[-1].lower() in ("item", "entry")]
         for node in nodes:
             title = _text(node, "title")
-            link = _text(node, "link", "guid")
+            link = _text(node, "link")
             if not link:                                # Atom puts it in href
                 for child in node:
-                    if child.tag.rsplit("}", 1)[-1].lower() == "link":
+                    if (child.tag.rsplit("}", 1)[-1].lower() == "link"
+                            and child.attrib.get("rel", "alternate") == "alternate"
+                            and child.attrib.get("type", "text/html") in ("text/html", "application/xhtml+xml")):
                         link = child.attrib.get("href", "")
                         if link:
                             break
-            if not (title and link.startswith("http")):
+            link = link or _text(node, "guid")
+            if not (title and urllib.parse.urlsplit(link).scheme in ("http", "https")):
                 continue
             summary = strip_tags(_text(node, "description", "summary"))
-            items.append({
-                "url": link.split("?")[0],
+            item = {
+                "url": canonical_url(link),
                 "title": title,
                 "source": source["name"],
                 "published": _parse_date(
                     _text(node, "pubdate", "published", "updated", "date")
                 ),
                 "summary": summary[:600],
-            })
+            }
+            # full_text_in_feed: the feed's own content:encoded (RSS) or
+            # <content> (Atom) is the whole post, so discovery.py skips
+            # fetching the page. For gamigion.com, whose short WordPress posts
+            # the page extractor can't read but whose feed carries them in
+            # full (probe_source.py, 2026-10-16).
+            if source.get("full_text_in_feed"):
+                body = strip_tags(_text(node, "encoded", "content"))
+                if body:
+                    item["text"] = body[:18000]
+            items.append(item)
     log(f"  [{source['name']}] {len(items)} items from feed")
     return items
 
@@ -167,7 +181,7 @@ class EmailFetchError(RuntimeError):
 # built from Substack's publicly documented email template shape, not a
 # real Gamigion specimen -- nobody has been able to fetch one from CI, and
 # the sandbox this was written in cannot reach a live inbox either. The
-# mechanism below (IMAP connect, seen-flagging, text-already-fetched wiring
+# mechanism below (IMAP connect, text-already-fetched wiring
 # into discovery.py, the source_health silence-is-normal fix) is real and
 # tested against a synthetic fixture. The exact _FOOTER_MARKERS regex is
 # the one piece that will likely need a one-line adjustment once a real
@@ -178,9 +192,26 @@ _FOOTER_MARKERS = re.compile(
     r"you.re receiving this (?:email|because)|©\s*20\d\d"
 )
 
+# A real Gamigion email (2026-10-15, "Smash Fest Level Deconstruction") showed
+# what the synthetic fixture didn't: Substack sends a PREVIEW of the post --
+# about 600 words of real analysis, then "Continue reading this post for free
+# in the Substack app / Claim my free post / Upgrade to paid" before the usual
+# Like/Comment/Restack footer. Everything from that prompt on is chrome.
+_PREVIEW_CUT = re.compile(
+    r"(?i)(?:user.s avatar\s*)?continue reading this post|claim my free post|"
+    r"upgrade to paid|this post is for (?:paid )?subscribers"
+)
+_PREVIEW_NOTE = ("\n\n[This is the email preview of a longer post: the rest of it "
+                 "(for a Deconstruction, the level-by-level breakdown) is not included here.]")
+# Masthead/chrome lines Substack puts above the post body.
+_HEADER_CHROME = re.compile(
+    r"(?im)^\s*(?:forwarded this email\?.*|read in app|preview|"
+    r"thanks to our .*|created by .*)\s*$"
+)
+
 
 def from_email(source: dict) -> list[dict]:
-    """Pull unread "new post" emails from a dedicated inbox.
+    """Pull recent "new post" emails from a dedicated inbox, read-only.
 
     Every message in this mailbox is assumed to be a subscription email for
     this one source -- that's why the setup instructions call for a
@@ -189,11 +220,9 @@ def from_email(source: dict) -> list[dict]:
     doesn't need it, and skipping it means one less thing that can silently
     stop matching if a newsletter platform changes its sending address.
 
-    Only UNSEEN messages are read (via BODY.PEEK[], which does not itself
-    mark a message seen), and a message is only flagged \\Seen *after* it
-    parses successfully -- so a message that fails to parse is retried next
-    run instead of being silently lost, the same resilience checkpoint.py
-    gives the rest of the pipeline.
+    Messages are date-bounded, not marked read or changed. BODY.PEEK[] plus
+    SELECT readonly=True keeps the mailbox untouched; downstream URL/history
+    deduplication prevents old newsletter posts from being reused.
     """
     address = os.environ.get("GMAIL_ADDRESS")
     app_password = os.environ.get("GMAIL_APP_PASSWORD")
@@ -213,10 +242,22 @@ def from_email(source: dict) -> list[dict]:
     )
 
     try:
-        conn = imaplib.IMAP4_SSL("imap.gmail.com")
+        conn = imaplib.IMAP4_SSL(source.get("imap_host", "imap.gmail.com"), timeout=30)
         conn.login(address, app_password)
-        conn.select(mailbox)
-        status, data = conn.search(None, "UNSEEN")
+        status, _ = conn.select(mailbox, readonly=True)
+        if status != "OK":
+            raise EmailFetchError(f"IMAP SELECT failed: {status}")
+        # Search by date, not unread status: collection is not publication.
+        # A downstream failure or a dry run must never consume a newsletter.
+        since = dt.date.today() - dt.timedelta(days=source.get("max_age_days", 7))
+        imap_date = f"{since.day:02d}-{('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec')[since.month-1]}-{since.year}"
+        # `sender` narrows a shared inbox (e.g. a personal-assistant address
+        # that also gets other mail) to this newsletter only. IMAP FROM is a
+        # case-insensitive substring match on the From header.
+        criteria = ["SINCE", imap_date]
+        if source.get("sender"):
+            criteria += ["FROM", f'"{source["sender"]}"']
+        status, data = conn.search(None, *criteria)
         if status != "OK":
             raise EmailFetchError(f"IMAP SEARCH failed: {status}")
     except EmailFetchError:
@@ -250,25 +291,39 @@ def from_email(source: dict) -> list[dict]:
                 log(f"  [{source['name']}] message {msg_id!r} has no HTML part, skipping")
                 continue
 
-            link_match = link_re.search(body_html)
-            if not link_match:
-                log(f"  [{source['name']}] message {msg_id!r}: no {base_host}/p/... "
-                    "link found, skipping (template may have changed -- see README)")
-                continue
-            url = link_match.group(0)
-
-            title = str(email_lib.header.make_header(
+            subject = str(email_lib.header.make_header(
                 email_lib.header.decode_header(msg.get("Subject", ""))
-            )) or url.rsplit("/", 1)[-1].replace("-", " ")
+            ))
+            link_match = link_re.search(body_html)
+            if link_match:
+                url = link_match.group(0)
+            else:
+                # Substack emails often carry only tracking redirects, or the
+                # "Read in app" link on open.substack.com/pub/<pub>/p/<slug>.
+                app = re.search(r"https?://open\.substack\.com/pub/[^/\"'\s]+/p/([a-z0-9-]+)", body_html, re.I)
+                slug = app.group(1) if app else re.sub(r"[^a-z0-9]+", "-", subject.lower()).strip("-")
+                if not slug:
+                    log(f"  [{source['name']}] message {msg_id!r}: no post link and no subject, skipping")
+                    continue
+                url = f"https://{base_host}/p/{slug}"
+                log(f"  [{source['name']}] message {msg_id!r}: no direct {base_host}/p/... link; "
+                    f"using {url}")
+
+            title = subject or url.rsplit("/", 1)[-1].replace("-", " ")
 
             body = body_html
             h1 = re.search(r"(?is)<h1[^>]*>.*?</h1>", body)
             if h1:
                 body = body[h1.end():]
+            previewed = False
+            preview = _PREVIEW_CUT.search(body)
+            if preview:
+                body = body[: preview.start()]
+                previewed = True
             cut = _FOOTER_MARKERS.search(body)
             if cut:
                 body = body[: cut.start()]
-            text = strip_tags(body)
+            text = _HEADER_CHROME.sub("", strip_tags(body)).strip()
             if len(text) < 400:
                 log(f"  [{source['name']}] message {msg_id!r}: body too short "
                     f"after extraction ({len(text)} chars), skipping -- "
@@ -289,11 +344,13 @@ def from_email(source: dict) -> list[dict]:
                 "source": source["name"],
                 "published": published,
                 "summary": text[:600],
-                "text": text[:14000],
+                "text": text[:14000] + (_PREVIEW_NOTE if previewed else ""),
+                # Only the preview was available: the rest of the post could
+                # qualify or contradict it, so it must not carry an episode.
+                "partial": previewed,
             })
             # Only mark read once everything above succeeded -- a crash or
             # a "skip" above leaves the message UNSEEN for next run's retry.
-            conn.store(msg_id, "+FLAGS", "\\Seen")
         except Exception as e:                            # noqa: BLE001
             log(f"  [{source['name']}] error processing message {msg_id!r}: {e} -- "
                 "leaving it unread for next run")
@@ -385,6 +442,8 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
     raw_counts: dict[str, int] = {}
 
     for source in sources:
+        if source.get("enabled", True) is False:
+            continue
         adapter = ADAPTERS.get(source.get("kind", "rss"))
         if not adapter:
             log(f"  [{source.get('name')}] unknown kind, skipped")
@@ -395,7 +454,7 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
         # catch inside, e.g. an IMAP login rejection. One source's adapter
         # blowing up must not take the whole run down with it.
         try:
-            fetched = adapter(source)
+            fetched = adapter(dict(source, max_age_days=max_age_days))
         except Exception as e:                          # noqa: BLE001
             log(f"  [{source['name']}] adapter raised: {e}")
             raw_counts[source["name"]] = -1
@@ -406,9 +465,10 @@ def collect(sources: list[dict], max_age_days: int) -> tuple[list[dict], set[str
         for item in fetched:
             # An unknown date is kept: html sources have none, and dropping
             # them would silently disable Gamesforum entirely.
-            if item["published"] and item["published"] < cutoff:
+            if item["published"] and not cutoff <= item["published"] <= dt.date.today():
                 continue
-            key = item["url"].rstrip("/").lower()
+            item["url"] = canonical_url(item["url"])
+            key = item["url"]
             if key in seen:
                 continue
             seen.add(key)

@@ -77,7 +77,7 @@ check("an unrelated article does not trip the heuristic",
 
 # ---------------------------------------------------------------- 2. false positive is NOT rejected
 
-D.gemini_json = lambda prompt, schema=None: {
+D.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": False,
     "reasoning": "One is a lawsuit settlement, the other is a technical "
                  "policy change; different announcements.",
@@ -93,7 +93,7 @@ check("when Gemini says two heuristically-flagged articles are NOT the "
 
 # ---------------------------------------------------------------- 3. confirmed duplicate IS rejected, and the freed cap slot backfills
 
-D.gemini_json = lambda prompt, schema=None: {
+D.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": True,
     "reasoning": "Both describe the same Google Play settlement.",
 }
@@ -111,7 +111,7 @@ check("this is the actual bug fix: the cap slot the duplicate would have "
 
 # ---------------------------------------------------------------- 4. confirmation failure fails open (keeps both, never silently drops a topic)
 
-def _raise(prompt, schema=None):
+def _raise(prompt, schema=None, **kwargs):
     raise RuntimeError("simulated API error")
 D.gemini_json = _raise
 result = D.select_stories(
@@ -126,7 +126,7 @@ check("a dedupe-confirmation API error fails open -- both articles are "
 THIRD = art("Google Play adds new safety controls for kids accounts",
             "Google Play rolls out parental controls and age verification.",
             6.5)
-D.gemini_json = lambda prompt, schema=None: {
+D.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": False, "reasoning": "distinct announcements",
 }
 result = D.select_stories(
@@ -172,7 +172,7 @@ def cap_field():
     ]
 
 
-D.gemini_json = lambda prompt, schema=None: {"same_story": False, "reasoning": "distinct"}
+D.gemini_json = lambda prompt, schema=None, **kwargs: {"same_story": False, "reasoning": "distinct"}
 
 field = cap_field()
 result = D.select_stories(field, CAP_SOURCES, CAP_THR)
@@ -346,6 +346,42 @@ with _tempfile.TemporaryDirectory() as _tmp:
               _memory.load_recent_topics() == [])
     finally:
         _memory.MEMORY_FILE = _real
+
+# ---------------------------------------------------------------- 13. daily quota failures stop the scoring loop immediately
+
+_quota_calls = []
+def _daily_quota(prompt, schema=None, **kwargs):
+    _quota_calls.append(kwargs)
+    raise D.GeminiQuotaExhausted("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+
+D.gemini_json = _daily_quota
+_score_profile = {"identity": {"who": "test"},
+                  "interests": {"core": [], "deprioritize": []}}
+_score_candidates = [{"_idx": i, "title": "A mobile game update",
+                      "text": "Game update data " * 100,
+                      "signals": D.substance_signals("Game update data " * 100)}
+                     for i in range(D.SCORE_BATCH + 1)]
+try:
+    D.score_all(_score_profile, _score_candidates)
+    check("a provider daily quota failure aborts scoring instead of retrying later batches", False)
+except D.GeminiQuotaExhausted:
+    check("a provider daily quota failure aborts scoring instead of retrying later batches",
+          len(_quota_calls) == 1 and _quota_calls[0].get("model") == D.GEMINI_SCORING_MODEL,
+          f"calls={len(_quota_calls)}, kwargs={_quota_calls}")
+
+# ---------------------------------------------------------------- partial (email-preview) articles never lead
+_prof = {"airtime": {"lead_share": 0.4, "second_share": 0.25, "remainder_share": 0.35}}
+_arts = [{"title": "preview", "_score": 10, "partial": True},
+         {"title": "full-a", "_score": 8}, {"title": "full-b", "_score": 7},
+         {"title": "full-c", "_score": 6}]
+D.assign_airtime(_arts, _prof)
+check("a partial article is moved behind the full ones, whatever its score",
+      [a["title"] for a in _arts] == ["full-a", "full-b", "full-c", "preview"],
+      str([a["title"] for a in _arts]))
+check("...so it gets the smallest share, never the lead",
+      _arts[0]["_airtime"] == 0.4 and _arts[-1]["_airtime"] < 0.25, str([a["_airtime"] for a in _arts]))
+check("the order inside the full articles is untouched (score order)",
+      [a["_score"] for a in _arts[:3]] == [8, 7, 6])
 
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

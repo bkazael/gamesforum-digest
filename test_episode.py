@@ -171,11 +171,12 @@ with tempfile.TemporaryDirectory() as tmp:
     try:
         # One turn per chunk: long enough that each exceeds the limit on
         # its own, so the chunker can't merge them and indices are stable.
-        turns = [{"speaker": P.SPEAKER_A, "text": "x" * (P.TTS_CHUNK_CHAR_LIMIT + 10)},
-                 {"speaker": P.SPEAKER_B, "text": "y" * (P.TTS_CHUNK_CHAR_LIMIT + 10)}]
+        turns = [{"speaker": P.SPEAKER_A, "text": "x " * 1200 + "."},
+                 {"speaker": P.SPEAKER_B, "text": "y " * 1200 + "."}]
 
         # Pretend a previous attempt finished chunk 1 only.
-        CP.save_chunk("2026-09-22", 1, b"CACHED")
+        first_chunk = P.audio_tools.chunks_for_turns(turns, P.TTS_CHUNK_CHAR_LIMIT)[0]
+        CP.save_chunk("2026-09-22", 1, b"CACHED", P.audio_identity(first_chunk))
 
         wav, mp3 = tmp_path / "a.wav", tmp_path / "a.mp3"
         P.synthesize_audio(turns, wav, mp3, date="2026-09-22")

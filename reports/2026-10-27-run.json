@@ -1,0 +1,149 @@
+{
+  "status": "complete",
+  "date": "2026-10-27",
+  "words": 1258,
+  "duration_seconds": 663,
+  "words_per_minute": 115.1,
+  "models": {
+    "text": "gemini-2.5-flash",
+    "scoring": "gemini-3.5-flash-lite",
+    "creative": "gemini-3.5-flash",
+    "tts": "gemini-2.5-flash-preview-tts"
+  },
+  "usage": {
+    "input_tokens": 61992,
+    "output_tokens": 13423,
+    "tts_chunks": 3,
+    "thinking_tokens": 4169
+  },
+  "elapsed_seconds": 834.3,
+  "profile_fingerprint": "47654937ae98aadedf010229be298cdfd50fd5d7eaf98939d45e274f460bce7b",
+  "editorial": {
+    "naturalness": 4,
+    "focus": 5,
+    "covered_article_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "source_assessments": [
+      {
+        "article_id": 1,
+        "type": "REPORTING",
+        "basis": "Reverse-engineering breakdown of Block Blast ad logic by a researcher, including self-promotion of a software product at the end.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 2,
+        "type": "REPORTING",
+        "basis": "Analysis of AppMagic data on top 50 puzzle games benchmarks.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 3,
+        "type": "REPORTING",
+        "basis": "News report on Fortnite's return to the Australian App Store following a federal court ruling.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 4,
+        "type": "REPORTING",
+        "basis": "Roundup column of soft launch games across major developers, containing a sponsored mention of FastSpring.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 5,
+        "type": "REPORTING",
+        "basis": "Financial reporting of Hasbro's Q3 revenue figures related to Monopoly Go.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      },
+      {
+        "article_id": 6,
+        "type": "REPORTING",
+        "basis": "Industry ranking list of top 50 mobile game makers for 2026 with market trends.",
+        "independent_context": true,
+        "listener_value": true,
+        "treatment": "DEEP"
+      }
+    ],
+    "summary": "The episode reviews the technical breakdown of Block Blast's server-driven ad monetization logic, analyzes top 50 mobile puzzle game retention and monetization benchmarks from AppMagic, covers Fortnite's legal return to the Australian App Store, summarizes soft launch updates from Supercell and Playrix, reports Hasbro's Q3 Monopoly Go licensing revenue, and highlights key findings from the 2026 Top 50 Mobile Game Makers list.",
+    "issues": [
+      {
+        "turn": 3,
+        "kind": "ATTRIBUTION",
+        "blocking": false,
+        "problem": "Dana states the App Store return in Australia happened after a court ruling, but the source article title and text state Fortnite returns to the App Store in Australia today following the verdict.",
+        "fix": "Ensure exact alignment with event timing if referring to the publication date."
+      }
+    ],
+    "fingerprint": "7bdc8ad6cf43cb873b13e542e446402fca20aa802103f1f77cdd715344accc4e",
+    "passed": true,
+    "problems": [],
+    "model": "gemini-3.5-flash-lite",
+    "review_version": 2
+  },
+  "artifacts": {
+    "episodes/2026-10-27.mp3": "5c11ea7ec1fa395d817375cc342f835d6531df8c1d238ca8456c28d9ae800322",
+    "episodes/2026-10-27.json": "640c2e072b84602739c58e39b8adeafc7f76272c92fc7e4292e4fbc008b75ac9",
+    "digests/2026-10-27.md": "85814c8f9c1cb42dc6f7fb3490ccad224ac83395f572f88487f1144cbfec1543",
+    "digests/2026-10-27-script.md": "934ef20a1497e55187aa0539d5476dee62acf71ad99b9d77dafc7d625b00d4cb",
+    "feed.xml": "370cdb8991fb2e30ee04ad88e12a17a7225a8c592a1b85ea3904ef3db9225800"
+  },
+  "sources": [
+    {
+      "title": "Block Blast’s $1M/day Ad Logic Just Got Cracked!",
+      "url": "https://www.gamigion.com/block-blasts-1m-day-ad-logic-just-got-cracked",
+      "published": "2026-10-23",
+      "score": 10.0,
+      "airtime": 0.3
+    },
+    {
+      "title": "Benchmarks from the Top 50 Mobile Puzzle Games?",
+      "url": "https://www.gamigion.com/benchmarks-from-the-top-50-mobile-puzzle-games",
+      "published": "2026-10-26",
+      "score": 9.0,
+      "airtime": 0.2
+    },
+    {
+      "title": "Fortnite returns to the App Store in Australia today",
+      "url": "https://www.pocketgamer.biz/fortnite-returns-to-the-app-store-in-australia-today",
+      "published": "2026-10-22",
+      "score": 9.0,
+      "airtime": 0.125
+    },
+    {
+      "title": "The soft launch games you need to know about from Supercell, EA, Moon Active, Zynga, more",
+      "url": "https://mobilegamer.biz/the-soft-launch-games-you-need-to-know-about",
+      "published": "2026-10-26",
+      "score": 8.0,
+      "airtime": 0.125
+    },
+    {
+      "title": "Monopoly Go earned Hasbro $41m in Q3, taking its nine-month total to $127m",
+      "url": "https://mobilegamer.biz/monopoly-go-earned-hasbro-41m-in-q3-taking-its-nine-month-total-to-127m",
+      "published": "2026-10-21",
+      "score": 8.0,
+      "airtime": 0.125
+    },
+    {
+      "title": "The Top 50 Mobile Game Makers of 2026",
+      "url": "https://www.pocketgamer.biz/the-top-50-mobile-game-makers-of-2026",
+      "published": "2026-10-21",
+      "score": 8.0,
+      "airtime": 0.125
+    }
+  ]
+}

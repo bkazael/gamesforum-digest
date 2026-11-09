@@ -200,6 +200,43 @@ def trim_agreement_openers(script: list[dict], keep: int = 2) -> tuple[list[dict
     return out, changed
 
 
+_HEB = re.compile(r"[\u05d0-\u05ea]")
+_LATIN = re.compile(r"[A-Za-z]")
+
+# "operators/developers must/should ..." -- the one formula every story of the
+# Pro 3.1 trial script ended on (7 of 8 stories) although the prompt allowed
+# two. Matching the stems only covers Hebrew's ל/ה prefixes.
+_FORMULA_RE = re.compile(
+    r"(?:מפעילים|מפתחים|סטודיואים|מפעילי)\s+(?:\S+\s+)?(?:צריכים|חייבים|כדאי|עליהם)"
+    r"|(?:כדאי|חשוב|צריך)\s+ל(?:מפעילים|מפתחים|סטודיואים)"
+)
+FORMULA_LIMIT = 2
+
+
+def hebrew_share(script: list[dict]) -> float:
+    """Hebrew letters as a share of all Hebrew+Latin letters in the script."""
+    text = " ".join((t.get("text") or "") for t in script)
+    he, la = len(_HEB.findall(text)), len(_LATIN.findall(text))
+    return he / max(he + la, 1)
+
+
+def script_style_problems(script: list[dict], lang: str = "he") -> list[str]:
+    """Problems of voice (not of form) that justify the one regenerate:
+    a script in the wrong language, or the same "developers should" ending
+    on more stories than the prompt allows. Both were seen in a real model
+    trial: Gemini 3.6 Flash wrote the whole episode in English, and Gemini
+    3.1 Pro closed seven of eight stories on the same formula."""
+    out = []
+    if lang == "he" and script and hebrew_share(script) < 0.5:
+        out.append("the script is not in Hebrew -- every spoken turn must be Hebrew "
+                   "(company and industry terms may stay in English)")
+    formula = sum(1 for t in script if _FORMULA_RE.search(t.get("text") or ""))
+    if formula > FORMULA_LIMIT:
+        out.append(f"{formula} turns use the 'operators/developers should ...' formula "
+                   f"(limit {FORMULA_LIMIT}); end stories in varied ways")
+    return out
+
+
 def style_report(script: list[dict]) -> list[str]:
     """A few lines of numbers describing how the script sounds."""
     words = max(count_words(script), 1)

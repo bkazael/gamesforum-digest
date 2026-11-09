@@ -12,7 +12,20 @@ name: Live smoke test (manual, small real cost)
 # discovered zero articles on every run.
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Smoke fixture or isolated full episode preview (never publishes)'
+        type: choice
+        options: [smoke, script, preview]
+        default: smoke
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   live-smoke:
@@ -21,7 +34,7 @@ jobs:
     # intro, TTS), and a single slow Gemini call can legitimately take a few
     # minutes -- a smoke test that times out on a slow day just teaches
     # people to ignore it.
-    timeout-minutes: 12
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -34,14 +47,42 @@ jobs:
 
       # No pip install: live_smoke.py and the modules it imports are
       # stdlib-only, same as the production pipeline.
-      - name: Run live smoke test
+      - name: Restore preview work
+        if: inputs.mode != 'smoke'
+        uses: actions/cache/restore@v4
+        with:
+          path: preview_output/.checkpoint
+          key: preview-${{ github.ref_name }}-${{ hashFiles('*.py', 'profile.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: preview-${{ github.ref_name }}-${{ hashFiles('*.py', 'profile.toml') }}-
+
+      - name: Run isolated validation
+        timeout-minutes: 30
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python live_smoke.py
+          GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
+          VALIDATION_MODE: ${{ inputs.mode }}
+        run: |
+          case "$VALIDATION_MODE" in
+            preview) python preview.py ;;
+            script) python preview.py --script-only ;;
+            *) python live_smoke.py ;;
+          esac
+
+      - name: Save preview work
+        if: always() && inputs.mode != 'smoke'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: preview_output/.checkpoint
+          key: preview-${{ github.ref_name }}-${{ hashFiles('*.py', 'profile.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload smoke output
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-smoke-output
-          path: ./smoke_output/*
-          retention-days: 2
+          name: validation-${{ inputs.mode }}-${{ github.run_attempt }}
+          path: |
+            smoke_output/
+            preview_output/
+          include-hidden-files: true
+          retention-days: 7

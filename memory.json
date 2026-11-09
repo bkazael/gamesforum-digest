@@ -110,18 +110,75 @@
   },
   {
     "episode_id": "ep_009",
-    "date": "2026-10-04",
-    "title": "קרב הענקים על נתוני מודעות, מירוץ ה-D2C וכיבוש דרום אמריקה: האתגרים החדשים של המובייל גיימינג | Ben's Weekly Digest",
+    "date": "2026-10-05",
+    "title": "רגולציה על מטבעות ונתונים, D2C חדש ושיווק יצירתי: מאחורי הקלעים של גיימינג מובייל | Ben's Weekly Digest",
     "topics_covered": [
-      "תביעת ענק בתחום פרסום המובייל: AppLovin נגד Unity",
-      "NetEase חודרת לשוק אמריקה הלטינית עם שותפות תשלומים מקומיים",
-      "האיחוד האירופי בוחן ענקיות גיימינג על מטבעות וירטואליים",
-      "Minecraft Blast של King חוזר ב-Soft Launch מחודש",
-      "מודעות Playable: האצת AI ודרישות אסטרטגיה יצירתית",
-      "Mario Kart Tour נסגר אחרי 7 שנים ו-268.5 מיליון דולר",
-      "מחירי D2C: הטבות נוספות מנצחות הנחות",
-      "עדכונים מפלטפורמות: עמלות Google Play ו-D2C של Unity"
+      "AppLovin takes legal action against Unity over Ad Quality SDK",
+      "NetEase Games Club partners with EBANX projecting $8.4bn in LATAM revenue this y",
+      "Europe's CPC targets King, Supercell, Mojang and others over virtual currencies",
+      "King’s Minecraft Blast is back in soft launch",
+      "The Weekly Round-up",
+      "Mario Kart Tour closes after seven years and nearly $270m in revenue",
+      "In-game vs. web store: How to price and package for D2C without breaking your ga",
+      "Playable Ads in 2027: AI, Creative Strategy & Mobile UA"
     ],
-    "key_takeaways": "התביעה בין AppLovin ל-Unity על איסוף ושימוש בנתוני פרסום עשויה ליצור תקדימים חשובים לתעשיית המודעות הניידות ולעצב מחדש את כללי התחרות ואיסוף הנתונים בעתיד. | שותפות NetEase עם EBANX להטמעת שיטות תשלום מקומיות כמו Pix, SPEI ו-PagoEfectivo פותחת פוטנציאל הכנסות משמעותי בשווקי LATAM, במיוחד בהתחשב באחוזים הגבוהים של האוכלוסייה המשתמשת בהן והיעדר כרטיסי אשראי אצל חלק ניכר מהשחקנים. | רשת ה-CPC של אירופה בוחנת חברות כמו King ו-Supercell בנוגע למטבעות וירטואליים וקווים מנחים לשקיפות, זכויות משיכה והגנת ילדים. זה מדגיש את הדרישה הגוברת לרגולציה ושקיפות במודלי מונטיזציה, במיוחד כלפי קטינים. | החזרה ל-soft launch של King's Minecraft Blast עם גרפיקה ופיצ׳רים משופרים, כמו Raid Tournament ומערכת companions, מראה כיצד IP גדול מנסה למצוא את הנוסחה הנכונה למשחק פאזל היברידי-קז'ואל עם מטא-פרוגרשן מעמיק. | מודעות playable הפכו לכלי UA מרכזי, עם עלייה דרמטית בנפחי הייצור בזכות AI. אך ההצלחה תלויה לא רק במהירות, אלא באסטרטגיה יצירתית חזקה ובהבנה עמוקה של השחקן כדי להעביר את 'חווית הליבה' של המשחק באופן אותנטי. | סגירת Mario Kart Tour מדגישה כי גם IP גדול דורש מודל מונטיזציה בר-קיימא ועדכוני תוכן מתמשכים כדי לשמור על מעורבות שחקנים והכנסות לטווח ארוך, במיוחד לאחר הסרת מכניקות כמו גאצ'ה שהשפיעו לרעה על ההכנסות. | בחנויות D2C, הצעת 'הטבות נוספות' (יותר מטבע וירטואלי באותו מחיר) עדיפה על הנחות מחיר ישירות להמרת שחקנים ולהגדלת ההכנסות, תוך שמירה על יציבות כלכלת המשחק. | הפחתת עמלות Google Play והשקת תמיכת D2C ב-Unity IAP SDK 5.4, יחד עם השקעה ב-AppsFlyer, מצביעים על מערכת אקולוגית מתפתחת, ידידותית יותר למפתחים, עם גמישות מוגברת בהפצה, מונטיזציה וחווית משחק."
+    "key_takeaways": "Operators should review their agreements with ad partners like Unity and AppLovin, especially regarding data collection and usage by SDKs, and understand implications for their own data privacy policies and compliance. | Evaluate the adoption of local payment methods and D2C strategies for key emerging markets in LATAM to address unbanked populations and leverage popular local payment options, potentially expanding revenue channels. | Operators with games in the EU, particularly those with virtual currencies and monetization mechanics for children, must review their in-game commercial practices against the CPC Network's 'Key Principles' and prepare for potential regulatory enforcement or legislative changes. | Observe how established IP (Minecraft) and proven casual mechanics (Candy Crush-style match-3, building meta) are iterated and re-tested in soft launch to inform potential future IP licensing, development, or genre expansion strategies. | Investigate Unity's new D2C payment options (IAP SDK 5.4) and Google's lowered Play Store commissions to optimize revenue. Also, monitor the development of foldable devices for potential future gaming opportunities and the role of AI in ad tech. | Analyze the long-term revenue performance of existing live-service games, especially those that have modified core monetization mechanics like gacha, to inform future game design, live ops, and sunsetting strategies. | When implementing D2C, experiment with exclusive entitlements, loyalty programs, and direct checkout flows instead of just discounts, and consider creating web-store exclusive content, while always balancing changes with the game's economy. | For mobile UA, evaluate integrating playable ads as a core strategy, explore AI tools to streamline their production while maintaining creative authenticity, and invest in analytics to iterate on specific 'Lego blocks' of playable design for better user qualification and retention."
+  },
+  {
+    "episode_id": "ep_010",
+    "date": "2026-10-12",
+    "title": "AI: בועה או חדשנות, צמיחה אגרסיבית בטורקיה וייטנאם, ותביעות מול ענקיות הפלטפורמה | Ben's Weekly Digest",
+    "topics_covered": [
+      "הבהלה ל-AI: בועה של טריליונים או חדשנות אמיתית?",
+      "טורקיה: מעצמת גיימינג עולה עם 'Scaling אגרסיבי'",
+      "תביעה נגד AppLovin: האם מודעות למבוגרים מגיעות לילדים?",
+      "כישלון לפיתוח ארוך: Rainbow Six Mobile נסגר לאחר 7 חודשים",
+      "גוגל שוב בבית המשפט: עמלות ה-Play Store תחת מתקפה בבריטניה",
+      "מעבר לרשתות ה-UA הגדולות: איפה הרווחים האמיתיים?",
+      "Google Playground: כלי ה-AI החדש לפיתוח משחקים מהיר",
+      "וייטנאם: מרכז כוח ייצור גלובלי ל-LiveOps ומשחקי היבריד"
+    ],
+    "key_takeaways": "מפתחים צריכים להעריך מחדש השקעות ב-AI, לתעדף חוויות שחקן חדשות על פני פרודוקטיביות גרידא, ולהיות מודעים לעלויות ארוכות טווח של שירותי AI צד שלישי שעלולות לעלות פי 20. | מפתחים צריכים לנתח את אסטרטגיות ה-Scaling האגרסיביות והמבוססות-תהליך של סטודיואים טורקיים בז'אנרים כמו פאזל ו-Hybridcasual, ולשקול שיתופי פעולה או כניסה לשווקים מתפתחים אלו. | מפעילים חייבים לבדוק בקפדנות את מדיניות הבטיחות לילדים, איסוף הנתונים ומנגנוני הציות של שותפי ה-Ad Monetization שלהם, במיוחד במשחקים שעשויים למשוך ילדים. | מפעילים צריכים להעריך ביקורתית מחזורי פיתוח ממושכים והקצאת משאבים נרחבת, גם עבור IP מבוסס, כדי להבטיח היתכנות שוק ברורה ומדדי ביצועים ניתנים להשגה לפני השקות גלובליות. | מפעילים צריכים לעקוב מקרוב אחר תביעה ייצוגית זו בבריטניה ולחצים רגולטוריים דומים, שכן התוצאה עשויה להשפיע עוד יותר על מבני עמלות הפלטפורמה והסכמי מפתחים-פלטפורמה. | מפעילים צריכים להעריך מחדש את אסטרטגיות ה-UA שלהם מעבר לרשתות המובילות, להתמקד ב-'Profit' כ-KPI מרכזי במקום מדדי Proxy, ולחקור את ה-'Long Tail' של ערוצי הפרסום. | מפעילים צריכים להתנסות בכלי יצירת משחקי AI כמו Google Playground לפרוטוטיפינג מהיר ואימות רעיונות, תוך ניצול כלי אלו לבדיקת קונספטים לפני הקצאת תקציבי פיתוח או UA משמעותיים. | מפעילים צריכים לבחון את וייטנאם כמרכז מתפתח לפיתוח משחקי מובייל, במיוחד משחקי Hybridcasual ופאזל, ולשקול יישום אסטרטגיות LiveOps המתמקדות ב'מרדפי משאבים' וב'חוויות Event-First' כדי לשפר את מעורבות השחקנים."
+  },
+  {
+    "episode_id": "ep_011",
+    "date": "2026-10-19",
+    "title": "ניצני רווח בסערה: 'Torture Sort', Gamer DNA ורגולציה גלובלית | Ben's Weekly Digest",
+    "topics_covered": [
+      "הצד האפל של המיון: 'Torture Sort' כמודל הכנסה חדש",
+      "Google Play מציגה את Gamer DNA: המהפכה בגילוי משחקים באמצעות AI",
+      "שינויים בהוצאות על רכישות בתוך האפליקציה: טורקיה כמנוע צמיחה",
+      "AdSurge: רשת הפרסום החדשה של Miniclip מתמקדת בתשואת מפרסמים",
+      "מכירה ישירה לצרכן (D2C): אסטרטגיה מקיפה להתמודדות עם מורכבות מסחר גלובלית"
+    ],
+    "key_takeaways": "לולאות משחק איטיות במכוון ומנגנוני Ad-gated יכולים להגדיל הכנסות מפרסומות באופן משמעותי, גם במחיר פגיעה בשימור שחקנים. | מנוע הגילוי החדש של Google Play, המבוסס על AI, יעביר את הפוקוס מדומיננטיות תרשימים להתאמה אישית לשחקן, ויחייב מפתחים לשנות את אסטרטגיות ה-ASO והעיצוב שלהם. | למרות ירידה גלובלית בהוצאות על רכישות בתוך האפליקציה, שווקים מתפתחים כמו טורקיה מראים צמיחה משמעותית, מה שמצביע על הזדמנויות חדשות למפתחים. | Miniclip השיקה את AdSurge, רשת פרסום חדשה המשתמשת בטכנולוגיית AI של Tencent כדי להגדיל את התשואה למפרסמים ולשפר את חווית השחקן, בניגוד לרשתות שמתעדפות את התשואה של עצמן. | מכירה ישירה לצרכן היא שכבת הצמיחה המהירה ביותר בגיימינג, ומחייבת אסטרטגיה משולבת של web stores, link-outs ו-distribution מקומי, תוך התאמה להעדפות תשלום ורגולציה אזוריות."
+  },
+  {
+    "episode_id": "ep_012",
+    "date": "2026-10-27",
+    "title": "סודות האלגוריתם של Block Blast, בנצ'מרקים לפאזל והקאמבק באוסטרליה | Ben's Weekly Digest",
+    "topics_covered": [
+      "הנדסה לאחור חושפת את מנוע המוניטיזציה של Block Blast",
+      "מדדי ביצועים מובילים מ-50 משחקי הפאזל הגדולים",
+      "Fortnite חוזר ל-iOS באוסטרליה בעקבות פסיקת בית משפט",
+      "מפת הבדיקות: Mo.co חוזר לבטא וההתרחבות של Playrix",
+      "Monopoly Go מכניס ל-Hasbro סכום של 41 מיליון דולר ברבעון השלישי",
+      "דירוג 50 מפתחות המובייל לשנת 2026"
+    ],
+    "key_takeaways": "המשחק מייצר בין 700 אלף למיליון דולר ביום מפרסומות באמצעות מודל מקומי שמנבא eCPM מ-27 פרמטרים ומכוון את רמת הקושי וההפסדים בהתאם לערך השחקן. | חציון שימור השחקנים בטופ 50 עומד על 42.8% ביום הראשון, 25.0% ביום השביעי ו-15.7% ביום השלושים, עם שונות דרמטית במוניטיזציה. | בית המשפט הפדרלי קבע כי Apple הפרה את חוקי התחרות וחייב פתיחה לחנויות צד שלישי ממרץ 2027 ללא עמלות מיותרות, מה שסלל את חזרת המשחק. | Supercell מחזירה את Mo.co למצב תחזוקה נמוכה בבטא לצורך שינויים מבניים, בעוד Playrix בוחנת מספר כותרים היברידיים במקביל. | ההכנסות של בעלת הזיכיון שומרות על יציבות מרשימה של 127 מיליון דולר בתשעת החודשים הראשונים של השנה הודות לעונות תוכן מתחלפות. | צמיחה שנתית צפויה של 6.8% בכלל השוק מונעת משיפור live ops ומעבר מואץ לערוצי מכירה ישירה לצרכן."
+  },
+  {
+    "episode_id": "ep_013",
+    "date": "2026-11-02",
+    "title": "מנופי צמיחה סמויים: מריקון משאבים ועד ניהול LiveOps מדויק | Ben's Weekly Digest",
+    "topics_covered": [
+      "ניצול משאבים קיימים והעלאת הכנסות בקז'ואל",
+      "אופטימיזציה של סלוטים ב-Township",
+      "סגירת Tetris Block Party ב-PlayStudios",
+      "מימון UA ללא דילול: השותפות בין Unity ל-PvX",
+      "קנס רגולטורי בדרום קוריאה מול Google ו-Apple",
+      "שכתוב מנוע הקוד ב-AdVenture Capitalist"
+    ],
+    "key_takeaways": "תכנון מנגנונים לריקון יתרות מטבע פרימיום ופריטים כפולים מייצר דרייב מחודש לרכישות בתוך האפליקציה. | אירועים שונים באותו סלוט מניעים מדדים מנוגדים; יש לתזמן אותם לפי יעדים עסקיים ולא לסירוגין באופן עיוור. | החברה ממשיכה בצמצום עלויות וסגירת כותרים שלא עמדו ביעדים כדי להתמודד עם לחצי נזילות ודרישות מסחר ב-Nasdaq. | מימון המבוסס על ביצועי קוהורטים מציע חלופה לגיוס הון, אך דורש שיתוף נתונים במסגרת ה-Developer Data Framework. | הגבלות על קישורי תשלום חיצוניים גוררות קנסות כבדים ומחזקות את הלגיטימציה של אסטרטגיות מכירה ישירה לצרכן. | חוב טכנולוגי מצטבר עלול לחייב שכתוב מלא של המשחק כדי לאפשר פיתוח עתידי, בתנאי שקיימת תמיכה פיננסית ארוכת טווח."
   }
 ]

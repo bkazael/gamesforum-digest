@@ -12,9 +12,8 @@ why, and what to do once a real Gamigion email is available to calibrate
 against.
 
 What IS real and being tested for keeps regardless of the exact template:
-  - IMAP is only ever asked for UNSEEN messages, via BODY.PEEK (no
-    unintended read-marking).
-  - A message is flagged \\Seen only after it parses successfully.
+  - IMAP searches a date-bounded window and fetches with BODY.PEEK while
+    selecting the mailbox read-only (no mailbox mutation).
   - The URL/title/text extraction shape matches what discovery.py expects.
   - A connection/login failure raises EmailFetchError distinctly from
     "mailbox reachable, nothing new" (empty list).
@@ -90,7 +89,7 @@ class _FakeIMAP:
     UNSEEN: set[bytes] = set()
     RAISE_ON_CONNECT = False
 
-    def __init__(self, host):
+    def __init__(self, host, timeout=None):
         if _FakeIMAP.RAISE_ON_CONNECT:
             raise OSError("connection refused (simulated)")
         self.host = host
@@ -99,13 +98,26 @@ class _FakeIMAP:
         if app_password == "wrong-password":
             raise Exception("AUTHENTICATIONFAILED")  # noqa: TRY002
 
-    def select(self, mailbox):
+    def select(self, mailbox, readonly=False):
+        assert readonly
         return "OK", [b"1"]
 
-    def search(self, charset, criteria):
-        assert criteria == "UNSEEN"
-        ids = b" ".join(sorted(_FakeIMAP.UNSEEN))
-        return "OK", [ids]
+    LAST_SEARCH: tuple = ()
+
+    def search(self, charset, *criteria):
+        assert criteria[0] == "SINCE" and criteria[1]
+        _FakeIMAP.LAST_SEARCH = criteria
+        ids = sorted(_FakeIMAP.INBOX)
+        if "FROM" in criteria:
+            # Real IMAP: case-insensitive substring of the From header.
+            want = criteria[criteria.index("FROM") + 1].strip('"').lower()
+            def sender(raw):
+                for line in raw.decode("utf-8", "replace").splitlines():
+                    if line.lower().startswith("from:"):
+                        return line.lower()
+                return ""
+            ids = [i for i in ids if want in sender(_FakeIMAP.INBOX[i])]
+        return "OK", [b" ".join(ids)]
 
     def fetch(self, msg_id, spec):
         assert spec == "(BODY.PEEK[])"
@@ -144,11 +156,11 @@ real_imap_ssl = S.imaplib.IMAP4_SSL
 os.environ["GMAIL_ADDRESS"] = "digest-ingest@example.com"
 os.environ["GMAIL_APP_PASSWORD"] = "correct-password"
 
-# ---------------------------------------------------------------- 1. happy path: one unread message
+# ---------------------------------------------------------------- 1. happy path: one recent message
 
 _install_fake({b"1": _fixture_email_bytes()}, {b"1"})
 items = S.from_email(SOURCE)
-check("one unread message yields one item", len(items) == 1, f"got {len(items)}")
+check("one recent message yields one item", len(items) == 1, f"got {len(items)}")
 if items:
     it = items[0]
     check("url is the /p/<slug> permalink",
@@ -160,14 +172,102 @@ if items:
     check("text excludes footer boilerplate",
           "Unsubscribe" not in it["text"] and "Manage your subscription" not in it["text"])
     check("item carries a usable published date", it["published"] is not None)
-check("the message was marked \\Seen after successful parse",
-      b"1" not in _FakeIMAP.UNSEEN, f"still unseen: {_FakeIMAP.UNSEEN}")
+    check("a full-text email is not flagged partial", it["partial"] is False)
+check("collection leaves mailbox message unchanged",
+      b"1" in _FakeIMAP.UNSEEN, f"unseen: {_FakeIMAP.UNSEEN}")
+check("collecting again does not consume the article",
+      len(S.from_email(SOURCE)) == 1)
 
-# ---------------------------------------------------------------- 2. no unread mail this week -- silence, not an error
+# ---------------------------------------------------------------- 2. no mail this week -- silence, not an error
 
 _install_fake({}, set())
 items = S.from_email(SOURCE)
-check("zero unread messages returns an empty list without raising", items == [])
+check("zero recent messages returns an empty list without raising", items == [])
+
+# ---------------------------------------------------------------- 2b. a shared (PA) inbox: only the newsletter's sender is read
+
+personal = b"""From: Dentist <reminders@clinic.example>
+Subject: Your appointment on Thursday
+Date: Mon, 01 Sep 2025 08:00:00 +0000
+Content-Type: text/html; charset="utf-8"
+
+<html><body><p>See you at 10:00. https://clinic.example/p/appointment-123</p></body></html>"""
+_install_fake({b"1": _fixture_email_bytes(), b"9": personal}, {b"1", b"9"})
+items = S.from_email(dict(SOURCE, sender="gamigion"))
+check("with sender set, IMAP is asked for FROM that sender",
+      _FakeIMAP.LAST_SEARCH[2:] == ("FROM", '"gamigion"'), str(_FakeIMAP.LAST_SEARCH))
+check("...and unrelated mail in the same inbox never becomes an article",
+      len(items) == 1 and "clinic" not in items[0]["url"], str([i["url"] for i in items]))
+items = S.from_email(SOURCE)
+check("without sender, the whole mailbox is read (dedicated-inbox mode)",
+      _FakeIMAP.LAST_SEARCH[2:] == ())
+
+import tomllib
+_profile = tomllib.loads((pathlib.Path(__file__).parent / "profile.toml").read_text(encoding="utf-8"))
+_gamigion = [x for x in _profile["sources"] if x.get("kind") == "email"]
+check("profile.toml's Gamigion source is narrowed to its sender (the inbox is shared)",
+      bool(_gamigion) and _gamigion[0].get("sender") == "gamigion")
+
+# ---------------------------------------------------------------- 2c. the REAL shape: a Substack preview (2026-10-15 Smash Fest email)
+
+def _real_shape_email(app_link: bool = True) -> bytes:
+    link = ('<a href="https://open.substack.com/pub/gamigion/p/smash-fest-level-deconstruction'
+            '?utm_source=email">READ IN APP</a>') if app_link else \
+           '<a href="https://substack.com/redirect/2/abc123?j=xyz">READ IN APP</a>'
+    html_body = f"""<html><body>
+<p>Forwarded this email? <a href="https://substack.com/redirect/1/x">Subscribe here</a> for more</p>
+<h1>Smash Fest Level Deconstruction (1-100)</h1>
+<p>100-Level FULL Breakdown with Raw Data</p>
+<p>Gamigion and Yagiz Gur</p><p>Preview</p>
+<p>{link}</p>
+<p>Created by Yagiz Gur, with Ceyda Malkoc</p>
+<p>Our Deconstructions are now FREE!</p>
+<p>THANKS TO OUR MARKET INTELLIGENCE PARTNER</p>
+<p>Smash Fest made 24.7M downloads and $6.2M in IAP revenue. Overall, Smash Fest has an
+IAP RpD of $0.25. About 85% of its IAP comes from the US, with an IAP RpD of $0.84. In the
+rest of the world it has 18.4M downloads, $951K in IAP and $0.05 IAP RpD.</p>
+<p>Royal Smash has 17.5M downloads and $6.25M in IAP. That gives it a worldwide IAP RpD that is
+44 percent higher than Smash Fest, and its US IAP RpD is 75 percent higher.</p>
+<p>Smash Fest has no in-game boosters. Only a pre-level booster and a fail offer, just like the
+early days of Pixel Flow. It is not fighting other five-person teams but teams of fifty to a
+hundred people, with more developers, more creatives, more tests and deeper UA experience.</p>
+<p>Smash Fest and Royal Smash have almost nothing in common on their levels. They are built
+around completely different level design approaches, compared side by side below.</p>
+<p>User's avatar</p>
+<p>Continue reading this post for free in the Substack app</p>
+<p>Claim my free post</p><p>Or upgrade your subscription. Upgrade to paid</p>
+<p>Like Comment Restack</p>
+<p>&copy; 2026 Gamigion contact@gamigion.com</p><p>Unsubscribe</p>
+</body></html>"""
+    msg = f"""From: Gamigion <gamigion@substack.com>
+Subject: Smash Fest Level Deconstruction (1-100)
+Date: {email.utils.format_datetime(__import__("datetime").datetime.now(__import__("datetime").timezone.utc))}
+MIME-Version: 1.0
+Content-Type: text/html; charset="utf-8"
+
+{html_body}"""
+    return msg.encode("utf-8")
+
+_install_fake({b"5": _real_shape_email()}, {b"5"})
+items = S.from_email(SOURCE)
+check("a real-shaped Substack preview yields one item", len(items) == 1, str(items))
+if items:
+    t = items[0]["text"]
+    check("...with the real analysis in it", "24.7M downloads" in t and "RpD" in t and "Pixel Flow" in t)
+    check("...and none of the paywall/preview chrome",
+          not any(x in t for x in ("Continue reading", "Claim my free post", "Upgrade to paid",
+                                   "Forwarded this email", "READ IN APP", "Unsubscribe", "Restack")), t[:300])
+    check("...and the model is told this is only a preview", "email preview of a longer post" in t)
+    check("...and the item is flagged partial, so it can never lead an episode", items[0]["partial"] is True)
+    check("the permalink comes from the Read-in-app link",
+          items[0]["url"] == "https://gamigion.substack.com/p/smash-fest-level-deconstruction", items[0]["url"])
+    check("title is the Subject", items[0]["title"] == "Smash Fest Level Deconstruction (1-100)")
+
+_install_fake({b"6": _real_shape_email(app_link=False)}, {b"6"})
+items = S.from_email(SOURCE)
+check("with only tracking redirects, the permalink falls back to the subject slug",
+      len(items) == 1 and items[0]["url"] == "https://gamigion.substack.com/p/smash-fest-level-deconstruction-1-100",
+      str([i["url"] for i in items]))
 
 # ---------------------------------------------------------------- 3. a message with no discoverable permalink is skipped, not crashed
 
@@ -180,7 +280,7 @@ Content-Type: text/html; charset="utf-8"
 _install_fake({b"2": bad}, {b"2"})
 items = S.from_email(SOURCE)
 check("a message with no matching /p/... link is skipped, not returned", items == [])
-check("an unparseable message is left UNSEEN for retry next run",
+check("an unparseable message remains unchanged for retry next run",
       b"2" in _FakeIMAP.UNSEEN, f"unseen: {_FakeIMAP.UNSEEN}")
 
 # ---------------------------------------------------------------- 4. login failure raises EmailFetchError distinctly

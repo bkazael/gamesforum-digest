@@ -24,10 +24,11 @@ from __future__ import annotations
 import datetime as dt
 import json
 import pathlib
+import runtime
 
-ROOT = pathlib.Path(__file__).resolve().parent
+ROOT = runtime.OUTPUT_ROOT
 MEMORY_FILE = ROOT / "memory.json"
-PROFILE_FILE = ROOT / "profile.toml"
+PROFILE_FILE = runtime.PROFILE_PATH
 
 DEFAULT_LOOKBACK = 3
 # Scoring looks further back than the script does: the script only needs
@@ -144,7 +145,6 @@ def append_entry(entry: dict) -> None:
     gamesforum_pipeline.py does this last, so a failed run never leaves a
     phantom episode in the archive."""
     episodes = _load_all()
+    episodes = [ep for ep in episodes if ep.get("date") != entry.get("date")]
     episodes.append(entry)
-    MEMORY_FILE.write_text(
-        json.dumps(episodes, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    runtime.atomic_write(MEMORY_FILE, json.dumps(episodes, ensure_ascii=False, indent=2))
