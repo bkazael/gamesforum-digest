@@ -389,6 +389,15 @@ def segment_problems(seg: dict, role: str, speakers: tuple[str, str], lang: str)
     if uncovered:
         problems.append(f"{len(seg['key_points'])} key points need more than {len(script)} turns")
     problems += script_quality.script_style_problems(script, lang)
+    if lang == "he":
+        # One turn written in English slipped through a lite model's story
+        # (2026-11-09 preview): the segment's overall Hebrew share still passed.
+        for i, turn in enumerate(script, 1):
+            letters = re.findall(r"[A-Za-z\u05d0-\u05ea]", turn["text"])
+            hebrew = sum(1 for c in letters if c >= "\u05d0")
+            if len(turn["text"].split()) >= 6 and letters and hebrew / len(letters) < 0.25:
+                problems.append(f"turn {i} is not in Hebrew; every turn is spoken Hebrew")
+                break
     if script and {t["speaker"] for t in script} != set(speakers):
         problems.append("both hosts must speak")
     return problems
