@@ -157,6 +157,11 @@ routine checks, a strong one only for design.
 | Monthly content + voice review | 2nd of the month | Content + voice (Sonnet) | Read the last 4 scripts and editorial reports: length, cuts, recurring review notes, hype words, English leaks, names to add to the glossary; open one PR with prompt/glossary tweaks | small |
 | Quarterly architecture review | Jan/Apr/Jul/Oct 5th | Architect (Opus) | Google model deprecations, quota/billing state, source health trend, dead code; update this plan | moderate, 4x a year |
 
+**How they are wired.** The three Claude checks are scheduled tasks that
+wake the Claude Code session this plan was written in (they need its GitHub
+access), so they run on whatever model that session is set to. Set it to
+Sonnet with `/model` after design work, so the routine checks stay cheap.
+
 The Monday check runs after all three scheduled firings (03:00, 06:00, 10:00
 UTC), which GitHub sometimes delays by hours. It never re-runs blindly. On
 the free tier one re-run spends a day's quota.
