@@ -46,6 +46,7 @@ except ModuleNotFoundError:           # 3.10 and older
         )
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import gamesforum_pipeline as _pipeline    # noqa: E402
 from gamesforum_pipeline import (          # noqa: E402
     fetch_article, gemini_json, log, GEMINI_SCORING_MODEL, GeminiQuotaExhausted,
 )
@@ -342,24 +343,60 @@ SCORE_SCHEMA = {
     "required": ["articles"],
 }
 
+def _scoring_call(prompt: str, schema: dict) -> dict:
+    """gemini_json on the scoring model; when its free-tier daily quota is
+    spent, the next model in the pipeline's QUOTA_FALLBACKS for the rest of
+    the run (the same rule the story calls follow)."""
+    chain = [m for m in dict.fromkeys([GEMINI_SCORING_MODEL, *_pipeline.QUOTA_FALLBACKS])
+             if m not in _pipeline._QUOTA_SPENT]
+    for i, m in enumerate(chain):
+        try:
+            return gemini_json(prompt, schema, model=m)
+        except GeminiQuotaExhausted:
+            _pipeline._QUOTA_SPENT.add(m)
+            if i == len(chain) - 1:
+                raise
+            print(f"::warning::{m}: daily request quota is spent; scoring with {chain[i + 1]}",
+                  flush=True)
+    raise GeminiQuotaExhausted("every configured model's daily quota is spent")
+
+
 # Batch size for scoring. Seventy-plus articles in one call is where the
 # first run fell over: the response drifted out of JSON entirely.
 SCORE_BATCH = 20
 
 
 def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
-    """Score in batches, with the response shape enforced by the API."""
+    """Score in batches, with the response shape enforced by the API.
+
+    A batch that still fails after gemini_json's own retries gets one more
+    try at the end of the pass. 2026-11-10: batch 2 met ten minutes of 503s,
+    batches 3 and 4 succeeded right after it, and the run stopped at 75%
+    coverage for want of the one batch that was never asked again.
+    """
     out: dict[int, dict] = {}
-    for start in range(0, len(candidates), SCORE_BATCH):
+    starts = list(range(0, len(candidates), SCORE_BATCH))
+    failed = _score_pass(profile, candidates, starts, out)
+    if failed:
+        log(f"  retrying {len(failed)} failed scoring batch(es) once more")
+        _score_pass(profile, candidates, failed, out)
+    return out
+
+
+def _score_pass(profile: dict, candidates: list[dict], starts: list[int],
+                out: dict[int, dict]) -> list[int]:
+    """Score the batches beginning at `starts` into `out`; return those that failed."""
+    failed = []
+    for start in starts:
         batch = candidates[start:start + SCORE_BATCH]
         try:
-            result = gemini_json(build_scoring_prompt(profile, batch),
-                                 SCORE_SCHEMA, model=GEMINI_SCORING_MODEL)
+            result = _scoring_call(build_scoring_prompt(profile, batch), SCORE_SCHEMA)
             rows = result.get("articles", []) if isinstance(result, dict) else []
         except GeminiQuotaExhausted:
             raise
         except Exception as e:                          # noqa: BLE001
             log(f"  batch {start // SCORE_BATCH + 1} failed ({e})")
+            failed.append(start)
             continue
         valid = {c["_idx"] for c in batch}
         for row in rows if isinstance(rows, list) else []:
@@ -382,7 +419,7 @@ def score_all(profile: dict, candidates: list[dict]) -> dict[int, dict]:
             }
         log(f"  batch {start // SCORE_BATCH + 1}: "
             f"{len(batch)} sent, {len(out)} scored so far")
-    return out
+    return failed
 
 
 # ------------------------------------------------------------ ledger
@@ -561,7 +598,7 @@ ARTICLE B: {b.get('title', '')}
 Are these genuinely the SAME underlying news event -- the same announcement,
 ruling, launch, or figures -- not merely related or about the same company?"""
     try:
-        result = gemini_json(prompt, DEDUPE_SCHEMA, model=GEMINI_SCORING_MODEL)
+        result = _scoring_call(prompt, DEDUPE_SCHEMA)
         same = bool(result.get("same_story"))
         log(f"    dedupe check: {a['title'][:40]!r} vs {b['title'][:40]!r} "
             f"-> {'SAME' if same else 'distinct'} "

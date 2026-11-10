@@ -337,9 +337,10 @@ with tempfile.TemporaryDirectory() as tmp:
               str(order))
         check("the intro prompt was built from the finished stories' list",
               "כותרת" in fake_all.intro_prompt)
-        check("the checkpoint is saved as each story finishes, after the script (intro owed), then after the intro",
-              saves[:3] == ["segments:1", "segments:2", "segments:3"]
-              and saves[3:] == ["script:no-intro", "script:intro"], str(saves))
+        check("the checkpoint is saved after selection, as each story finishes, after the script "
+              "(intro owed), then after the intro",
+              saves[:4] == ["segments:0", "segments:1", "segments:2", "segments:3"]
+              and saves[4:] == ["script:no-intro", "script:intro"], str(saves))
         check("...and every save really landed on disk, with real date-bearing articles",
               all(persisted), str(persisted))
         final = synth[0] if synth else []

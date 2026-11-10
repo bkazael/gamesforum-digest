@@ -1136,6 +1136,10 @@ def main() -> int:
             state["last_run"] = today
             runtime.atomic_write(STATE_FILE, json.dumps(state, indent=2, ensure_ascii=False))
             return 0
+        # Save the selection itself: scoring is ~5 paid calls, and a run that
+        # fails before its first story finishes must not buy it again.
+        data = {"segments": {}}
+        checkpoint.save_content(today, articles, data)
 
     # 1. The stories, one call each (segments.py). Skipped when the checkpoint
     # already holds the assembled script. The checkpoint always keeps the full

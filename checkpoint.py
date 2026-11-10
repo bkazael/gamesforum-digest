@@ -100,7 +100,7 @@ def load_content(date: str) -> tuple[list[dict], dict] | None:
         # than half-resuming into a confusing failure further downstream.
         # Either the assembled script, or the finished stories of an episode that
         # was interrupted mid-way (segments.py saves each one as it completes).
-        if not data.get("script") and not data.get("segments"):
+        if not data.get("script") and "segments" not in data:
             return None
         return articles, data
     except Exception:

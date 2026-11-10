@@ -361,13 +361,41 @@ _score_candidates = [{"_idx": i, "title": "A mobile game update",
                       "text": "Game update data " * 100,
                       "signals": D.substance_signals("Game update data " * 100)}
                      for i in range(D.SCORE_BATCH + 1)]
+D._pipeline._QUOTA_SPENT.clear()
 try:
     D.score_all(_score_profile, _score_candidates)
     check("a provider daily quota failure aborts scoring instead of retrying later batches", False)
 except D.GeminiQuotaExhausted:
-    check("a provider daily quota failure aborts scoring instead of retrying later batches",
-          len(_quota_calls) == 1 and _quota_calls[0].get("model") == D.GEMINI_SCORING_MODEL,
-          f"calls={len(_quota_calls)}, kwargs={_quota_calls}")
+    models = [c.get("model") for c in _quota_calls]
+    check("a spent daily quota tries each fallback model once, then aborts scoring "
+          "instead of retrying later batches",
+          models == list(dict.fromkeys([D.GEMINI_SCORING_MODEL, *D._pipeline.QUOTA_FALLBACKS])),
+          f"models tried: {models}")
+D._pipeline._QUOTA_SPENT.clear()
+
+# ---------------------------------------------------------------- 13b. a failed batch gets one more try at the end
+# 2026-11-10: batch 2 failed after ten minutes of 503s, batches 3-4 then
+# succeeded, and the run stopped at 75% coverage. The failed batch is now asked
+# once more after the pass.
+
+_batch_calls = {"n": 0}
+def _second_batch_fails_once(prompt, schema=None, **kwargs):
+    _batch_calls["n"] += 1
+    if _batch_calls["n"] == 2:
+        raise RuntimeError("HTTP Error 503: Service Unavailable")
+    ids = [int(x) for x in __import__("re").findall(r"^ID (\d+)$", prompt, __import__("re").M)]
+    return {"articles": [{"id": i, "score": 7, "why": "w", "topic": "t", "axis": "a",
+                          "reasoning": "r"} for i in ids]}
+
+D.gemini_json = _second_batch_fails_once
+_many = [{"_idx": i, "title": f"A mobile game update {i}", "text": "Game update data " * 100,
+          "signals": D.substance_signals("Game update data " * 100)}
+         for i in range(D.SCORE_BATCH * 2 + 1)]
+_got = D.score_all(_score_profile, _many)
+check("a scoring batch that fails is retried once at the end of the pass",
+      _batch_calls["n"] == 4, f"calls={_batch_calls['n']}")
+check("...and its articles are scored, so coverage is complete",
+      len(_got) == len(_many), f"{len(_got)}/{len(_many)} scored")
 
 # ---------------------------------------------------------------- partial (email-preview) articles never lead
 _prof = {"airtime": {"lead_share": 0.4, "second_share": 0.25, "remainder_share": 0.35}}
