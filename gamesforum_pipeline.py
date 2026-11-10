@@ -41,6 +41,10 @@ GEMINI_SCORING_MODEL = os.environ.get("GEMINI_SCORING_MODEL") or "gemini-2.5-fla
 # can use a model with more suitable throughput/cost characteristics.
 GEMINI_CREATIVE_MODEL = os.environ.get("GEMINI_CREATIVE_MODEL") or GEMINI_TEXT_MODEL
 TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
+# The per-story fact review, the title and the outro. Its own model so that
+# scoring, review and writing each draw on their own free-tier daily quota
+# (~20 requests per model; see PLAN.md, section 2).
+GEMINI_REVIEW_MODEL = os.environ.get("GEMINI_REVIEW_MODEL") or "gemini-3.5-flash"
 
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
 LANG = os.environ.get("DIGEST_LANG", "he")
@@ -1050,7 +1054,7 @@ def produce_script(articles: list[dict], today: str, memory_context: str,
     log(f"writing {len(articles)} stories, {segments.WORKERS} at a time...")
     return segments.build_episode(
         articles, call=call, save=save, resume=resume, log=log,
-        models={"creative": GEMINI_CREATIVE_MODEL, "review": GEMINI_SCORING_MODEL},
+        models={"creative": GEMINI_CREATIVE_MODEL, "review": GEMINI_REVIEW_MODEL},
         speakers=(SPEAKER_A, SPEAKER_B), lang=LANG, memory_context=memory_context,
         **({"min_segments": min_segments} if min_segments else {}))
 
@@ -1071,7 +1075,7 @@ def finalize_episode(data: dict, today: str) -> dict:
         "published_with_warnings": bool(dropped),
         "stories": len(data.get("kept") or []),
         "dropped": dropped,
-        "model": live_model(GEMINI_SCORING_MODEL),
+        "model": live_model(GEMINI_REVIEW_MODEL),
         "notes": notes,
     }
     runtime.atomic_write(ROOT / "reports" / f"{today}-editorial.json", json.dumps({
@@ -1220,6 +1224,7 @@ def main() -> int:
         "status": "complete", "date": today, "words": words, "duration_seconds": duration,
         "words_per_minute": wpm, "models": {"text": live_model(GEMINI_TEXT_MODEL),
         "scoring": live_model(GEMINI_SCORING_MODEL), "creative": live_model(GEMINI_CREATIVE_MODEL),
+        "review": live_model(GEMINI_REVIEW_MODEL),
         "tts": live_model(TTS_MODEL)}, "usage": USAGE_LOG,
         "elapsed_seconds": round(time.monotonic() - _run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),

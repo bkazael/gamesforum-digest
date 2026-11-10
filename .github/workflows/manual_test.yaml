@@ -60,6 +60,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
+          GEMINI_SCORING_MODEL: ${{ vars.GEMINI_SCORING_MODEL }}
+          GEMINI_REVIEW_MODEL: ${{ vars.GEMINI_REVIEW_MODEL }}
           VALIDATION_MODE: ${{ inputs.mode }}
         run: |
           case "$VALIDATION_MODE" in
