@@ -107,6 +107,33 @@ def load_content(date: str) -> tuple[list[dict], dict] | None:
         return None
 
 
+def adopt_recent(date: str, days: int = 3) -> str | None:
+    """Take over the unfinished episode of a day in the last `days`.
+
+    A Tuesday or Wednesday catch-up run (weekly-digest.yml) continues Monday's
+    paid work instead of buying it again: the selection and every finished
+    story move to today's name. Returns the adopted date, or None. Speech
+    chunks are not moved; they are keyed by their text and are cheap next to
+    the stories.
+    """
+    import datetime as _dt
+    if _content_path(date).exists():
+        return None
+    today = _dt.date.fromisoformat(date)
+    for path in sorted(CHECKPOINT_DIR.glob("????-??-??-content.json"), reverse=True):
+        try:
+            earlier = _dt.date.fromisoformat(path.name[:10])
+        except ValueError:
+            continue
+        if 0 < (today - earlier).days <= days:
+            try:
+                path.replace(_content_path(date))
+                return earlier.isoformat()
+            except OSError:
+                return None
+    return None
+
+
 def save_chunk(date: str, index: int, pcm: bytes, identity: str | None = None) -> None:
     """Store one synthesized audio chunk, by its position in the script."""
     try:

@@ -128,5 +128,23 @@ with tempfile.TemporaryDirectory() as tmp:
     finally:
         C.CHECKPOINT_DIR = real_dir
 
+# ---------------------------------------------------------------- catch-up runs adopt the week's unfinished episode
+import tempfile as _tf
+with _tf.TemporaryDirectory() as _tmp:
+    _saved = C.CHECKPOINT_DIR
+    C.CHECKPOINT_DIR = pathlib.Path(_tmp)
+    try:
+        C.save_content("2026-11-09", [{"title": "a"}], {"segments": {"0": {"status": "ok"}}})
+        check("a Tuesday run adopts Monday's unfinished episode",
+              C.adopt_recent("2026-11-10") == "2026-11-09"
+              and C.load_content("2026-11-10") is not None
+              and C.load_content("2026-11-09") is None)
+        check("nothing is adopted when today already has its own checkpoint",
+              C.adopt_recent("2026-11-10") is None)
+        C.save_content("2026-11-02", [{"title": "old"}], {"segments": {}})
+        check("last week's leftovers are never adopted", C.adopt_recent("2026-11-06") is None)
+    finally:
+        C.CHECKPOINT_DIR = _saved
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

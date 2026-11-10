@@ -22,6 +22,14 @@ for weeks. CI runs 12 zero-cost test files on every push.
 | 10-19 to 11-02 | published | episodes of 902-1,258 words (8-11 min) | design (one giant call) |
 | 11-09 | 65-70 | 503s and timeouts, then **429: free tier, 20 requests/day per model**, spent by manual re-runs | quota |
 | 11-10 | 72 | one scoring batch failed after 10 min of 503s and was never retried; stopped at 75% coverage | bug (fixed in f2559e8) |
+| 11-10 | 73 | 35 min of 503s on scoring (all scored), then 503s on every story until the run's deadline | Google overload |
+| 11-10 | 74 | a code push changed the checkpoint cache key, so the paid selection was lost; the writing model's quota was already spent **by the 503 retries of run 73**; one reviewer outage then ended the run | design + quota (fixed in this commit) |
+
+**The most important finding of the day:** on the free tier, requests that
+come back 503 still count against the 20-a-day quota. Run 73's story calls
+returned nothing but 503s and still used up `gemini-3.8-flash` for the day.
+On the free tier, patient retries during an outage burn the quota they're
+waiting for.
 
 Three of the six causes are about the Google account and quota rather than
 the code, and the code made each of them worse. It retried too fast, put
@@ -72,8 +80,10 @@ same budget. Two ways forward:
   the AI Studio billing page after the first paid week. A spending cap in the
   Google Cloud console removes the risk of surprises.
 
-**Recommendation: B.** It is the single change that removes the most failure
-modes for the least money. Everything below works under either option.
+**Recommendation: B, and more strongly after 11-10.** It is the single change
+that removes the most failure modes for the least money. On the free tier a
+Google overload day cannot be waited out, because the waiting itself spends
+the quota. Everything below works under either option.
 
 ## 3. Which model does which job
 
@@ -166,7 +176,9 @@ The Monday check runs after all three scheduled firings (03:00, 06:00, 10:00
 UTC), which GitHub sometimes delays by hours. It never re-runs blindly: on
 the free tier one full re-run spends a day's quota. A Monday lost to a Google
 outage is retried automatically on Tuesday and Wednesday (06:17 and 14:17
-UTC); those runs exit at once when the week already has an episode.
+UTC); those runs exit at once when the week already has an episode, and
+otherwise continue the week's unfinished episode (the checkpoint is kept per
+ISO week, and `checkpoint.adopt_recent()` moves it to the run's date).
 
 ## 6. Runbook: when an episode fails
 
@@ -175,7 +187,7 @@ UTC); those runs exit at once when the week already has an episode.
 | `402 ... prepayment credits are depleted` | The project's prepaid credit is gone | Top up, or switch to normal billing |
 | `429 ... per day ... limit: 20` | Free-tier daily quota spent | Nothing today; it resets in ~16h. The next model is used automatically if configured. Avoid manual re-runs |
 | `404 ... use models/X` | Model retired for this key | Automatic switch to X. Set the repo variable to X to make it permanent |
-| `503 high demand` repeated | Google overload (does not spend quota) | Nothing; the Tue/Wed catch-up runs resume from the checkpoint. A manual re-run hours later is fine |
+| `503 high demand` repeated | Google overload. On the free tier these attempts **do** spend the daily quota | Nothing; the Tue/Wed catch-up runs continue the week's checkpoint. Avoid same-day manual re-runs on the free tier |
 | `story N cut from the episode` | A factual error survived one rewrite | Read `reports/<date>-editorial.json`; usually fine as is |
 | `Only N stories survived review` | Fewer than 3 stories left | Check the editorial report; if the reviewer is wrong, tune the review prompt |
 | Python traceback anywhere else | A bug | Dev fix with a test, push, re-run once |

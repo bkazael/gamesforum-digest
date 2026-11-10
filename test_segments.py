@@ -80,6 +80,8 @@ check("a later story opens on its own, with no greeting or recap",
       "No greeting, no recap" in prompt(index=1))
 check("a middle story ends with a hand-over naming the next story",
       '"Next story title"' in prompt(index=1) and "hand-over" in prompt(index=1))
+check("the hand-over names the next subject but states none of its facts (a reviewer cut a story for that)",
+      "State no fact or number from it" in prompt(index=1))
 last = prompt(index=2, nxt=None)
 check("the last story does not hand over and does not sign off (the frame writes the outro)",
       "LAST story" in last and "show outro is written separately" in last)
@@ -201,12 +203,14 @@ check("a spoken number found in neither the article nor the points is flagged to
 # publishable false
 r = seg(stub(publishable=False))
 check("pure promotion is dropped without a review", r["status"] == "dropped" and "promotion" in r["reason"])
-# reviewer outage raises (so the run can resume), it is never a silent pass
-try:
-    seg(stub(fail_review=True))
-    check("a reviewer outage fails the run instead of publishing unreviewed", False, "no exception")
-except RuntimeError as e:
-    check("a reviewer outage fails the run instead of publishing unreviewed", "could not be reviewed" in str(e))
+# reviewer outage: the free numbers check decides (2026-11-10: one outage ended a run)
+plain = [{"speaker": A if i % 2 == 0 else B, "text": "תור על הכתבה, 41 מיליון."} for i in range(20)]
+r = seg(stub(fail_review=True, script=plain))
+check("a reviewer outage keeps a story whose numbers all match its article, marked unreviewed",
+      r["status"] == "ok" and "not reviewed" in r["review"][0]["problem"])
+r = seg(stub(fail_review=True, script=plain[:-1] + [{"speaker": B, "text": "ו-73 אחוז מזה, 41 מיליון."}]))
+check("...and cuts a story that says a number found nowhere in the article",
+      r["status"] == "dropped" and "73" in r["reason"])
 # an empty script is an error
 try:
     seg(stub(script=[]))

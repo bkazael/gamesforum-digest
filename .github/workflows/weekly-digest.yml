@@ -55,21 +55,26 @@ jobs:
 
       - name: Episode date
         id: ep
-        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
 
       # Every run gets a clean runner, so checkpoint.py's .checkpoint/ dir
       # would vanish between attempts without this -- and the whole point
       # of it is to survive a failed attempt. restore-keys does prefix
       # matching, so today's second attempt picks up today's first attempt
       # (cache keys are immutable, hence run_id in the key and a prefix to
-      # find it again). A new date simply finds nothing and starts fresh.
+      # find it again). Keyed by ISO week, not date+code hash: a code fix
+      # pushed mid-day, or a Tue/Wed catch-up run, must still find the
+      # week's unfinished episode (2026-11-10 lost a paid selection to a
+      # code push). checkpoint.adopt_recent() moves it to today's date.
       - name: Restore episode checkpoint
         continue-on-error: true   # no checkpoint just means "start fresh"
         uses: actions/cache/restore@v4
         with:
           path: .checkpoint
-          key: checkpoint-v2-${{ steps.ep.outputs.date }}-${{ hashFiles('*.py', 'profile.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: checkpoint-v2-${{ steps.ep.outputs.date }}-${{ hashFiles('*.py', 'profile.toml') }}-
+          key: checkpoint-v3-${{ steps.ep.outputs.week }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: checkpoint-v3-${{ steps.ep.outputs.week }}-
 
       # A step-level timeout smaller than the job's own (35) matters
       # specifically because a JOB-level timeout cancels every remaining
@@ -127,7 +132,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .checkpoint
-          key: checkpoint-v2-${{ steps.ep.outputs.date }}-${{ hashFiles('*.py', 'profile.toml') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: checkpoint-v3-${{ steps.ep.outputs.week }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload diagnostics
         if: always()

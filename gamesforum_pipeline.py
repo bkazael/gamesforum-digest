@@ -223,7 +223,7 @@ def fetch_article(url: str) -> dict | None:
 
 # ---------------------------------------------------------------- Gemini Text API
 
-def gemini_json(prompt: str, schema: dict | None = None, tries: int = 6,
+def gemini_json(prompt: str, schema: dict | None = None, tries: int = 4,
                 timeout: int | None = None, model: str | None = None) -> dict:
     """One schema-constrained Gemini call, retried on failure.
 
@@ -1151,6 +1151,9 @@ def main() -> int:
     # Resume first, before spending anything. An earlier attempt today may have
     # finished some or all of the stories (each is checkpointed the moment it
     # is done), so a retry pays only for what is missing. See checkpoint.py.
+    adopted = checkpoint.adopt_recent(today)
+    if adopted:
+        log(f"continuing the unfinished episode of {adopted} (a catch-up run)")
     resumed = checkpoint.load_content(today)
     if resumed:
         articles, data = resumed

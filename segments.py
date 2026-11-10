@@ -118,9 +118,9 @@ ROLES = {
 BRIEF_ARTICLE_WORDS = 250
 MIN_SEGMENTS = 3
 WORKERS = 3
-SEGMENT_TRIES = 7
+SEGMENT_TRIES = 4
 SEGMENT_TIMEOUT = 240
-SMALL_TRIES = 5
+SMALL_TRIES = 3
 
 
 def role_for(index: int, article: dict) -> str:
@@ -248,8 +248,10 @@ def segment_prompt(article: dict, index: int, total: int, role: str, next_title:
         ending = ("This is the LAST story. End it plainly on its own point. Do not hand over "
                   "and do not sign off: the show outro is written separately.")
     else:
-        ending = (f"End with a natural one-line hand-over to the next story: "
-                  f"\"{next_title}\". Vary the form; do not say 'let's move on to'.")
+        ending = (f"End with a natural one-line hand-over that names the SUBJECT of the next "
+                  f"story (its title: \"{next_title}\") in a few words. State no fact or "
+                  "number from it: this article is your only source, and the next story tells "
+                  "its own facts. Vary the form; do not say 'let's move on to'.")
     memory = ""
     if memory_context:
         memory = ("\nPREVIOUS EPISODES (continuity on ongoing STORYLINES only; mention one "
@@ -470,10 +472,20 @@ def build_segment(article: dict, index: int, total: int, role: str, next_title: 
                           sch["review"], model=models["review"], tries=SMALL_TRIES, timeout=150)
             issues = [i for i in review.get("issues") or [] if isinstance(i, dict)]
         except Exception as e:                                  # noqa: BLE001
-            # An unreviewed segment is not published on faith: the numbers check
-            # above already ran, and a reviewer outage is worth a retry of the
-            # whole run, not a silent pass.
-            raise RuntimeError(f"{tag} could not be reviewed ({type(e).__name__}: {e})") from e
+            # 2026-11-10: one reviewer outage ended a run whose stories were
+            # written. Without a review the free numbers check decides: a story
+            # that says a number found in neither its article nor its key points
+            # is cut, anything else ships with a note that it was not reviewed.
+            if suspects:
+                log(f"::warning::{tag} review unavailable and it says numbers not in the "
+                    f"article ({', '.join(suspects)}); cutting it")
+                return {**seg, "status": "dropped",
+                        "reason": f"unreviewed, unsupported numbers: {', '.join(suspects)}"}
+            log(f"::warning::{tag} review unavailable ({type(e).__name__}); its numbers all "
+                "match the article, keeping it unreviewed")
+            seg["review"] = [{"turn": 0, "kind": "OTHER", "blocking": False,
+                              "problem": "not reviewed (reviewer unavailable)", "fix": ""}]
+            break
         blocking = [i for i in issues if i.get("blocking") and i.get("kind") in ("FACT", "ATTRIBUTION")]
         seg["review"] = issues
         for i in issues:
