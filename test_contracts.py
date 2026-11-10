@@ -438,6 +438,28 @@ with tempfile.TemporaryDirectory() as tmp:
         os.environ.pop("FORCE_REGENERATE", None)
         (P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR, CP.CHECKPOINT_DIR) = saved
 
+# ---------------------------------------------------------------- 7b. catch-up runs on Tuesday and Wednesday
+# A Monday lost to an outage is retried on Tue/Wed; those runs must do nothing
+# when the week already has an episode, and must not block next Monday.
+
+with tempfile.TemporaryDirectory() as tmp:
+    saved_ep = P.EPISODES
+    P.EPISODES = pathlib.Path(tmp)
+    try:
+        (P.EPISODES / "2026-11-09.mp3").write_bytes(b"x")
+        check("a Tuesday after a published Monday sees the week's episode",
+              P.recent_episode("2026-11-10") == "2026-11-09")
+        check("the next Monday is not blocked by last week's episode",
+              P.recent_episode("2026-11-16") is None)
+        (P.EPISODES / "2026-11-09.mp3").unlink()
+        (P.EPISODES / "2026-11-11.mp3").write_bytes(b"x")
+        check("...nor by a Wednesday catch-up episode five days earlier",
+              P.recent_episode("2026-11-16") is None)
+        check("today's own episode is not 'recent' (the idempotence guard handles it)",
+              P.recent_episode("2026-11-11") is None)
+    finally:
+        P.EPISODES = saved_ep
+
 # ---------------------------------------------------------------- 8. the episode title
 #
 # A published item's guid is permanent, so the title is the one part of it

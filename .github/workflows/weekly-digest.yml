@@ -14,6 +14,12 @@ on:
     # slow API has time to recover between attempts.
     - cron: "0 6 * * 1"
     - cron: "0 10 * * 1"
+    # Catch-up firings for a Monday lost to a Google outage (2026-11-10:
+    # every Monday firing met hours of 503s). main() exits at once when the
+    # week already has an episode (recent_episode()), so on a normal week
+    # these cost a minute of runner time and no model calls.
+    - cron: "17 6 * * 2,3"
+    - cron: "17 14 * * 2,3"
   workflow_dispatch: {}   # Trigger manually from Actions tab
 
 permissions:

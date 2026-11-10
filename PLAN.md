@@ -163,8 +163,10 @@ access), so they run on whatever model that session is set to. Set it to
 Sonnet with `/model` after design work, so the routine checks stay cheap.
 
 The Monday check runs after all three scheduled firings (03:00, 06:00, 10:00
-UTC), which GitHub sometimes delays by hours. It never re-runs blindly. On
-the free tier one re-run spends a day's quota.
+UTC), which GitHub sometimes delays by hours. It never re-runs blindly: on
+the free tier one full re-run spends a day's quota. A Monday lost to a Google
+outage is retried automatically on Tuesday and Wednesday (06:17 and 14:17
+UTC); those runs exit at once when the week already has an episode.
 
 ## 6. Runbook: when an episode fails
 
@@ -173,7 +175,7 @@ the free tier one re-run spends a day's quota.
 | `402 ... prepayment credits are depleted` | The project's prepaid credit is gone | Top up, or switch to normal billing |
 | `429 ... per day ... limit: 20` | Free-tier daily quota spent | Nothing today; it resets in ~16h. The next model is used automatically if configured. Avoid manual re-runs |
 | `404 ... use models/X` | Model retired for this key | Automatic switch to X. Set the repo variable to X to make it permanent |
-| `503 high demand` repeated | Google overload | Nothing; the next scheduled run resumes from the checkpoint |
+| `503 high demand` repeated | Google overload (does not spend quota) | Nothing; the Tue/Wed catch-up runs resume from the checkpoint. A manual re-run hours later is fine |
 | `story N cut from the episode` | A factual error survived one rewrite | Read `reports/<date>-editorial.json`; usually fine as is |
 | `Only N stories survived review` | Fewer than 3 stories left | Check the editorial report; if the reviewer is wrong, tune the review prompt |
 | Python traceback anywhere else | A bug | Dev fix with a test, push, re-run once |

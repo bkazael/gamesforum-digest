@@ -1039,6 +1039,29 @@ def publication_complete(today: str) -> bool:
         return False
 
 
+CATCH_UP_WINDOW_DAYS = 4
+
+
+def recent_episode(today: str, days: int = CATCH_UP_WINDOW_DAYS) -> str | None:
+    """The date of an episode published in the `days` before `today`, if any.
+
+    The workflow also fires on Tuesday and Wednesday so a Monday lost to a
+    Google outage (2026-11-10: 35 minutes of 503s on scoring, then the stories)
+    still gets its episode that week. Those catch-up firings must do nothing
+    when the week already has one. Four days: a Wednesday catch-up is five
+    days before the next Monday, which must still run.
+    """
+    day = dt.date.fromisoformat(today)
+    for mp3 in sorted(EPISODES.glob("????-??-??.mp3"), reverse=True):
+        try:
+            published = dt.date.fromisoformat(mp3.stem)
+        except ValueError:
+            continue
+        if 0 < (day - published).days <= days:
+            return mp3.stem
+    return None
+
+
 def produce_script(articles: list[dict], today: str, memory_context: str,
                    resume: dict | None, min_segments: int | None = None) -> dict:
     """The stories, title, outro and digest summary (no intro yet). One Gemini
@@ -1120,6 +1143,10 @@ def main() -> int:
         return 0
     if force:
         checkpoint.clear(today)
+    earlier = recent_episode(today)
+    if earlier and dt.date.fromisoformat(today).weekday() != 0 and not force:
+        log(f"this week already has an episode ({earlier}); a catch-up run has nothing to do.")
+        return 0
 
     # Resume first, before spending anything. An earlier attempt today may have
     # finished some or all of the stories (each is checkpointed the moment it
