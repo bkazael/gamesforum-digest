@@ -18,8 +18,11 @@ on:
     # every Monday firing met hours of 503s). main() exits at once when the
     # week already has an episode (recent_episode()), so on a normal week
     # these cost a minute of runner time and no model calls.
-    - cron: "17 6 * * 2,3"
-    - cron: "17 14 * * 2,3"
+    # After 08:00 UTC on purpose: the free-tier daily quota resets at
+    # midnight Pacific, and an earlier catch-up would meet the quota the
+    # failed Monday runs already spent.
+    - cron: "17 9 * * 2,3"
+    - cron: "17 15 * * 2,3"
   workflow_dispatch: {}   # Trigger manually from Actions tab
 
 permissions:

@@ -175,8 +175,8 @@ Sonnet with `/model` after design work, so the routine checks stay cheap.
 The Monday check runs after all three scheduled firings (03:00, 06:00, 10:00
 UTC), which GitHub sometimes delays by hours. It never re-runs blindly: on
 the free tier one full re-run spends a day's quota. A Monday lost to a Google
-outage is retried automatically on Tuesday and Wednesday (06:17 and 14:17
-UTC); those runs exit at once when the week already has an episode, and
+outage is retried automatically on Tuesday and Wednesday (09:17 and 15:17
+UTC, after the free-tier quota resets at midnight Pacific); those runs exit at once when the week already has an episode, and
 otherwise continue the week's unfinished episode (the checkpoint is kept per
 ISO week, and `checkpoint.adopt_recent()` moves it to the run's date).
 
