@@ -203,12 +203,39 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(p.gemini_json_quota("y", {}, model="primary"), {"ok": "second"})
         self.assertEqual(seen, ["primary", "second", "second"])
 
-    def test_overload_is_waited_out_on_the_same_model_not_swapped(self):
+    def test_a_model_that_keeps_timing_out_is_skipped_for_the_rest_of_the_run(self):
+        seen = []
+        def fake(prompt, schema, tries, timeout, model):
+            seen.append((model, tries))
+            if model == "primary":
+                raise TimeoutError("The read operation timed out")
+            return {"ok": model}
+        with patch.object(p, "gemini_json", side_effect=fake), patch.object(p, "_QUOTA_SPENT", set()), \
+                patch.object(p, "_UNHEALTHY", set()), patch.object(p, "_MODEL_FAILS", {}), \
+                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+            self.assertEqual(p.gemini_json_quota("a", {}, model="primary", tries=4), {"ok": "second"})
+            self.assertEqual(p.gemini_json_quota("b", {}, model="primary", tries=4), {"ok": "second"})
+            self.assertEqual(p.gemini_json_quota("c", {}, model="primary", tries=4), {"ok": "second"})
+        # two calls tried the primary (only twice each), then it was skipped
+        self.assertEqual(seen, [("primary", 2), ("second", 4), ("primary", 2), ("second", 4), ("second", 4)])
+
+    def test_the_last_model_keeps_its_error_and_all_its_tries(self):
         def fake(prompt, schema, tries, timeout, model):
             raise urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
         with patch.object(p, "gemini_json", side_effect=fake) as call, patch.object(p, "_QUOTA_SPENT", set()), \
+                patch.object(p, "_UNHEALTHY", set()), patch.object(p, "_MODEL_FAILS", {}), \
                 patch.object(p, "QUOTA_FALLBACKS", ["second"]):
             with self.assertRaises(urllib.error.HTTPError):
+                p.gemini_json_quota("x", {}, model="primary", tries=4)
+        self.assertEqual([c.kwargs["tries"] for c in call.call_args_list], [2, 4])
+
+    def test_a_budget_stop_is_not_mistaken_for_a_dead_model(self):
+        def fake(prompt, schema, tries, timeout, model):
+            raise RuntimeError("Insufficient run budget for retry")
+        with patch.object(p, "gemini_json", side_effect=fake) as call, patch.object(p, "_QUOTA_SPENT", set()), \
+                patch.object(p, "_UNHEALTHY", set()), patch.object(p, "_MODEL_FAILS", {}), \
+                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+            with self.assertRaises(RuntimeError):
                 p.gemini_json_quota("x", {}, model="primary")
         self.assertEqual(call.call_count, 1)
 

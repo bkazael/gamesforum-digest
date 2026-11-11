@@ -333,23 +333,61 @@ QUOTA_FALLBACKS = [m.strip() for m in (os.environ.get("GEMINI_QUOTA_FALLBACKS")
 _QUOTA_SPENT: set[str] = set()
 
 
+# A model that keeps timing out or answering 503 is as unusable as one whose
+# quota is gone, and on the free tier every attempt it fails still spends the
+# 20-a-day quota: 2026-11-11, gemini-3.8-flash timed out on four stories (4
+# tries each, 240s apiece) and used its whole day's quota in 35 minutes while
+# gemini-3.5-flash answered the same calls in 20 seconds. After this many
+# calls that exhausted their tries on such errors, the model is skipped for
+# the rest of the run.
+UNHEALTHY_AFTER_FAILED_CALLS = 2
+FIRST_MODEL_TRIES = 2
+_MODEL_FAILS: dict[str, int] = {}
+_UNHEALTHY: set[str] = set()
+
+
+def _is_transient(e: Exception) -> bool:
+    if isinstance(e, urllib.error.HTTPError):
+        return e.code in (408, 429, 500, 502, 503, 504)
+    # Timeouts, resets and DNS/connection errors; a RuntimeError is our own
+    # run-budget signal and must propagate.
+    return isinstance(e, (OSError, ValueError)) and not isinstance(e, GeminiQuotaExhausted)
+
+
 def gemini_json_quota(prompt: str, schema: dict | None = None, *, model: str,
-                      tries: int = 6, timeout: int | None = None) -> dict:
-    """gemini_json that moves to the next model only when `model`'s daily quota is spent."""
-    chain = [m for m in dict.fromkeys([model, *QUOTA_FALLBACKS]) if m not in _QUOTA_SPENT]
+                      tries: int = 4, timeout: int | None = None) -> dict:
+    """gemini_json that moves to the next model when `model` cannot serve the call.
+
+    Moves on when the model's daily quota is spent, or when it exhausted its
+    (few) tries on timeouts/overload; after repeated failed calls the model is
+    skipped for the rest of the run. The last model in the chain gets all of
+    `tries` and its error is raised.
+    """
+    chain = [m for m in dict.fromkeys([model, *QUOTA_FALLBACKS])
+             if m not in _QUOTA_SPENT and m not in _UNHEALTHY] or [model]
     for i, m in enumerate(chain):
+        last = i == len(chain) - 1
         try:
-            return gemini_json(prompt, schema, tries=tries, timeout=timeout, model=m)
+            result = gemini_json(prompt, schema, tries=tries if last else min(tries, FIRST_MODEL_TRIES),
+                                 timeout=timeout, model=m)
+            _MODEL_FAILS[m] = 0
+            return result
         except GeminiQuotaExhausted:
             _QUOTA_SPENT.add(m)
-            if i == len(chain) - 1:
+            if last:
                 raise
             print(f"::warning::{m}: daily request quota is spent; using {chain[i + 1]} "
                   "for the rest of this run.", flush=True)
+        except Exception as e:                                  # noqa: BLE001
+            if last or not _is_transient(e):
+                raise
+            _MODEL_FAILS[m] = _MODEL_FAILS.get(m, 0) + 1
+            note = f"{m} did not answer ({type(e).__name__}); trying {chain[i + 1]} for this call"
+            if _MODEL_FAILS[m] >= UNHEALTHY_AFTER_FAILED_CALLS:
+                _UNHEALTHY.add(m)
+                note += f", and skipping {m} for the rest of this run"
+            print(f"::warning::{note}.", flush=True)
     raise GeminiQuotaExhausted("every configured model's daily quota is spent")
-
-
-
 
 
 # ---------------------------------------------------------------- the intro, written last

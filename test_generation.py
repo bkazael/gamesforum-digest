@@ -89,7 +89,7 @@ check("a good intro is welcome + the model's turns", turns[0] == P.welcome_turn(
 check("the welcome line is fixed in code, not left to the model",
       turns[0]["text"].startswith("ברוכים הבאים ל-Ben's Weekly Digest"))
 check("write_intro asks for INTRO_SCHEMA with a short bounded call",
-      intro_seen["schema"] is P.INTRO_SCHEMA and intro_seen["kw"].get("tries") == 4)
+      intro_seen["schema"] is P.INTRO_SCHEMA and intro_seen["kw"].get("tries") in (2, 4) and intro_seen["kw"].get("timeout") == 150)
 ip = intro_seen["prompts"][0]
 check("the intro prompt is built from the FINISHED episode: its story list", "EU Kids Act" in ip and "YouTube Playables" in ip)
 check("the intro prompt carries the stories' striking facts and the through-line",
