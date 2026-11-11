@@ -655,6 +655,13 @@ def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[d
         if len(chosen) >= thr["max_articles"]:
             art["_reject"] = f"מחוץ ל-top {thr['max_articles']}"
             continue
+        # Slots beyond the core are for strong stories only (2026-11-11: 8-15
+        # articles a week score 8+, the episode took 6 and ran 8-12 minutes).
+        core = int(thr.get("core_articles", thr["max_articles"]))
+        extra_min = float(thr.get("extra_slot_min_score", 0))
+        if len(chosen) >= core and art["_score"] < extra_min:
+            art["_reject"] = f"מקום {len(chosen) + 1} דורש ציון {extra_min:g}+"
+            continue
         if is_duplicate(art, chosen):
             continue
 

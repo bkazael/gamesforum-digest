@@ -97,6 +97,7 @@ the strong model only where wording is the product.
 | Intro | creative model | Same reason; 1-2 calls |
 | Fact review per story | `gemini-3.5-flash` (`GEMINI_REVIEW_MODEL`, added 11-10) | Better at catching wrong numbers than lite, and has its own quota |
 | Title + outro | review model | Small, structured |
+| Proofreading, whole episode (added 11-11) | creative model, falls back down the chain | One call; Hebrew spelling and grammar need the strongest Hebrew model; never blocks the run |
 | Speech | `gemini-2.5-flash-preview-tts` (`TTS_MODEL`) | Only TTS model in use; swap if retired (automatic on a 404 that names a replacement) |
 | Pro models | not used | Slower, pricier, and the quality gap is not where our failures are |
 
@@ -162,7 +163,7 @@ routine checks, a strong one only for design.
 
 | Check | When | Who (model) | Does | Cost |
 | --- | --- | --- | --- | --- |
-| CI | every push | GitHub, no model | 12 test files, zero Gemini calls | free |
+| CI | every push | GitHub, no model | 13 test files, zero Gemini calls | free |
 | Monday run check | Mon 15:47 UTC | QA (Sonnet) | Did the episode publish? If not: classify cause from the log, fix only a clear bug, re-run once if quota allows, report in Hebrew | a few cents of Claude, 0-1 Gemini runs |
 | Monthly content + voice review | 2nd of the month | Content + voice (Sonnet) | Read the last 4 scripts and editorial reports: length, cuts, recurring review notes, hype words, English leaks, names to add to the glossary; open one PR with prompt/glossary tweaks | small |
 | Quarterly architecture review | Jan/Apr/Jul/Oct 5th | Architect (Opus) | Google model deprecations, quota/billing state, source health trend, dead code; update this plan | moderate, 4x a year |

@@ -411,5 +411,21 @@ check("...so it gets the smallest share, never the lead",
 check("the order inside the full articles is untouched (score order)",
       [a["_score"] for a in _arts[:3]] == [8, 7, 6])
 
+# ---------------------------------------------------------------- extra slots (2026-11-11)
+D.confirm_same_story = lambda a, b: False
+_pool = [art(f"Distinct story number {i} about topic{i}", f"unique{i} thing{i} detail{i}", sc,
+             source=f"Src{i}") for i, sc in enumerate([10, 9, 9, 8, 8, 7, 8.5, 7, 6.5, 8])]
+_srcs = [{"name": f"Src{i}", "max_per_episode": 3} for i in range(10)]
+_got = D.select_stories(_pool, _srcs, {"min_score": 6, "max_articles": 8, "core_articles": 6,
+                                       "extra_slot_min_score": 8.0})
+check("six core slots take the best over the bar; slots 7-8 take only 8+ stories (here one more)",
+      len(_got) == 7 and _got[6]["_score"] == 8, str([a["_score"] for a in _got]))
+check("a 7 that missed the core is rejected with the reason", any(
+    a["_score"] == 7 and "דורש ציון" in a.get("_reject", "") for a in _pool))
+_got = D.select_stories([a for a in _pool if a["_score"] < 8 or a["_score"] >= 9],
+                        _srcs, {"min_score": 6, "max_articles": 8, "core_articles": 6,
+                                "extra_slot_min_score": 8.0})
+check("a weak week stays at six stories rather than padding", len(_got) == 6, str(len(_got)))
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

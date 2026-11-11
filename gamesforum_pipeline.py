@@ -30,6 +30,7 @@ import article_parser
 import audio_tools
 import speech as speech_tools
 import source_health
+import proofread
 
 # ---------------------------------------------------------------- config
 
@@ -1154,6 +1155,7 @@ def finalize_episode(data: dict, today: str) -> dict:
         "dropped": dropped,
         "model": live_model(GEMINI_REVIEW_MODEL),
         "notes": notes,
+        "proofread": data.get("proofread"),
     }
     runtime.atomic_write(ROOT / "reports" / f"{today}-editorial.json", json.dumps({
         **data["editorial_review"],
@@ -1239,13 +1241,26 @@ def main() -> int:
         data = {**built, "source_alerts": source_health.pending_alerts(),
                 # Explicitly False: a resumed run knows the intro is still owed
                 # and a legacy checkpoint without the key never gets a second greeting.
-                "intro_done": False}
+                "intro_done": False,
+                # Same idea for the proofreading pass (proofread.py): a legacy
+                # checkpoint without the key, whose speech may already be cached,
+                # is never re-proofread, so its cached chunks stay valid.
+                "proofread_done": False}
         checkpoint.save_content(today, selected, data)
 
     # The intro is written LAST, once the stories it previews exist. Never
     # raises (it falls back to a plain welcome), so this cannot fail a run.
     if data.get("intro_done") is False:
         data = add_intro(data)
+        checkpoint.save_content(today, selected, data)
+
+    # Proofreading: one call over the whole episode, after the intro so it reads
+    # what the listener hears. Never raises; see proofread.py.
+    if data.get("proofread_done") is False:
+        data["script"], data["proofread"] = proofread.proofread_episode(
+            data["script"], call=lambda *a, **k: gemini_json_quota(*a, **k),
+            model=GEMINI_CREATIVE_MODEL, lang=LANG, log=log)
+        data["proofread_done"] = True
         checkpoint.save_content(today, selected, data)
 
     data = finalize_episode(data, today)

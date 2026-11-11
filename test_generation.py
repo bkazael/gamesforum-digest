@@ -278,6 +278,10 @@ def fake_all(prompt, schema=None, **kw):
         order.append("intro")
         fake_all.intro_prompt = prompt
         return GOOD_INTRO
+    if "edits" in props:
+        order.append("proofread")
+        fake_all.proof_prompt = prompt
+        return {"edits": []}
     raise AssertionError("unexpected schema")
 
 def setup_env(tmp_path, fake):
@@ -317,6 +321,7 @@ with tempfile.TemporaryDirectory() as tmp:
         saves.append("script" if data.get("script") else "segments:%d" % len(data.get("segments") or {}))
         if data.get("script"):
             saves[-1] += ":intro" if data.get("intro_done") else ":no-intro"
+            saves[-1] += ":proofread" if data.get("proofread_done") else ""
         real_save(date, arts, data)
         # The 2026-10-04 live run printed "could not save content (Object of
         # type date is not JSON serializable)" twice and still went green --
@@ -332,15 +337,18 @@ with tempfile.TemporaryDirectory() as tmp:
         rc = P.main()
         check("main() completes with the story, frame and intro stages", rc == 0)
         check("the stages run in the designed order: every story and its review, then the frame, then the intro",
-              order[-2:] == ["frame", "intro"] and order.count("story") == 3 and order.count("review") == 3
+              order[-3:] == ["frame", "intro", "proofread"] and order.count("story") == 3 and order.count("review") == 3
               and order.index("frame") > max(i for i, o in enumerate(order) if o in ("story", "review")),
               str(order))
         check("the intro prompt was built from the finished stories' list",
               "כותרת" in fake_all.intro_prompt)
         check("the checkpoint is saved after selection, as each story finishes, after the script "
-              "(intro owed), then after the intro",
+              "(intro owed), after the intro, then after proofreading",
               saves[:4] == ["segments:0", "segments:1", "segments:2", "segments:3"]
-              and saves[4:] == ["script:no-intro", "script:intro"], str(saves))
+              and saves[4:] == ["script:no-intro", "script:intro", "script:intro:proofread"], str(saves))
+        check("the proofreader reads the whole episode, intro included",
+              "ברוכים הבאים" in fake_all.proof_prompt or "Welcome" in fake_all.proof_prompt
+              or "1. " in fake_all.proof_prompt)
         check("...and every save really landed on disk, with real date-bearing articles",
               all(persisted), str(persisted))
         final = synth[0] if synth else []
@@ -365,8 +373,8 @@ with tempfile.TemporaryDirectory() as tmp:
                 for i in (0, 1)}
         CP.save_content(today, ARTICLES, {"segments": done})
         P.main()
-        check("a resumed run with two stories done writes only the third (plus its review, the frame, the intro)",
-              order == ["story", "review", "frame", "intro"], str(order))
+        check("a resumed run with two stories done writes only the third (plus its review, the frame, the intro, the proofread)",
+              order == ["story", "review", "frame", "intro", "proofread"], str(order))
 
         # A resumed run that still owes the intro writes ONLY the intro.
         order.clear(); saves.clear(); synth.clear()
