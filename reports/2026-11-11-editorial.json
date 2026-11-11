@@ -1,0 +1,170 @@
+{
+  "passed": false,
+  "published_with_warnings": true,
+  "stories": 5,
+  "dropped": [
+    {
+      "index": 4,
+      "reason": "unresolved factual problem: turn 15: The conversation introduces the number 13 regarding Take-Two mobile bookings falling 13%, but this number does not appear anywhere in the provided article text. -> Remove the mention of the 13% drop or the external article reference, as it is not supported by the provided text."
+    }
+  ],
+  "model": "gemini-3.5-flash",
+  "notes": [
+    {
+      "turn": 0,
+      "kind": "OTHER",
+      "blocking": false,
+      "problem": "not reviewed (reviewer unavailable)",
+      "fix": ""
+    },
+    {
+      "turn": 3,
+      "kind": "OTHER",
+      "blocking": false,
+      "problem": "נפלה טעות סופר במילה \"ענייה\" במקום \"עלייה\" (\"ענייה מ-42 אחוז\").",
+      "fix": "יש לתקן ל-\"עלייה מ-42 אחוז\"."
+    },
+    {
+      "turn": 10,
+      "kind": "OTHER",
+      "blocking": false,
+      "problem": "Yoni brings up Monopoly Go, which is completely unrelated to the article about Rovio, Ruby Games, and Alictus.",
+      "fix": "Remove the mention of Monopoly Go or replace it with a reference from the text, such as the Paxie Games analogy."
+    },
+    {
+      "turn": 15,
+      "kind": "FACT",
+      "blocking": true,
+      "problem": "The conversation introduces the number 13 regarding Take-Two mobile bookings falling 13%, but this number does not appear anywhere in the provided article text.",
+      "fix": "Remove the mention of the 13% drop or the external article reference, as it is not supported by the provided text."
+    }
+  ],
+  "segments": {
+    "0": {
+      "status": "ok",
+      "reason": null,
+      "stance": "NEUTRAL_REPORTING",
+      "headline": "בית משפט בארה״ב מטיל הגבלות חמורות על חשבונות Papaya Gaming",
+      "key_points": [
+        "בית המשפט לפשיטות רגל בדלאוור אסר על Papaya Gaming להעביר כספים מחשבונות הבנק שלה בארה״ב.",
+        "הצו ניתן בעקבות חוב של כ-730 מיליון דולר ל-Skillz, הכולל 719 מיליון דולר פיצויים על פרסום מטעה ו-10 מיליון דולר הוצאות משפט.",
+        "השופט דחה את בקשת Papaya להכיר בהליכי חדלות הפירעון שלה מישראל בארה״ב לאחר שימוע של 3 ימים.",
+        "ההחלטה התקבלה לאחר שנחשפה העברה לא מדווחת של יותר מ-70 מיליון דולר מארה״ב לישראל לפני המשפט באפריל 2026.",
+        "Papaya מחויבת לממן תשלומים עסקיים שוטפים מתוך חשבונות מחוץ לארה״ב בשיעור של 115% מראש מכל סכום תשלום.",
+        "חל איסור להעביר כספים לבעלי מניות, מקורבים או חברות קשורות, וקיימת חובת דיווח על כל תשלום ל-US Trustee ולעורכי הדין של Skillz.",
+        "Papaya ערערה על פסק הדין אך לא הפקידה ערבות, והנושים בישראל יצביעו ב-8 בנובמבר 2026 על הצעת הסדר חוב מעודכנת."
+      ],
+      "caution": "הכתבה אינה מציינת כמה נזילות כספית נותרה ל-Papaya בחשבונות מחוץ לארה״ב כדי לעמוד בדרישת המימון מראש של 115% מכל תשלום.",
+      "review": []
+    },
+    "1": {
+      "status": "ok",
+      "reason": null,
+      "stance": "NEUTRAL_REPORTING",
+      "headline": "האיחוד האירופי מקדם הגבלות על מונטיזציה ומנגנוני התקדמות במשחקים",
+      "key_points": [
+        "טיוטה שהודלפה לקראת הצגת חוק ההגינות הדיגיטלית (Digital Fairness Act) ב-11 בנובמבר 2026 מציעה להחליף דירקטיבה קיימת בתקנה מחייבת אחידה בכל מדינות האיחוד.",
+        "סעיפים 14 עד 17 בטיוטה אוסרים על loot boxes בתשלום ומנגנוני pay-to-win ו-pay-to-progress עבור קטינים, ומחייבים כיבוי מטבעות וירטואליים כברירת מחדל ללא אישור הורים.",
+        "ההצעה מחייבת הצגת שווי כספי אמיתי של מטבעות וירטואליים, חשיפת הסתברויות בפרסים משתנים, ואפשרות למבוגרים לכבות פיצ'רים המעודדים שימוש כפייתי.",
+        "מנגנוני האכיפה כוללים קנסות של עד 6% מהמחזור השנתי העולמי של החברה במקרים של הפרות מסוימות.",
+        "הטיוטה דורשת fairness-by-design ואוסרת על עיצוב ממשקים מניפולטיבי (dark patterns) המשפיע מהותית על התנהגות הצרכן."
+      ],
+      "caution": "מדובר בטיוטה ראשונית שהודלפה לפני תהליך חקיקה מלא בפרלמנט ובמועצת האיחוד, והיא אינה מפרטת כיצד ייושם אימות גיל או מה ההגדרה המדויקת למנגנונים המעודדים שימוש מופרז.",
+      "review": [
+        {
+          "turn": 0,
+          "kind": "OTHER",
+          "blocking": false,
+          "problem": "not reviewed (reviewer unavailable)",
+          "fix": ""
+        }
+      ]
+    },
+    "2": {
+      "status": "ok",
+      "reason": null,
+      "stance": "NEUTRAL_REPORTING",
+      "headline": "סגירת Fortis Games: לקחים ממימון ריכוזי והרחבת צוות",
+      "key_points": [
+        "חברת Fortis Games סגרה את פעילותה עם פגיעה בלמעלה מ-400 משרות, לאחר שהשקיעה סביב 300 מיליון דולר בניסיון להשיק שלושה משחקי מובייל.",
+        "החברה הוקמה במרץ 2022 במימון מלא של Sands Casinos עם 150 עובדים, והתרחבה ל-300 עובדים באוגוסט 2023 ועד ל-440 עובדים בעת הסגירה.",
+        "המשחק השלישי של החברה, Twilight Towers, הגיע לשלב ההשקה הרכה בספטמבר 2025 ונסגר עקב שימור שחקנים חלש.",
+        "מודל המימון מישות יחידה סיפק מהירות וסבלנות אך מנע סיגנלים של השוק והוביל לגידול בצוות טרם הוכחת המוצר בשוק."
+      ],
+      "caution": "הכתבה אינה מפרטת את הדו",
+      "review": []
+    },
+    "3": {
+      "status": "ok",
+      "reason": null,
+      "stance": "NEUTRAL_REPORTING",
+      "headline": "גל פיטורים וצמצום פעילות ב-Ruby Games בטורקיה",
+      "key_points": [
+        "Rovio מצמצמת משמעותית את הפעילות של אולפן Ruby Games באיזמיר שבטורקיה, שנרכש ב-2021.",
+        "כ-20 עובדים פוטרו במסגרת המהלך, ורק צוות מצומצם נותר כדי לתפעל את המשחקים הקיימים.",
+        "אין כרגע תוכניות לפיתוח משחקים חדשים באולפן.",
+        "הכתבה משווה זאת למקרה של Alictus, שנרכשה על ידי SciPlay ב-2022 ופעילותה בטורקיה נסגרה לחלוטין.",
+        "הדפוס המשותף לשני המקרים מעלה שאלות לגבי האופן שבו חברות רוכשות פוגעות לעיתים במומחיות ובחוזקות המקוריות של האולפנים שקנו."
+      ],
+      "caution": "הכתבה אינה חושפת את הנתונים הפיננסיים המלאים או את שיקולי העלות המדויקים שהניעו את Rovio ו-SciPlay לבצע את הצמצומים.",
+      "review": [
+        {
+          "turn": 10,
+          "kind": "OTHER",
+          "blocking": false,
+          "problem": "Yoni brings up Monopoly Go, which is completely unrelated to the article about Rovio, Ruby Games, and Alictus.",
+          "fix": "Remove the mention of Monopoly Go or replace it with a reference from the text, such as the Paxie Games analogy."
+        }
+      ]
+    },
+    "4": {
+      "status": "dropped",
+      "reason": "unresolved factual problem: turn 15: The conversation introduces the number 13 regarding Take-Two mobile bookings falling 13%, but this number does not appear anywhere in the provided article text. -> Remove the mention of the 13% drop or the external article reference, as it is not supported by the provided text.",
+      "stance": "COMPANY_CLAIMS",
+      "headline": "אסטרטגיית העונות והמכניקות של Monopoly Go",
+      "key_points": [
+        "המשחק חצה את רף 6 מיליארד הדולרים בהוצאות שחקנים מצטברות במלאת שלוש שנים להשקתו.",
+        "ההשקה הראשונית ב-2023 הביאה ל-1 מיליארד דולר בפחות מחצי שנה, ופי שלושה מכך בשנת ה-1.",
+        "החברה משלבת בין שיתופי פעולה עם IP חיצוני כמו Marvel, Star Wars ו-Harry Potter לבין תמות מקוריות כמו Pets Season.",
+        "תהליך הפיתוח עבר מהערכה על הנייר לבניית פרוטוטייפים ובדיקה משחקית כדי לוודא הנאה.",
+        "פיתוח מכניקה עונתי אורך מימים ספורים ועד מספר חודשים למנגנונים מורכבים.",
+        "מכניקות חדשות מושקות אך ורק בתחילת עונה כדי למנוע ריבוי מששתים ולבחון את תגובת השחקנים כמקשה אחת.",
+        "פיצ'רים מוצלחים עשויים לחזור בעונות עתידיות עם טוויסט חדש במקום להישאר כפיצ'ר קבוע ביומיום."
+      ],
+      "caution": "הכתבה אינה מספקת נתוני שימור שחקנים, החזר על השקעה ברכישת משתמשים או פירוט מדויק על תרומת כל עונה להכנסות.",
+      "review": [
+        {
+          "turn": 15,
+          "kind": "FACT",
+          "blocking": true,
+          "problem": "The conversation introduces the number 13 regarding Take-Two mobile bookings falling 13%, but this number does not appear anywhere in the provided article text.",
+          "fix": "Remove the mention of the 13% drop or the external article reference, as it is not supported by the provided text."
+        }
+      ]
+    },
+    "5": {
+      "status": "ok",
+      "reason": null,
+      "stance": "NEUTRAL_REPORTING",
+      "headline": "הכנסות המובייל של Take-Two ירדו ב-13%",
+      "key_points": [
+        "הזמנות נטו ממובייל ירדו ב-13% משנה לשנה ל-707.6 מיליון דולר ברבעון השני של שנת הכספים 2027.",
+        "המובייל היווה 45% מסך ההזמנות נטו לעומת 42% אשתקד, בעוד סך ההזמנות של החברה ירד ב-18% ל-1.6 מיליארד דולר.",
+        "הכנסות מפרסום במובייל ירדו ב-9% ל-121 מיליון דולר משנה לשנה, אך הציגו שיפור סדרתי בהשוואה לרבעון הקודם.",
+        "Toon Blast צמח ב-4% ו-Words With Friends ב-6% בזכות עדכוני תוכן ושיתופי פעולה מותגיים.",
+        "הוצאות UA היו נמוכות מהתחזית בשל דחיית עיתוי השקות ושינויים בלוח הזמנים של משחקים חדשים.",
+        "הנהלת החברה סירבה לחשוף נתונים מדויקים על היקף ה-D2C, אך ציינה כי הפעילות צומחת ובעלת מרווח גבוה."
+      ],
+      "caution": "הדיווח אינו מפרט את נתוני ה-D2C או ה-eCPM המדויקים, ומסתמך במידה רבה על תחזיות הנהלה לגבי התמתנות בכותרים ותיקים.",
+      "review": [
+        {
+          "turn": 3,
+          "kind": "OTHER",
+          "blocking": false,
+          "problem": "נפלה טעות סופר במילה \"ענייה\" במקום \"עלייה\" (\"ענייה מ-42 אחוז\").",
+          "fix": "יש לתקן ל-\"עלייה מ-42 אחוז\"."
+        }
+      ]
+    }
+  }
+}
