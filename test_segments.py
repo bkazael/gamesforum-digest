@@ -330,5 +330,38 @@ except RuntimeError:
 check("...but the stories that finished before it are saved",
       saved and set(saved[-1]) == {"0", "1", "3"}, str([sorted(s) for s in saved]))
 
+# ---------------------------------------------------------------- small repairs (2026-11-11)
+
+check("an Arabic lam inside a Hebrew word becomes a lamed",
+      S.strip_stray_script("נקודת כשل ריכוזית") == "נקודת כשל ריכוזית")
+check("Latin names, digits, shekel and punctuation are untouched",
+      S.strip_stray_script("Türkiye: 41 מיליון ₪, ל-Rockstar.") == "Türkiye: 41 מיליון ₪, ל-Rockstar.")
+check("an unmapped foreign letter is removed", S.strip_stray_script("שלום 你好") == "שלום ")
+
+base = [{"speaker": A if i % 2 == 0 else B, "text": f"תור {i + 1} על 41 מיליון דולר."} for i in range(12)]
+issues = [{"turn": 5, "kind": "OFF_TOPIC", "blocking": False, "problem": "x", "fix": ""},
+          {"turn": 3, "kind": "TYPO", "blocking": False, "problem": "x", "fix": "",
+           "replacement": "תור 3 על 41 מיליון דולר!"}]
+out, done = S.apply_review_edits(base, issues, floor=8)
+check("an off-topic turn is deleted and a one-character typo is replaced",
+      len(out) == 11 and out[2]["text"].endswith("!") and len(done) == 2, str(done))
+check("the input script is not modified in place", len(base) == 12 and not base[2]["text"].endswith("!"))
+bad = [{"turn": 3, "kind": "TYPO", "blocking": False, "problem": "x", "fix": "",
+        "replacement": "תור 3 על 42 מיליון דולר."},
+       {"turn": 4, "kind": "TYPO", "blocking": False, "problem": "x", "fix": "",
+        "replacement": "משהו אחר לגמרי שאין לו קשר לתור המקורי בכלל"},
+       {"turn": 1, "kind": "OFF_TOPIC", "blocking": False, "problem": "x", "fix": ""}]
+out, done = S.apply_review_edits(base, bad, floor=8)
+check("a replacement that changes a number or the sentence, and the opening turn, are left alone",
+      out == base and done == [], str(done))
+out, done = S.apply_review_edits(base[:8], [{"turn": 5, "kind": "OFF_TOPIC", "blocking": False,
+                                              "problem": "x", "fix": ""}], floor=8)
+check("nothing is deleted below the role's turn floor", len(out) == 8 and done == [])
+
+r = seg(stub(script=turns(20, "41 מיליון."),
+             issues_seq=[[{"turn": 6, "kind": "OFF_TOPIC", "blocking": False, "problem": "x", "fix": ""}]]))
+check("build_segment applies the reviewer's off-topic deletion and keeps the story",
+      r["status"] == "ok" and len(r["script"]) == 19 and r["edits"], str(r.get("edits")))
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import concurrent.futures
 import copy
+import difflib
 import re
+import unicodedata
 
 import script_quality
 import speech as speech_tools
@@ -71,10 +73,14 @@ REVIEW_SCHEMA = {
                 "type": "OBJECT",
                 "properties": {
                     "turn": {"type": "INTEGER"},
-                    "kind": {"type": "STRING", "enum": ["FACT", "ATTRIBUTION", "OTHER"]},
+                    "kind": {"type": "STRING",
+                             "enum": ["FACT", "ATTRIBUTION", "OFF_TOPIC", "TYPO", "OTHER"]},
                     "blocking": {"type": "BOOLEAN"},
                     "problem": {"type": "STRING"},
                     "fix": {"type": "STRING"},
+                    # TYPO only: the whole turn again with the slip corrected and
+                    # nothing else changed.
+                    "replacement": {"type": "STRING"},
                 },
                 "required": ["turn", "kind", "blocking", "problem", "fix"],
             },
@@ -319,6 +325,10 @@ does not support: a wrong or invented number, a wrong comparison base, a wrong p
 proposal presented as law, a result presented as certain.
 ATTRIBUTION (blocking when it materially misleads): a company's or vendor's own claim
 presented as established fact.
+OFF_TOPIC (never blocking): a turn that brings in something unrelated to this article
+(another game, company or story). Name the turn; it will be deleted.
+TYPO (never blocking): a misspelt or wrong word. Put the WHOLE turn again in "replacement"
+with only that word corrected, nothing else changed.
 OTHER: anything else (wording, repetition). Never blocking.
 
 Opinions and analysis by the hosts are fine when they are framed as opinion. Return an
@@ -412,6 +422,60 @@ def _numbered(script: list[dict]) -> str:
 
 # ---------------------------------------------------------------- one segment
 
+# ---------------------------------------------------------------- small repairs
+
+# A weak writer sometimes drops a letter of another script into a Hebrew word
+# (2026-11-11: an Arabic lam inside "כשל"). Lookalikes are mapped, anything else
+# outside Hebrew, Latin, digits and punctuation is removed.
+_LOOKALIKE = {"ل": "ל", "ا": "א", "و": "ו", "ر": "ר", "ي": "י", "ن": "נ", "م": "מ", "ه": "ה"}
+_ALLOWED_RE = re.compile(r"[\u0590-\u05ff\x00-\u024f\u2000-\u206f\u20aa\u20ac\u00a0-\u00ff]")
+
+
+def strip_stray_script(text: str) -> str:
+    out = []
+    for ch in text:
+        if _ALLOWED_RE.match(ch):
+            out.append(ch)
+        elif ch in _LOOKALIKE:
+            out.append(_LOOKALIKE[ch])
+        elif unicodedata.category(ch).startswith(("P", "S", "Z")):
+            out.append(ch)
+    return "".join(out)
+
+
+def apply_review_edits(script: list[dict], issues: list[dict], floor: int,
+                       log=lambda m: None) -> tuple[list[dict], list[str]]:
+    """Apply the reviewer's free, safe repairs: OFF_TOPIC turns are deleted (never the
+    opening turn, never below the role's turn floor) and a TYPO is replaced by the
+    corrected turn only when it is the same turn with one small change (same numbers,
+    almost the same text). Anything else is left as it was."""
+    script = [dict(t) for t in script]
+    done: list[str] = []
+    for i in issues:
+        if i.get("kind") != "TYPO" or i.get("blocking"):
+            continue
+        n, new = i.get("turn"), str(i.get("replacement") or "").strip()
+        if not isinstance(n, int) or not 1 <= n <= len(script) or not new:
+            continue
+        old = script[n - 1]["text"]
+        if (new != old and numerals(new) == numerals(old)
+                and difflib.SequenceMatcher(None, old, new).ratio() >= 0.9):
+            script[n - 1]["text"] = new
+            done.append(f"turn {n}: typo fixed")
+    drop = sorted({i["turn"] for i in issues
+                   if i.get("kind") == "OFF_TOPIC" and not i.get("blocking")
+                   and isinstance(i.get("turn"), int) and 2 <= i["turn"] <= len(script)},
+                  reverse=True)
+    for n in drop:
+        if len(script) - 1 < floor:
+            break
+        script.pop(n - 1)
+        done.append(f"turn {n}: off-topic turn removed")
+    for d in done:
+        log(f"  edit: {d}")
+    return script, done
+
+
 def build_segment(article: dict, index: int, total: int, role: str, next_title: str | None,
                   *, call, models: dict, speakers: tuple[str, str], lang: str,
                   memory_context: str, log) -> dict:
@@ -426,6 +490,7 @@ def build_segment(article: dict, index: int, total: int, role: str, next_title: 
                    tries=SEGMENT_TRIES, timeout=SEGMENT_TIMEOUT)
         script, structural = _clean_script(raw.get("script"), speakers)
         script, _ = speech_tools.translate_hebrew_terms(script, lang)
+        script = [{**t, "text": strip_stray_script(t["text"])} for t in script]
         seg = {
             "publishable": bool(raw.get("publishable", True)),
             "stance": raw.get("stance") if raw.get("stance") in STANCES else "NEUTRAL_REPORTING",
@@ -502,6 +567,8 @@ def build_segment(article: dict, index: int, total: int, role: str, next_title: 
         seg = {**write(revise_note(seg, notes)), "review": []}
         if not seg["script"]:
             raise RuntimeError(f"{tag} came back with no script after a fact rewrite")
+    seg["script"], seg["edits"] = apply_review_edits(
+        seg["script"], seg.get("review") or [], ROLES[role]["floor"], lambda m: log(f"{tag}{m}"))
     return {**seg, "status": "ok"}
 
 
