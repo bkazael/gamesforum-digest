@@ -78,13 +78,12 @@ check("the first story is told there is no greeting, the preview comes before it
       "BEFORE this segment" in p0 and "Do not greet" in p0)
 check("a later story opens on its own, with no greeting or recap",
       "No greeting, no recap" in prompt(index=1))
-check("a middle story ends with a hand-over naming the next story",
-      '"Next story title"' in prompt(index=1) and "hand-over" in prompt(index=1))
-check("the hand-over names the next subject but states none of its facts (a reviewer cut a story for that)",
-      "State no fact or number from it" in prompt(index=1))
+check("no story hands over to, mentions or hints at another story (weak writers leaked its facts)",
+      "Do NOT mention, hint at or hand over to any other story" in prompt(index=1)
+      and "Next story title" not in prompt(index=1))
 last = prompt(index=2, nxt=None)
-check("the last story does not hand over and does not sign off (the frame writes the outro)",
-      "LAST story" in last and "show outro is written separately" in last)
+check("the last story does not sign off either (the frame writes the outro)",
+      "show outro is written separately" in last)
 check("the Hebrew rule comes first and again after the article",
       p0.startswith("OUTPUT LANGUAGE: HEBREW") and p0.rstrip().endswith("source material only."))
 check("the prompt asks for the key points first, then a conversation that covers every one",

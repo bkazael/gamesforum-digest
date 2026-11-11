@@ -244,14 +244,15 @@ def segment_prompt(article: dict, index: int, total: int, role: str, next_title:
         position = (f"The previous story has just ended with a hand-over. Open this story "
                     f"directly in one natural sentence naming it. {a} speaks first. No "
                     "greeting, no recap, no 'let's move on'.")
-    if last:
-        ending = ("This is the LAST story. End it plainly on its own point. Do not hand over "
-                  "and do not sign off: the show outro is written separately.")
-    else:
-        ending = (f"End with a natural one-line hand-over that names the SUBJECT of the next "
-                  f"story (its title: \"{next_title}\") in a few words. State no fact or "
-                  "number from it: this article is your only source, and the next story tells "
-                  "its own facts. Vary the form; do not say 'let's move on to'.")
+    # No hand-over to the next story, last story or not. Twice (2026-11-10 and
+    # 11-11) a hand-over line carried a fact or the subject of the NEXT story into
+    # this one -- "Take-Two fell 13%" inside a Monopoly Go story -- and the fact
+    # reviewer rightly cut or flagged it; weaker writers cannot name a topic
+    # without borrowing from it. Each story opens by naming itself (see POSITION),
+    # which is all the transition the listener needs.
+    ending = ("End plainly on this story's own point: an observation, a number, or an open "
+              "question. Do NOT mention, hint at or hand over to any other story, and do not "
+              "sign off: the next story opens itself and the show outro is written separately.")
     memory = ""
     if memory_context:
         memory = ("\nPREVIOUS EPISODES (continuity on ongoing STORYLINES only; mention one "

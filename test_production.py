@@ -6,6 +6,7 @@ import json
 import pathlib
 import shutil
 import tempfile
+import types
 import unittest
 from unittest.mock import patch, Mock
 import urllib.error
@@ -253,6 +254,41 @@ class ProductionTests(unittest.TestCase):
         self.assertEqual(max(delays), 300)
         self.assertEqual(p.retry_delay(None, 0), p.retry_delay(503, 0))
 
+    def test_a_failed_filter_graph_falls_back_instead_of_losing_the_voiced_episode(self):
+        # 2026-11-11: the full mix died with "Invalid data found when processing
+        # input" after 14 minutes of paid speech. Each retry drops one nicety.
+        tried = []
+        def fake_run(cmd, **k):
+            graph = " ".join(cmd)
+            tried.append("atempo" in graph and "jingle" in graph and "full"
+                         or "jingle" in graph and "no-tempo"
+                         or "plain")
+            if len(tried) < 3:
+                return types.SimpleNamespace(returncode=183, stderr="Invalid data found when processing input")
+            pathlib.Path(cmd[-1]).write_bytes(b"mp3")
+            return types.SimpleNamespace(returncode=0, stderr="")
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(p, "gemini_tts_chunk", return_value=b"\0\0" * 2400), \
+                patch.object(p.runtime, "load_profile", return_value={"speech": {"tempo": 0.94}}), \
+                patch.object(p, "ASSETS_DIR", pathlib.Path(tmp)), \
+                patch.object(p.subprocess, "run", side_effect=fake_run):
+            (pathlib.Path(tmp) / "jingle.m4a").write_bytes(b"j")
+            mp3 = pathlib.Path(tmp) / "e.mp3"
+            p.synthesize_audio([{"speaker": "Dana", "text": "שלום"}], pathlib.Path(tmp) / "e.wav", mp3)
+            self.assertTrue(mp3.exists())
+        self.assertEqual(tried, ["full", "no-tempo", "plain"])
+
+    def test_every_ffmpeg_variant_failing_raises_with_the_reason(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(p, "gemini_tts_chunk", return_value=b"\0\0" * 2400), \
+                patch.object(p.runtime, "load_profile", return_value={"speech": {"tempo": 1.0}}), \
+                patch.object(p, "ASSETS_DIR", pathlib.Path(tmp)), \
+                patch.object(p.subprocess, "run", return_value=types.SimpleNamespace(
+                    returncode=183, stderr="Invalid data found when processing input")):
+            with self.assertRaisesRegex(RuntimeError, "Invalid data found"):
+                p.synthesize_audio([{"speaker": "Dana", "text": "שלום"}],
+                                   pathlib.Path(tmp) / "e.wav", pathlib.Path(tmp) / "e.mp3")
+
     def test_speech_tempo_is_applied_and_bounded(self):
         captured = {}
         with tempfile.TemporaryDirectory() as tmp, \
@@ -260,7 +296,8 @@ class ProductionTests(unittest.TestCase):
                 patch.object(p.runtime, "load_profile", return_value={"speech": {"tempo": 0.94}}), \
                 patch.object(p, "ASSETS_DIR", pathlib.Path(tmp)), \
                 patch.object(p.subprocess, "run", side_effect=lambda cmd, **k: (
-                    captured.setdefault("cmd", cmd), pathlib.Path(cmd[-1]).write_bytes(b"mp3"))):
+                    captured.setdefault("cmd", cmd), pathlib.Path(cmd[-1]).write_bytes(b"mp3"),
+                    types.SimpleNamespace(returncode=0, stderr=""))[-1]):
             p.synthesize_audio([{"speaker": "Dana", "text": "שלום"}],
                                pathlib.Path(tmp) / "e.wav", pathlib.Path(tmp) / "e.mp3")
         self.assertIn("atempo=0.94,loudnorm", " ".join(captured["cmd"]))

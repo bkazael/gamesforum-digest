@@ -166,6 +166,7 @@ with tempfile.TemporaryDirectory() as tmp:
             if arg == "-i" and str(cmd[i + 1]).endswith(".wav"):
                 produced["pcm"] = pathlib.Path(cmd[i + 1]).read_bytes()
         pathlib.Path(cmd[-1]).write_bytes(b"fake mp3")
+        return type("Done", (), {"returncode": 0, "stderr": ""})()
     P.subprocess.run = fake_run
 
     try:

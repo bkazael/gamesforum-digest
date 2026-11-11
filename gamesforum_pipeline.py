@@ -876,38 +876,54 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
     jingle_mp3 = ASSETS_DIR / "jingle.mp3"
     jingle_file = jingle_m4a if jingle_m4a.exists() else (jingle_mp3 if jingle_mp3.exists() else None)
 
-    if jingle_file:
-        log(f"found jingle asset ({jingle_file.name}), applying radio ducking & outro fade...")
-        filter_complex = (
+    staged = mp3_path.with_name(mp3_path.stem + ".part.mp3")
+    loud = "loudnorm=I=-19:TP=-1.5:LRA=9"
+
+    def jingle_cmd(speech_filter: str) -> list[str]:
+        mix = (
             "[0:a]atrim=duration=4.5,afade=t=out:st=2.0:d=2.5,volume=0.30[jingle_fade];"
-            f"[1:a]{slow}adelay=2200|2200[speech_delayed];"
+            f"[1:a]{speech_filter}adelay=2200|2200[speech_delayed];"
             "[jingle_fade][speech_delayed]amix=inputs=2:normalize=0:duration=longest[intro_mixed];"
             "[2:a]atrim=duration=5,afade=t=out:st=2:d=3,volume=0.30[outro];"
-            "[intro_mixed][outro]concat=n=2:v=0:a=1,loudnorm=I=-19:TP=-1.5:LRA=9[outa]"
+            f"[intro_mixed][outro]concat=n=2:v=0:a=1,{loud}[outa]"
         )
-        cmd = [
-            "ffmpeg", "-y", "-loglevel", "error",
-            "-i", str(jingle_file),
-            "-i", str(wav_path),
-            "-i", str(jingle_file),
-            "-filter_complex", filter_complex,
-            "-map", "[outa]",
-            "-ar", "24000", "-ac", "1",
-            "-codec:a", "libmp3lame", "-b:a", "96k",
-            str(mp3_path)
-        ]
-    else:
-        cmd = [
-            "ffmpeg", "-y", "-loglevel", "error",
-            "-i", str(wav_path),
-            "-af", f"{slow}loudnorm=I=-19:TP=-1.5:LRA=9", "-ar", "24000", "-ac", "1",
-            "-codec:a", "libmp3lame", "-b:a", "96k",
-            str(mp3_path)
-        ]
+        return ["ffmpeg", "-y", "-loglevel", "error", "-i", str(jingle_file), "-i", str(wav_path),
+                "-i", str(jingle_file), "-filter_complex", mix, "-map", "[outa]",
+                "-ar", "24000", "-ac", "1", "-codec:a", "libmp3lame", "-b:a", "96k", str(staged)]
 
-    staged = mp3_path.with_name(mp3_path.stem + ".part.mp3")
-    cmd[-1] = str(staged)
-    subprocess.run(cmd, check=True, timeout=_remaining_timeout(120))
+    def plain_cmd(speech_filter: str) -> list[str]:
+        return ["ffmpeg", "-y", "-loglevel", "error", "-i", str(wav_path), "-af", f"{speech_filter}{loud}",
+                "-ar", "24000", "-ac", "1", "-codec:a", "libmp3lame", "-b:a", "96k", str(staged)]
+
+    # 2026-11-11: the full graph died with "Invalid data found when processing
+    # input" after the speech had been paid for and voiced (14 minutes of TTS).
+    # A finished voice track must not be lost to a cosmetic filter, so each step
+    # drops one nicety: first the slow-down, then the jingle.
+    variants: list[tuple[str, list[str]]] = []
+    if jingle_file:
+        log(f"found jingle asset ({jingle_file.name}), applying radio ducking & outro fade...")
+        variants.append(("jingle + slow-down" if slow else "jingle", jingle_cmd(slow)))
+        if slow:
+            variants.append(("jingle, without the slow-down", jingle_cmd("")))
+        variants.append(("speech only, without the jingle", plain_cmd("")))
+    else:
+        variants.append(("speech only", plain_cmd(slow)))
+        if slow:
+            variants.append(("speech only, without the slow-down", plain_cmd("")))
+    last_error = ""
+    for label, cmd in variants:
+        done = subprocess.run(cmd, capture_output=True, text=True,
+                              timeout=_remaining_timeout(600))
+        if done.returncode == 0 and staged.exists() and staged.stat().st_size > 0:
+            if label != variants[0][0]:
+                print(f"::warning::the audio was assembled as: {label} (the full mix failed: "
+                      f"{last_error[-300:].strip()})", flush=True)
+            break
+        last_error = (done.stderr or "").strip() or f"exit {done.returncode}"
+        log(f"  ffmpeg ({label}) failed: {last_error[-400:]}")
+        staged.unlink(missing_ok=True)
+    else:
+        raise RuntimeError(f"ffmpeg could not assemble the episode: {last_error[-400:]}")
     if staged.stat().st_size == 0:
         raise RuntimeError("ffmpeg produced an empty episode")
     staged.replace(mp3_path)
