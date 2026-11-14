@@ -1,0 +1,31 @@
+{
+ "target": "2026-11-16",
+ "published": null,
+ "holds": 0,
+ "held": null,
+ "last_error": null,
+ "history": [
+  {
+   "date": "2026-11-14",
+   "did": [
+    "selected 8 stories",
+    "wrote 4 stories"
+   ],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-13",
+    "today": {
+     "gemini-3.5-flash-lite": 6,
+     "gemini-3.5-flash": 3,
+     "gemini-3.8-flash": 9
+    },
+    "this_run": {
+     "gemini-3.5-flash-lite": 6,
+     "gemini-3.5-flash": 3,
+     "gemini-3.8-flash": 9
+    },
+    "daily_budget": 16
+   }
+  }
+ ]
+}

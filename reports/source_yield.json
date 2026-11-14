@@ -1,0 +1,55 @@
+[
+ {
+  "date": "2026-11-14",
+  "sources": {
+   "MobileGamer.biz": {
+    "listed": 9,
+    "blocked": 0,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 0,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 9,
+    "selected": 2
+   },
+   "Gamigion": {
+    "listed": 10,
+    "blocked": 0,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 0,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 10,
+    "selected": 3
+   },
+   "PocketGamer.biz": {
+    "listed": 48,
+    "blocked": 5,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 0,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 43,
+    "selected": 3
+   },
+   "Gamesforum": {
+    "listed": 22,
+    "blocked": 0,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 17,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 5,
+    "selected": 0
+   }
+  }
+ }
+]

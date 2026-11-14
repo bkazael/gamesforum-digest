@@ -1,0 +1,545 @@
+{
+  "articles": [
+    {
+      "url": "https://mobilegamer.biz/supercell-and-king-bosses-warn-eus-digital-fairness-act-would-hurt-players-and-mobile-studios",
+      "title": "Supercell and King bosses warn EU’s Digital Fairness Act could hurt players and studios",
+      "text": "By \n \n Vikki Blake \n\n / 12th November 2026 \n\n Supercell boss Ilkka Paananen and King president Todd Green have hit back at the EU’s Digital Fairness Act, which the European Commission formally proposed on November 11.\n\n The published proposal largely matches the leaked draft we reported on earlier this week . Paid-for virtual currencies would be switched off by default in games aimed at minors unless a parent approves, and loot boxes and pay-to-win mechanics would be banned for minors.\n\n Games would also have to show the real-money value of virtual items, and let all players switch off loot boxes and addictive design features. In large-scale cases, the Commission would be able to fine companies up to 6% of their worldwide annual turnover.\n\n The statements follow trade bodies Video Games Europe and the European Games Developer Federation calling the proposal “unworkable, unjustified and disproportionate” , and warning that it would be “game over for the European games industry”.\n\n Supercell CEO Ilkka Paananen, who warned last year that tighter rules on in-game currencies could “deliver a critical blow” to the European games business, said in a LinkedIn post that the DFA “promises to protect European consumers. I believe it would hurt them.”\n\n He said around 95% of Supercell’s monthly players play for free, and that making it harder for the minority who pay means “there are fewer free games for everyone.”\n\n He also argued that the proposal “treats any game rated below Pegi 18 as aimed at children”, and that showing a euro value for in-game currency doesn’t work because players buy it “at different prices, through bundles and offers, so any euro figure is a guess. That is confusion, not clarity.”\n\n King president Todd Green said on LinkedIn that parts of the proposal “add further uncertainty rather than resolving it”, and that companies “will struggle to determine whether ordinary features, such as in-game currency, optional purchases or progression mechanics, fall within scope.”\n\n “This matters, particularly for Europe’s mobile games sector, made up of more than 1,000 dedicated studios, many of them small and independent businesses, that will need to face the dramatic consequences of these proposed changes,” said Green.\n\n UK trade body Ukie has also backed Video Games Europe’s position. In a statement shared with PocketGamer.biz , it said: “We are particularly concerned about undermining parental agency by placing blanket restrictions on certain features, rather than giving parents the ability to make decisions based on individual circumstances.”\n\n Ukie described Pegi as “recognised by parents worldwide as a gold-standard in age rating for games”, adding: “If implemented as proposed, the DFA will directly undermine the value and effectiveness of this system.” It has also urged the UK government to “resist following an approach that risks limiting player choice, harming parents’ ability to choose the right options for their children, creating uncertainty for developers and weakening the UK’s export capability.”\n\n Consumer protection commissioner Michael McGrath described the DFA as “the most ambitious reform of EU consumer protection rules in a generation”, and the Commission says it will save EU consumers up to €13.7bn a year. The proposal will now be discussed by the European Parliament and Council.\n\n King and Supercell were among the companies named in coordinated action launched by the EU’s Consumer Protection Cooperation Network in September over how they sell in-game currencies.",
+      "published": "2026-11-12",
+      "author": null,
+      "content_label": null,
+      "extraction": "article/main",
+      "source": "MobileGamer.biz",
+      "signals": {
+        "words": 550,
+        "figures": 8,
+        "figures_per_100w": 1.45,
+        "quotes": 14,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 10,
+      "_why": "Supercell and King execs warn EU Digital Fairness Act threatens virtual currencies. · **DECISION**",
+      "_reasoning": "Supercell CEO Ilkka Paananen and King president Todd Green publicly criticized the EU's newly proposed Digital Fairness Act, warning that bans on virtual currencies and pay-to-win mechanics for minors threaten studio operations and player choice. This is critical regulatory exposure data for any operator with European reach.",
+      "_score": 9.0,
+      "_also": [
+        {
+          "title": "Finnish and German games associations warn EU Digital Fairness Act could hurt industry",
+          "url": "https://www.pocketgamer.biz/finnish-and-german-games-associations-warn-eu-digital-fairness-act-could-hurt-industry",
+          "source": "PocketGamer.biz"
+        },
+        {
+          "title": "Digital Fairness Act raises questions over future of mobile game monetisation",
+          "url": "https://www.pocketgamer.biz/digital-fairness-act-raises-questions-over-mobile-game-monetisation",
+          "source": "PocketGamer.biz"
+        }
+      ]
+    },
+    {
+      "url": "https://www.pocketgamer.biz/apples-new-ios-terms-in-the-eu-are-live-what-alternative-app-stores-now-mean-for-game-studios",
+      "title": "Apple's new iOS terms in the EU are live: What alternative app stores now mean for game studios",
+      "text": "\"This is a meaningful change. Under the previous model, publishers and developers effectively faced a tax for even testing an alternative distribution channel\"\n\n By Guest Author (Sponsored) \n\n November 9, 2026 \n\n Share:\n\n Prefer PocketGamer.biz on Google \n\n On October 1st, Apple's new EU business terms came into force.\n\n Apple has replaced the Core Technology Fee (CTF) with a 5% Core Technology Commission on digital sales through alternative app stores.\n\n This aligns Apple’s economics with commercial activity, rather than charging for reach, installs and experimentation.\n\n That gives publishers a clearer basis to assess whether alternative distribution can work for their business.\n\n Stay Informed \n\n Get Industry News In Your Inbox…\n\n Sign Up Today\n\n Alexander Baksheev , the co-founder & CEO of Onside.io , explains the impact of Apple's newly enforced business terms across the EU and the implications for developers when it comes to alternative app stores. \n\r\n On the October 1st, Apple's new EU business terms, set out in Attachment 14 to the Apple Developer Program License Agreement, came into force. For developers, the main change is the fee. Apple has replaced the Core Technology Fee (CTF) with a 5% Core Technology Commission (CTC) on digital sales made through alternative app stores and web distribution. The switch comes more than a year after the European Commission fined Apple €500 million and raised concerns that the CTF was discouraging alternative distribution.\n\r\n This is a meaningful change. Under the previous model, publishers and developers effectively faced a tax for even testing an alternative distribution channel: €0.50 for every first annual install above one million. For larger publishers, that created an open-ended cost and made it difficult to seriously consider an alternative store.\n\r\n A 5% commission on covered digital sales is a far more workable model. It aligns Apple’s economics with commercial activity, rather than charging for reach, installs and experimentation. That gives publishers a clearer basis to assess whether alternative distribution can work for their business and it removes one of the biggest economic barriers to trying an alternative app store.\n\r\n “This is a meaningful change. Under the previous model, publishers and developers effectively faced a tax for even testing an alternative distribution channel: €0.50 for every first annual install above one million.” Alexander Baksheev \n\n How alternative app stores work and who is in the market \n\r\n The Digital Markets Act , an EU regulation designed to increase competition in the app market, came into force in November 2022. Apple and the other first designated gatekeepers had until March 2024 to comply, and that is when iPhone users in the EU could first download apps from outside the App Store. Japan followed on December 18th, 2025 and Brazil opened its market on June 18th, 2026.\n\r\n Users download an alternative app store from the operator’s website. After that, it works much like Apple’s App Store: they browse and install apps inside it. For developers, the difference is in who does the distribution work. On Apple’s App Store, Apple does it; outside it, that work moves to the alternative store. Either way, every app still has to pass notarisation, which Apple describes as a baseline review that applies regardless of the distribution channel.\n\r\n Two years in, the market is still small: alternative stores account for well under 1% of iOS app distribution. Each store has picked its own audience. Epic Games Store focuses on Epic's titles and partner games. AltStore PAL serves technical users with self-hosted apps such as emulators. Aptoide brought its Android catalogue to iOS, and Skich built game discovery around a swipe interface. Onside is a general-purpose store where games sit next to other categories. One operator has already left: MacPaw closed Setapp Mobile in February 2026, citing Apple’s still-evolving and complex business terms.\n\r\n Why game studios should care \n\r\n Alternative distribution offers game studios two levers that are worth testing alongside the App Store: a potentially cheaper route to user acquisition and a lower commission.\n\r\n The first lever is user acquisition. Thanks to the DMA, studios can now convert cheaper web traffic into iOS installs through an alternative store, while still tracking attribution. Onside, for example, has built its own attribution platform, which sends conversion data to major ad networks.\n\r\n That means studios can optimise their web campaigns for installs and in-app purchases. According to Onside’s internal data, acquiring a user for the store costs around €2. For select games that already perform well on the App Store, Onside will also fund and run user acquisition itself in exchange for a revenue share.\n\r\n “Alternative distribution offers game studios two levers that are worth testing alongside the App Store: a potentially cheaper route to user acquisition and a lower commission.” Alexander Baksheev \n\n The second lever is the commission. Apple charges a 26% commission on App Store in-app purchases in the EU, while alternative app stores typically charge less. Onside charges developers 12% on paid apps, in-app purchases and subscriptions, and handles payments by card and Apple Pay. As a result, studios keep more of what players spend. Onside’s developer documentation explains how publishing and payments work on its store.\n\r\n Together, these two levers can improve a game’s unit economics. For established titles, that could mean unlocking new channels and audiences. Meanwhile, they could help launch games that struggle on the App Store because acquiring users there might cost more than those users bring in.\n\r\n The new question \n\r\n Apple's new EU business terms still impose significant operational requirements, but this removes one of the most important economic barriers. We expect more publishers to start exploring alternative distribution in Europe as a result. It is a meaningful win for the DMA as it moves the market closer to a model where developers have a genuine commercial choice.\n\r\n The new terms also raise a question: will lower fees be enough to move alternative stores past their sub-1% share of iOS app distribution? At Onside, we’re putting a lot of work into making that happen with our partners across the games industry, and we believe it can be done. The studios that try alternative distribution in the coming months will show how close we are.\n\n #Sponsored \n\n #Regulation \n\n #Alternative App stores \n\n #European Union \n\n Companies\n\n People\n\n Related\n\n DMArmageddon? It doesn’t have to be the end of the world \n\n Europe's CPC targets King, Supercell, Mojang and others over virtual currencies \n\n Europe's triple-threat for mobile gaming \n\n Daily log-in bonuses and activity streaks under threat in EU Kids Act \n\n Apple's $2,000+ iPhone Duo and the backlash against new EU App Store rules | Week in Mobile Games podcast",
+      "published": "2026-11-09",
+      "author": "Guest Author (Sponsored)",
+      "content_label": null,
+      "extraction": "article/main",
+      "source": "PocketGamer.biz",
+      "signals": {
+        "words": 1082,
+        "figures": 24,
+        "figures_per_100w": 2.22,
+        "quotes": 7,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 66,
+      "_why": "Apple's replacement of the EU CTF with a 5% Core Technology Commission on alternative store sales. · **DECISION**",
+      "_reasoning": "Apple has officially replaced the contentious Core Technology Fee in the EU with a 5% Core Technology Commission on digital sales through alternative app stores. Written by an alternative store CEO, it breaks down the economics of bypassing traditional app store fees and testing alternative web distribution channels without facing open-ended per-install cost penalties.",
+      "_score": 8.0
+    },
+    {
+      "url": "https://www.gamigion.com/get-kicked-off-the-app-store-and-almost-never-coming-back",
+      "title": "Get Kicked Off the App Store, and Almost Never Coming Back?!",
+      "text": "I recently came across a post from Ihar Koshaleu , who flagged this data from Apple’s 2025 App Store Transparency Report.\n\n The numbers are pretty scary for anyone publishing on iOS:\n\n 𝟭𝟲𝟲,𝟴𝟵𝟵 𝗮𝗽𝗽𝘀 𝗿𝗲𝗺𝗼𝘃𝗲𝗱 → 26,305 developers appealed, Apple restored 423. That’s a 1.6% success rate.\n\n 𝟭𝟵𝟯,𝟬𝟯𝟱 𝗱𝗲𝘃𝗲𝗹𝗼𝗽𝗲𝗿 𝗮𝗰𝗰𝗼𝘂𝗻𝘁𝘀 𝘁𝗲𝗿𝗺𝗶𝗻𝗮𝘁𝗲𝗱 → 192,702 of them (99.8%) for fraud.\n\n 𝟭𝟬,𝟭𝟮𝟳 𝗮𝗰𝗰𝗼𝘂𝗻𝘁𝘀 𝗮𝗽𝗽𝗲𝗮𝗹𝗲𝗱, 𝟰𝟵𝟵 𝗴𝗼𝘁 𝗿𝗲𝗶𝗻𝘀𝘁𝗮𝘁𝗲𝗱 → 4.9%. And losing the account is the real nightmare… that’s every app you publish, gone.\n\n It’s not hard to understand why Apple is cleaning house. The 2026 vibe-coding boom has flooded the store with hundreds of thousands of near-identical apps, and the App Store now has the same trust problem Google Play had years ago. \n\n 𝗧𝗵𝗲 𝗲𝗿𝗮 𝗼𝗳 𝗔𝗽𝗽𝗹𝗲 𝗹𝗼𝗼𝗸𝗶𝗻𝗴 𝘁𝗵𝗲 𝗼𝘁𝗵𝗲𝗿 𝘄𝗮𝘆 𝗼𝗻 𝗳𝗮𝗸𝗲 𝗱𝗶𝘀𝗰𝗼𝘂𝗻𝘁𝘀, 𝘀𝗸𝗲𝘁𝗰𝗵𝘆 𝗽𝗮𝘆𝘄𝗮𝗹𝗹𝘀 𝗮𝗻𝗱 𝗼𝘁𝗵𝗲𝗿 “𝗴𝗿𝗲𝘆 𝗮𝗿𝗲𝗮” 𝗺𝗲𝗰𝗵𝗮𝗻𝗶𝗰𝘀 𝗹𝗼𝗼𝗸𝘀 𝗹𝗶𝗸𝗲 𝗶𝘁’𝘀 𝗲𝗻𝗱𝗶𝗻𝗴.\n\n The post Get Kicked Off the App Store, and Almost Never Coming Back?! first appeared on Gamigion: Mobile Games Industry News .",
+      "partial": false,
+      "source": "Gamigion",
+      "published": "2026-11-13",
+      "signals": {
+        "words": 163,
+        "figures": 12,
+        "figures_per_100w": 7.36,
+        "quotes": 0,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 3,
+      "_why": "Apple App Store 2025 transparency report showing strict removal and termination rates. · **DECISION**",
+      "_reasoning": "Data from Apple's 2025 Transparency Report reveals that 166,899 apps were removed with only a 1.6% appeal success rate, alongside nearly 200,000 developer account terminations primarily for fraud. This highlights extreme tightening of App Store enforcement that directly threatens compliance and operational continuity.",
+      "_score": 8.0,
+      "_note": "נכנס מעל תקרת Gamigion (2): ציון גבוה והיה מקום פנוי"
+    },
+    {
+      "url": "https://www.gamigion.com/to-block-or-not-to-block-part-2-the-advertiser-i-should-not-have-blocked",
+      "title": "To Block or Not to Block, Part 2: The Advertiser I Should NOT Have Blocked",
+      "text": "Modern life can get very confusing, especially in the wild world of ad monetization. \n\n A couple of weeks ago, I outlined what I think is the best way to approach competitor blocking on mobile . \n\n TLDR: look at churn by creative ID and block the outlier apps that cause higher-than-average churn. \n\n Turns out I had a blind spot , and a decision I made for a client last week exposed it.\n\n Meet this week’s antagonist: Top Tycoon . \n\n If you don’t know, Top Tycoon is a coin looter masquerading as an idle game. They lean on fake onboarding and a huge range of creative themes to keep their UA funnel full. That has made them one of the biggest UA spenders in mobile, and they shipped 1,807 new creatives in the last month alone. \n\n I have no issue with the UA strategy. It’s how modern mobile gaming works. \n\n But it does mean that in the hunt for installs, they copy whatever is working. Last week, that was my client’s gameplay. As you can imagine, churn from their creatives spiked. So after a couple of days, I blocked them.\n\n Ad revenue dropped 13%. \n\n Where my math went wrong \n\n Here are the top campaigns from the day before the block, by share of impressions:\n\n AppLovin only reports an aggregate eCPM. So to estimate the loss, I took Top Tycoon’s impressions and multiplied them by the average eCPM. The results came out as an acceptable high hundreds of dollars per day. An acceptable price to eliminate churn.\n\n The real loss was actually in the thousands of dollars per day. \n\n The fix was simple \n\n AppLovin’s ad callback also gives you the revenue for each impression. Track that by creative ID, and you know what each advertiser actually pays you, not just how often they show up.\n\n Here’s the same pie chart by revenue:\n\n The gap between share of revenue and share of voice is staggering. \n\n Top Tycoon wasn’t even a direct competitor. They were one of our top-paying advertisers, and I removed them without knowing it because we weren’t looking at the data this way. Top Tycoon was filling at eCPMs far above our average. Not looking at the average hid this figure.\n\n What we do now \n\n Track churn by creative ID and flag any creative that deviates from the norm.\n\n Look up the app behind that creative in “Creative Reporting”.\n\n Pull every creative ID from that app that ran in the last 7 days. \n\n Add up the revenue from all of them. That’s what you lose if you block. \n\n Then decide if the churn is worth that number.\n\n Churn tells you what an advertiser costs you. Revenue tells you what blocking them costs you. You need both. \n\n How’s your SDK-less Bid Floor Product going, Felix?\n\n TLDR: As mentioned , I’ve built a bid floor optimization product ( Segmenta-ai.com) for AppLovin MAX that runs via API. No SDK, minimal dev work, fixed fee after a free trial. \n\n Our 8 tests from last week are all positive so far! Low double digits and climbing! One partner has agreed to a case study to share once the test is over.\n The post To Block or Not to Block, Part 2: The Advertiser I Should NOT Have Blocked first appeared on Gamigion: Mobile Games Industry News .",
+      "partial": false,
+      "source": "Gamigion",
+      "published": "2026-11-12",
+      "signals": {
+        "words": 550,
+        "figures": 5,
+        "figures_per_100w": 0.91,
+        "quotes": 0,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 24,
+      "_why": "Case study on how blocking high-churn ad creatives dropped daily ad revenue by thousands due to hidden high eCPMs. · **TACTIC**",
+      "_reasoning": "A highly practical tactical write-up detailing how blocking high-churn ad creatives accidentally slashed ad revenue by thousands of dollars daily because eCPM was evaluated in aggregate rather than by creative ID revenue. Provides exact methods for tracking advertiser value versus churn costs using AppLovin MAX data.",
+      "_score": 9.0
+    },
+    {
+      "url": "https://www.gamigion.com/why-two-near-identical-bus-match-games-ended-up-with-a-13x-iap-revenue-gap",
+      "title": "Why Two Near-Identical Bus Match Games Ended Up With a 13x IAP Revenue Gap",
+      "text": "Bus conveyor-belt match games have emerged as one of the strongest breakout casual categories of the year. The core loop is instantly readable, highly shareable, and works extremely well for user acquisition.\n\n But two leading titles in the space tell a very clear story about what actually separates high-monetization hits from high-download also-rans. Same genre, similar core mechanics, comparable total download scale — and a roughly 13x gap in lifetime IAP revenue.\n\n The difference is not art, not theme, not marketing budget. It comes down to level difficulty tuning, and how tightly that difficulty is aligned with the monetization system.\n\n The Download Race: Volume vs. Geographic Mix\n\n First, the raw scale. Both titles have reached massive download numbers, but they took very different paths to get there.\n\n Bus Traffic Fever, from GOODROID, scaled up in April and stabilized at 300K–450K daily installs through May. It now sits at 62 million total downloads across platforms: 42 million on Android, 20 million+ on iOS.\n\n Bus Fever Party, from Lumi Games, launched later and scaled faster. It hit mass volume in mid-August, stabilized at 700K–800K daily installs in September, and has now passed 51 million total downloads. Its growth came at the direct expense of the earlier leader: Bus Traffic Fever dropped from 450K to ~100K daily installs as the newer title took share.\n\n The geographic split is where the strategies diverge most sharply:\n\n – Bus Traffic Fever top markets: US (13% of downloads), Mexico, Indonesia, India, Turkey\n\n – Bus Fever Party top markets: India (26% of downloads), Brazil, US, Mexico, Indonesia\n\n Bus Fever Party blew out on emerging market volume — it hit 5 million downloads in Brazil alone, compared to only 200K for its competitor. That volume drove its fast rise up the download charts. But it also set the stage for the revenue gap to come.\n\n The Revenue Divide: Same Genre, 13x IAP Gap\n\n On IAP revenue, the two titles are in completely different leagues.\n\n – Bus Traffic Fever has generated $19 million in lifetime IAP. The US alone accounts for 63% of that revenue (~$12M), followed by Japan, UK, Canada and Germany. Its top 5 revenue markets are all high-value Tier 1 territories.\n\n – Bus Fever Party has reached ~$1.5 million in total IAP. The US still makes up 68% of its revenue, so the revenue concentration pattern is similar — but the per-download monetization is drastically lower.\n\n The revenue per download (RPD) gap is stark. In India, for example, Bus Traffic Fever reaches $0.15 RPD. Bus Fever Party sits below $0.01.\n\n Even as download counts converge over time, the monetization gap will remain massive. The two products are competing in the same subgenre, but they are fundamentally playing two different games.\n\n The Level Design Fork: Deep Difficulty vs. Casual Satisfaction\n\n The root of the revenue gap lies in level design philosophy. The two titles took the same core loop and pushed it in opposite directions.\n\n #Bus Traffic Fever: Higher difficulty, structured pay-to-solve\n\n Bus Traffic Fever received a major update this year that significantly raised difficulty: more buses per level, more colors, higher failure rates. It also added two subtle quality-of-life features and moved power-up unlocks much earlier in the progression.\n\n The design philosophy is clear: pack each level with enough buses and friction that players naturally get stuck. Difficulty went up by at least one full tier. The result? Daily IAP revenue rose by nearly 40% after the update, and power-up purchase penetration increased notably.\n\n This follows the same playbook seen in Color Block Jam and Pixel Flow: the Pay-to-Solve (P2S) model works when difficulty is calibrated to create consistent, mild frustration that power-ups can resolve.\n\n Bus Fever Party: Lighter difficulty, smooth casual flow\n\n Bus Fever Party took the opposite approach. It uses primary/secondary color design, fewer high-capacity buses, and a gentler difficulty curve. Levels introduce clear progression prompts, and the overall feel leans into fast, satisfying clears rather than tight puzzle challenge.\n\n The experience is smoother and more accessible. It is better at acquiring users — especially in more casual emerging markets. But it also generates far less natural demand for paid power-ups. When players can clear levels reliably through skill alone, there is much less reason to spend.\n\n The Core Lesson: Monetization Lives or Dies By Difficulty Alignment\n\n Both approaches are valid strategies. One optimizes for download scale and reach; the other optimizes for revenue per user.\n\n But the comparison makes one point very clear: copying the core loop is easy. Tuning difficulty pacing, monetization hooks and target user profile into one cohesive system — that is the real competitive moat in this category.\n\n Bus Fever Party proved that a lighter, more casual take can grab massive volume fast, especially in emerging markets. But the misalignment between low difficulty and IAP monetization left it with huge download numbers and comparatively little revenue.\n\n Bus Traffic Fever proved that raising difficulty and tightening pay-to-solve tuning can directly move revenue — even on a mature product. It is further evidence that the P2S model works reliably across multiple puzzle subgenres, when executed well.\n\n For studios working in casual puzzle, the takeaway is straightforward. User acquisition and core loop novelty will get you downloads. But long-term monetization is built in the level design, one difficulty curve adjustment at a time.\n The post Why Two Near-Identical Bus Match Games Ended Up With a 13x IAP Revenue Gap first appeared on Gamigion: Mobile Games Industry News .",
+      "partial": false,
+      "source": "Gamigion",
+      "published": "2026-11-13",
+      "signals": {
+        "words": 905,
+        "figures": 29,
+        "figures_per_100w": 3.2,
+        "quotes": 0,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 11,
+      "_why": "Analysis of two bus match games revealing a 13x IAP gap driven by level difficulty tuning. · **TACTIC**",
+      "_reasoning": "An in-depth analysis comparing bus match titles Bus Traffic Fever and Bus Fever Party reveals a 13x lifetime IAP revenue gap stemming from level design difficulty tuning and pay-to-solve mechanics. This provides a direct, highly actionable puzzle monetization tactic the operator can test immediately.",
+      "_score": 9.0
+    },
+    {
+      "url": "https://www.pocketgamer.biz/playtika-rules-out-sale-and-will-continue-as-independent-company",
+      "title": "Playtika rules out sale and will continue as independent company",
+      "text": "The company's board said independence offered the best path to long-term shareholder value\n\n By Isa Muhammad \n\n November 9, 2026 \n\n Share:\n\n Prefer PocketGamer.biz on Google \n\n Adjusted EBITDA increased 15.9% to a record $252.1 million.\n\n Disney Solitaire revenue grew 88.4% year-on-year to $111.2 million.\n\n Playtika expects to finish 2026 around the midpoint of its revenue and adjusted EBITDA forecasts.\n\n Stay Informed \n\n Get Industry News In Your Inbox…\n\n Sign Up Today\n\n Playtika will continue operating as an independent, publicly traded company after completing a strategic review of its business and potential sale options.\n\r\n The publisher's board of directors concluded that remaining independent would offer the best path to creating long-term value for shareholders.\n\r\n Playtika relaunched its strategic review in April 2026, with a special committee of independent directors tasked with assessing options for the business and its portfolio. \n\r\n The process came amid reports of interest from potential buyers, including Tencent, which was reportedly in talks to acquire Playtika-owned SuperPlay for between $1 billion and $1.5bn.\n\r\n Playtika acquired SuperPlay in 2024 for an initial $690 million, with additional payments tied to the studio's financial performance to bring the deal up to around $2bn. However, no deal with Tencent was confirmed.\n\r\n “With the strategic review complete, we are moving forward as an independent company,\" said Playtika CEO Robert Antokol. “Our third quarter reflects what makes Playtika durable: loyal players and games built to last. \n\r\n Portfolio performance \n\r\n The announcement came alongside Playtika's third-quarter results, with revenue reaching $673.8m, down 0.1% year-on-year. Net income stood at $40.4m, while adjusted net income reached $120.7m.\n\r\n Among its games, Disney Solitaire generated $111.2m in revenue, up 88.4% year-on-year. June's Journey also grew 12.1% to $76.6m, while Bingo Blitz revenue fell 18.2% to $133m.\n\r\n However, Disney Solitaire revenue fell 21.9% compared with the previous quarter. Playtika had planned to reduce user acquisition spending in the second half of 2026 after front-loading investment earlier in the year. The company said this would affect revenue sequentially but support improved profitability and margins. \n\r\n Playtika sales and marketing costs have seen a reduction from the previous year, too, falling from $206.3m in Q3 2025 to $167.8m in Q3 2026.\n\r\n Playtika has also reaffirmed its full-year revenue forecast of $2.75bn to $2.85bn and adjusted EBITDA guidance of $750m to $790m. It now expects to finish around the midpoint of both ranges.\n\n #Financials \n\n #Strategic Review \n\n Companies\n\n People\n\n Related\n\n Playtika allocates up to $450m for “bolt-on” M&A activity over next three years \n\n Playtika revenue grew 8.9% to $2.58 billion in 2021 \n\n Revealed: Mobile publishers share their record D2C sales \n\n Playtika launches portfolio-wide strategic review \n\n Direct-to-consumer sales hit record levels again in Q4",
+      "published": "2026-11-09",
+      "author": "Isa Muhammad",
+      "content_label": null,
+      "extraction": "article/main",
+      "source": "PocketGamer.biz",
+      "signals": {
+        "words": 434,
+        "figures": 41,
+        "figures_per_100w": 9.45,
+        "quotes": 4,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 65,
+      "_why": "Playtika rules out sale, reports Q3 revenue of $673.8m, and details intentional cuts to UA spending to boost margins. · **DECISION**",
+      "_reasoning": "Playtika officially concluded its strategic review, ruling out a sale and committing to independence after posting Q3 revenue of $673.8m and highlighting massive growth in Disney Solitaire up 88.4% to $111.2m. Crucially, Playtika details its deliberate cut in UA spending from $206.3m to $167.8m to protect margins, offering concrete financial benchmarks for large casual operators balancing growth and profitability.",
+      "_score": 8.0
+    },
+    {
+      "url": "https://mobilegamer.biz/data-digest-learnings-tops-ad-charts-savvys-6bn-moonton-deal-decas-4-5m-buy-more",
+      "title": "Data digest: Learnings tops ad charts, Savvy’s $6bn Moonton deal, Deca’s $4.5m buy, more",
+      "text": "By \n \n Vikki Blake \n\n / 11th November 2026 \n\n Every Wednesday we break down the latest data, research and financial results into digestible chunks.\n\n Read on for the numbers you need to know about without the fluff.\n\n This column is sponsored by Xsolla , offering the #1 web shop solution for mobile games that generates more value, purchases, and revenue. Get started here. \n\n Learnings tops Q3 ad revenue charts \n\n Learnings made around $135m in ad revenue in Q3 2026 across 19 markets, according to Sensor Tower . That’s 62% more than second-placed Voodoo on $83.1m, and an 8% rise quarter-on-quarter, the fastest growth in the top ten. Vita Mahjong brought in $60.8m, around 45% of Learnings’ total, but its ad revenue remained flat. Easybrain was third with $70.3m.\n\n Voodoo led on downloads with 117m, while Learnings’ downloads fell 9% to 99.8m. Downloads across the 19 markets fell 2.1% quarter-on-quarter and 7.3% year-on-year to 6.38bn.\n\n China clears Savvy’s $6bn Moonton deal \n\n China’s State Administration for Market Regulation has approved Savvy Games Group’s acquisition of Mobile Legends: Bang Bang developer Moonton from ByteDance, according to a list of approved mergers spotted by pocketgamer.biz .\n\n The deal, which Bloomberg said was near completion in March and is valued at over $6bn, was cleared unconditionally, with the review completed on October 29. ByteDance bought Moonton for around $4bn in 2021.\n\n Deca buys Island Hoppers for $4.5m \n\n Embracer’s Deca Group has bought farming adventure game Island Hoppers from GDEV-owned Nexters for around $4.5m upfront, plus an earn-out of up to around $0.5m, according to an Embracer announcement .\n\n Deca expects to make its money back in around two and a half to three and a half years. The deal closed in August but couldn’t be announced until now due to “previous commercial restrictions”.\n\n Deca subsidiary A Thinking Ape will take over publishing and development, and plans to keep investing in UA, live ops and content. Island Hoppers launched in October 2023 on iOS, Android and browser.\n\n “Great games can have much longer lives than the market often expects,” said Deca CEO Ken Go.\n\n Honor of Kings dominates a decade of top grossing charts \n\n Honor of Kings is the top grossing mobile game of 2026 so far, with $1.14bn in IAP revenue up to November 5, according to AppMagic’s decade review .\n\n It’s the sixth year Tencent’s MOBA has taken the top spot since 2016, after 2017, 2018, 2019, 2022 and 2023.\n\n Monster Strike, number one in 2016 with $807m, now ranks 37th with $137m this year. PUBG Mobile led in 2020 ($1.4bn) and 2021 ($1.6bn) and sits 23rd with $209m. 2024’s leader Monopoly Go is third with $867m, down from $1.5bn two years ago, while Last War: Survival topped 2025 with $1.4bn.\n\n Free Fire Max is the most downloaded game of 2026 so far with 225m downloads.\n\n Krafton mobile revenue rises 3.2% to $375.6m \n\nKrafton’s mobile revenue grew 3.2% year-on-year to $375.6m (₩504.3bn) in Q3, according to its latest results , making up just over half of the company’s total revenue.\n\n Overall revenue rose 11.6% to $725.9m (₩971.4bn), despite PC revenue falling 32.5% to $178m and console dropping 15.9% to $6.4m. Operating profit fell 35.5% to $168.1m, which Krafton put down to costs from Gamescom and other activities.\n\n Revenue from the PUBG IP was up 11%. Across the first nine months of the year, Krafton’s revenue grew 51% to $2.6bn and operating profit rose 14% to $819.4m, both records for the period.\n\n Digimon Alysion passes 200,000 pre-registrations \n\n Bandai’s Digimon Alysion has passed 200,000 pre-registrations two weeks after they opened on October 27, according to the publisher . The card battler, based on the Digimon Card Game, is available to pre-register in 49 countries and regions, including Japan and North America. It’s due to launch soon.",
+      "published": "2026-11-11",
+      "author": null,
+      "content_label": null,
+      "extraction": "article/main",
+      "source": "MobileGamer.biz",
+      "signals": {
+        "words": 628,
+        "figures": 80,
+        "figures_per_100w": 12.74,
+        "quotes": 2,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 23,
+      "_why": "Learnings tops Q3 ad revenue with $135m, Savvy clears $6bn Moonton deal, AppMagic decade charts. · **MARKET**",
+      "_reasoning": "A comprehensive data digest covering Q3 ad revenue charts led by Learnings at $135m, Savvy's cleared $6bn acquisition of Moonton, and AppMagic's decade review topped by Honor of Kings. Provides concrete revenue and download figures across puzzle, hybrid-casual, and heavy mobile markets.",
+      "_score": 8.0
+    },
+    {
+      "url": "https://www.pocketgamer.biz/ai-is-changing-discoverability-how-talking-tom-boosted-ai-referral-traffic-by-357",
+      "title": "AI is changing discoverability: How Talking Tom boosted AI referral traffic by 357%",
+      "text": "Outfit7 senior director of engineering Primož Bevk talks SEO, GEO and understanding users\n\n By Aaron Astle \n\n November 12, 2026 \n\n Share:\n\n Prefer PocketGamer.biz on Google \n\n One year ago, the Talking Tom IP was barely being suggested to users of AI.\n\n Outfit7 set out to increase discoverability for its major IP.\n\n Stay Informed \n\n Get Industry News In Your Inbox…\n\n Sign Up Today\n\n As more of the population turns toward AI to answer questions and find recommendations, there’s inevitably a cohort of mobile gamers asking LLMs too. Instead of browsing an app store or going to Google to research their next potential game, some may go to ChatGPT, Claude or one of the many other tools now available.\n\r\n While this may be a convenience for users, this isn’t necessarily an advantage for developers and publishers. Discoverability is splintering. Search engine optimisation (SEO), generative engine optimisation (GEO), recommendations from AI and rocketing tech advancements are all factors to keep track of. But, if properly optimised, there may be ways to take advantage of the change and boost appearances in AI results, at least for now.\n\r\n Outfit7 began auditing itself across the major LLMs in October 2025 and found that Talking Tom & Friends had \"near-zero visibility\" through indirect prompts at the time - such as asking for a virtual pet mobile game to play.\n\r\n “There is a lot of misinformation and misconception about GEO and there is no quick way to make it work - it requires persistence.” Primož Bevk \n\n Setting out to change this, the company formed a cross-functional core team with staff across marketing, legal, PR, copywriting, content creation and technical SEO. Now, Outfit7 claims to have seen a 357% increase in AI referral traffic over six months.\n\r\n \"For a game to be discovered, it needs to be present where the users are, whether it’s app stores, social media, traditional search or AI,\" Outfit7 senior director of engineering Primož Bevk tells PocketGamer.biz.\n\r\n \"So, I think we need to follow the shift if we want to be considered a choice for gamers. In the end, AI is just one of the surfaces through which users interact with the digital world and we should leverage the benefits it brings.\n\r\n \"For us, the goal was to be present where we could reach new potential fans and players, while also building awareness of both the Outfit7 corporate brand and Talking Tom & Friends. It’s usually easy to pass ‘who are you’ but much harder to pass open discovery questions.\"\n\r\n Optimising at Outfit7 \n\r\n The company looked at dual strategies: owned media and earned media. While optimising a website may help when the AI comes to pull results, the tech typically draws from multiple sources. As a result, Outfit7 set out to identify sites the AI would deem high authority, then worked with those outlets to secure coverage, increasing its potential for discovery.\n\r\n Despite amassing billions of downloads , the Talking Tom IP wasn't showing up in indirect AI searches a year ago. Now, Outfit7 claims to have increased Talking Tom’s presence across 50 real-world player discovery prompts to 90%.\n\n To monitor traffic increase, the company used its website as a proxy since traffic couldn’t be directly measured from LLMs to the app stores. For prompt presence, the team decided on 50 prompts where the brand wasn’t originally showing, but where they thought it should.\n\r\n Establishing what those prompts should be meant studying organic search behaviour, such as defining \"high-intent keywords\" and determining what users were searching for. Data was gathered from customer support emails and app store reviews to give a picture of how Talking Tom players speak and Outfit7 began to formulate prompts its target audience might ask AI - and how to word them.\n\r\n Bevk notes that studying the language of customer reviews has also been useful in understanding the existing playerbase. While these users already know the Talking Tom brand, they might only play a handful of the 20-plus Talking Tom & Friends games. This means they might discover a new title through AI, too.\n\r\n \"When we first started, we hit this wall right away. How can we be sure that the strategy we execute even works if we cannot easily measure KPIs that we take for granted with SEO?\" Bevk recalls.\n\r\n \"So, we had to get creative and set some proxy indicators, like measuring AI traffic on our brand website and employing a similar GEO strategy for both app store storefronts and our website.\"\n\r\n “For a game to be discovered, it needs to be present where the users are, whether it’s app stores, social media, traditional search or AI.” Primož Bevk \n\n With the lack of SEO-equivalent support with LLMs and no way to simply download a spreadsheet of what people are asking AI, it’s becoming more challenging to understand search performance. Webmaster tools have been a go-to for SEO, but GEO can be more of a blind spot.\n\r\n Bevk reveals that organic web search has actually never been a major user acquisition channel for Talking Tom, so the company hadn’t put much emphasis on SEO optimisation anyway. That’s meant the team had \"a lot to catch up\" on with GEO.\n\r\n \"There is a lot of misinformation and misconception about GEO and there is no quick way to make it work - it requires persistence,\" he adds.\n\n With this in mind, we ask how Outfit7 can be certain its recent efforts are what led to improved results for the IP, when evolutions in tech and improvements to the LLMs themselves are also occurring concurrently.\n\r\n “Put yourself in the shoes of your audience.” Primož Bevk \n\n \"The short answer is we can’t. LLMs are advancing at a staggering rate and there is no Google Search Console for AI which could reassure us on the effectiveness of our changes,\" admits Bevk.\n\r\n \"That being said, looking at our data and comparing it to the trend from before we started implementing our GEO strategy, we can say with confidence that if the trend was on a slow increase before, now it’s decidedly more positive. And we believe that cannot be just from improvements in the LLMs themselves.\"\n\r\n Top tips beyond Talking Tom \n\r\n We ask Bevk what advice he would give to other studios looking to maximise their discoverability via AI. He says a company should focus on what its goals are, on blind spots and on understanding what a specific audience is looking for within that category of games.\n\r\n \"Put yourself in the shoes of your audience. Understand what they are looking for. Why is your game the one they would want to play? You need to find out what questions they are asking,\" he expands.\n\n He also recommends looking to Reddit and Google Trends, then writing helpful content that answers relevant questions being asked online. Especially for smaller studios, making the most of AI results may prove to be a key avenue going forward.\n\r\n \"I think for indies it’s even more important to have good SEO fundamentals and consider AI discoverability as an important avenue, especially if they are in less saturated genres and categories, where it’s easier to stand out.\"\n\r\n Outfit7’s own research concluded that there is no \"set it and forget it\" model because of how quickly the AI landscape changes. GEO is like a moving target, so studios must be ready to adapt quickly even if they believe they’ve mastered optimisation today.\n\r\n Bevk concludes that, going forward, Outfit7 will continuously expand the number of prompts it tracks. At the same time, the team must focus on what is useful and relevant for players across the Talking Tom catalogue.\n\n #User Acquisition \n\n #Artificial Intelligence \n\n #Talking Tom \n\n #Discoverability \n\n #Talking Tom & Friends \n\n Companies\n\n People\n\n Related\n\n Outfit7's VP of legal on the risks AI poses to game IP ownership \n\n Mobile’s Halloween tricks and treats: Clash of Clans, Talking Tom, Monopoly Go, Fortnite and more \n\n Agree IP terms early, cut through AI hype, stop overloading players: Four lessons from PGC Nordics \n\n October’s Collabs Corner: Pokémon goes clubbing, Love and Deepspace meets Blade Runner 2049, Monopoly Go at McDonald’s, and more \n\n August's Collabs Corner: Sonic races into Fortnite, Brawl Stars gets an adidas makeover, Nikke meets Persona, and more",
+      "published": "2026-11-12",
+      "author": "Aaron Astle",
+      "content_label": null,
+      "extraction": "article/main",
+      "source": "PocketGamer.biz",
+      "signals": {
+        "words": 1358,
+        "figures": 23,
+        "figures_per_100w": 1.69,
+        "quotes": 15,
+        "promo_markers": 0,
+        "pr_phrases": 0
+      },
+      "_idx": 28,
+      "_why": "Outfit7 boosts AI referral traffic 357% in six months using Generative Engine Optimization (GEO). · **TACTIC**",
+      "_reasoning": "Outfit7 shares how they achieved a 357% increase in AI referral traffic over six months by auditing LLMs, tracking proxy brand traffic, and optimizing Generative Engine Optimization (GEO) for Talking Tom. Offers actionable insights into emerging discovery channels beyond traditional app store SEO.",
+      "_score": 8.0
+    }
+  ],
+  "data": {
+    "segments": {
+      "0": {
+        "publishable": true,
+        "stance": "NEUTRAL_REPORTING",
+        "headline": "בכירי Supercell ו-King נגד הצעת חוק ההגינות הדיגיטלית באירופה",
+        "key_points": [
+          "ב-11 בנובמבר 2026 פרסמה הנציבות האירופית רשמית את הצעת ה-Digital Fairness Act, הכוללת קנסות של עד 6% מהמחזור השנתי העולמי במקרים רחבי היקף.",
+          "ההצעה מחייבת כיבוי ברירת מחדל של מטבעות וירטואליים בתשלום במשחקים המיועדים לקטינים ללא אישור הורים, ואיסור מלא על Loot Boxes ומנגנוני Pay-to-Win עבור קטינים.",
+          "משחקים יחויבו להציג שווי כספי אמיתי לפריטים וירטואליים, ולאפשר לכלל השחקנים לכבות מנגנוני Loot Boxes ומאפייני עיצוב ממכרים.",
+          "מנכ״ל Supercell, אילקה פאננן, ציין כי כ-95% מהשחקנים החודשיים משחקים בחינם, וטען שההצעה מתייחסת לכל משחק מתחת ל-PEGI 18 כמיועד לילדים.",
+          "נשיא King, טוד גרין, התריע כי אי-הוודאות בהגדרות תפגע ביותר מ-1,000 אולפני מובייל באירופה, רובם עסקים קטנים ועצמאיים.",
+          "הנציבות האירופית טוענת כי המהלך יחסוך לצרכנים עד 13.7 מיליארד אירו בשנה; ההצעה עוברת כעת לדיונים בפרלמנט ובמועצה האירופית."
+        ],
+        "caution": "מדובר בהצעת חוק ראשונית של הנציבות האירופית, שטרם אושרה וצפויה לעבור דיונים, שינויים והצבעות בפרלמנט האירופי ובמועצת האיחוד.",
+        "takeaway": "יש למפות את תלות המשחק במטבעות וירטואליים ובשחקנים מתחת לגיל 18, ולהיערך טכנולוגית להצגת מחירים בכסף אמיתי ומתגי נטרול מנגנונים.",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "הנציבות האירופית הציגה רשמית ב-11 בנובמבר את הצעת ה-Digital Fairness Act, ומיד גררה התנגדות פומבית חריפה מצד מנכ״ל Supercell ונשיא King."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מה ההצעה הזו דורשת בפועל ממפתחי משחקים?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "מטבעות וירטואליים בתשלום יכובו כברירת מחדל במשחקים המיועדים לקטינים אלא אם התקבל אישור הורה, ומנגנוני Loot Boxes ו-Pay-to-Win ייאסרו לחלוטין עבור קטינים."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "איך הנציבות מגדירה משחק שמיועד לקטינים?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "אילקה פאננן מ-Supercell טוען בפוסט שפרסם כי ההצעה מתייחסת למעשה לכל משחק שמדורג מתחת ל-PEGI 18 כמיועד לילדים."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "זה אומר שכל כותר קז'ואל או פאזל רגיל נופל להגדרה הזו."
+          },
+          {
+            "speaker": "Dana",
+            "text": "ולא רק זה. ההצעה דורשת מכל המשחקים להציג ערך בכסף אמיתי לכל פריט וירטואלי, ולאפשר לכלל השחקנים, כולל בגירים, לכבות Loot Boxes ומאפייני עיצוב ממכרים."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "איך אפשר להציג ערך נקוב באירו כשמטבעות נמכרים בחבילות שונות ובהנחות שונות?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "זו בדיוק הנקודה שפאננן העלה. שחקנים רוכשים מטבעות במחירים משתנים דרך באנדלים והצעות מיוחדות, כך שכל מספר באירו יהיה ניחוש שמייצר בלבול במקום שקיפות."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מה הייתה העמדה של King בנושא הזה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "נשיא King, טוד גרין, ציין שחברות יתקשו לקבוע אם פיצ'רים שגרתיים כמו מטבע פנימי, רכישות אופציונליות או מכניקות התקדמות נכנסים תחת תחולת החוק."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "כמה אולפנים באירופה בכלל מושפעים מהמהלך הזה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "לפי הנתונים שגרין הציג, מדובר ביותר מ-1,000 אולפני מובייל באירופה, שרובם עסקים קטנים ועצמאיים שאין להם משאבים משפטיים להתמודד עם אי-הוודאות הזו."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "פאננן התייחס גם למודל הכלכלי של Free-to-Play?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "הוא ציין שכ-95% מהשחקנים החודשיים של Supercell משחקים בחינם לחלוטין. אם מקשים על המיעוט שמשלם, התוצאה תהיה פחות משחקים חינמיים לכולם."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מה גובה הסנקציות שהנציבות מציעה להטיל על חברות שלא יעמדו בכללים?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "במקרים של הפרות בהיקף נרחב, הנציבות תוכל להטיל קנסות של עד 6% מהמחזור השנתי העולמי של החברה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "איגודי התעשייה האירופיים הצטרפו לביקורת הזו?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "איגודי Video Games Europe ו-EGDF כינו את ההצעה לא ישימה, לא מוצדקת וחסרת פרופורציה, וטענו שהיא עלולה לפגוע אנושות בתעשייה המקומית."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "נשמע קול דומה גם מחוץ לאיחוד האירופי?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "ארגון Ukie הבריטי גיבה את העמדה הזו, והזהיר שפגיעה במערכת הדירוג של PEGI מגבילה את שיקול הדעת ההורי. הם קראו לממשלת בריטניה לא לאמץ קו דומה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "איך הנציבות האירופית מנמקת את הצורך בצעד כזה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "נציב הגנת הצרכן, מייקל מקגראת', הגדיר את החוק כרפורמה השאפתנית ביותר של כללי הגנת הצרכן מזה דור, והנציבות מעריכה שהוא יחסוך לצרכנים עד 13.7 מיליארד אירו בשנה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "החברות האלו כבר היו על הכוונת של הרגולטורים עוד לפני פרסום ההצעה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "Supercell ו-King כבר נכללו בספטמבר בהליך אכיפה מתואם של רשת הגנת הצרכן באיחוד, בדיוק סביב האופן שבו הן מוכרות מטבעות במשחק."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מה לוח הזמנים הצפוי עכשיו עד שזה יהפוך לחוק מחייב?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "ההצעה הועברה לדיונים בפרלמנט האירופי ובמועצה האירופית, כך שיש עוד תהליך חקיקה ממושך לפני אישור סופי."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "השאלה היא האם אולפנים יוכלו לחכות לנוסח הסופי, או ששינוי מבנה המטבעות כבר מחייב הערכות בקוד מעכשיו."
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "problems": [],
+        "status": "written"
+      },
+      "1": {
+        "publishable": true,
+        "stance": "VENDOR_MARKETING",
+        "headline": "עמלות ה-iOS החדשות באירופה והכדאיות של חנויות חלופיות",
+        "key_points": [
+          "ב-1 באוקטובר 2026 נכנסו לתוקף התנאים המסחריים המעודכנים של Apple באיחוד האירופי, שבהם עמלת ה-Core Technology Fee בסך 0.50 אירו לכל התקנה ראשונה שנתית מעל 1 מיליון הוחלפה ב-Core Technology Commission של 5% על מכירות דיגיטליות.",
+          "העדכון מגיע מעל שנה לאחר שהנציבות האירופית קנסה את Apple ב-500 מיליון אירו בעקבות חשש שמבנה העמלות הקודם חסם הפצה חלופית.",
+          "שנתיים לאחר כניסת חוק ה-DMA לתוקף באירופה, וכאשר יפן נפתחה בדצמבר 2025 וברזיל ביוני 2026, חנויות צד שלישי מהוות עדיין פחות מ-1% מכלל הפצת אפליקציות iOS באירופה.",
+          "חברת MacPaw כבר סגרה את חנות Setapp Mobile בפברואר 2026 בשל מורכבות התנאים של Apple, בעוד חנויות כמו Epic Games Store, AltStore PAL, Aptoide, Skich ו-Onside ממשיכות לפעול.",
+          "לפי נתוני חברת Onside, היא גובה עמלה של 12% על רכישות בתוך האפליקציה לעומת 26% ש-Apple גובה ב-App Store באירופה (בתוספת 5% עמלת Apple בחנות החלופית, סך הכל 17%).",
+          "Onside טוענת שעלות רכישת משתמש לחנות שלה דרך קמפיינים ברשת עומדת על כ-2 אירו, ומציעה מימון UA תמורת חלוקת הכנסות לכותרים מובילים."
+        ],
+        "caution": "המאמר נכתב מטעם מנכ״ל Onside, חנות אפליקציות אלטרנטיבית בעלת אינטרס שיווקי מובהק; הנתונים על עלות רכישת משתמשים בסך 2 אירו הם נתונים פנימיים של החברה, והמאמר אינו מציג נתוני המרה בפועל או שיעורי שימור של משתמשים שהתקינו משחקים דרך חנויות צד שלישי.",
+        "takeaway": "יש לבחון האם חיסכון של 9 נקודות אחוז בעמלות הפלטפורמה מצדיק את החיכוך בהתקנת חנות חיצונית, במיוחד בכותרים בעלי LTV גבוה שנשענים על רכישות בתוך האפליקציה.",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "ב-PocketGamer.biz מדווחים על עדכון התנאים המסחריים של Apple באיחוד האירופי שנכנס לתוקף ב-1 באוקטובר, ומשנה את מבנה העמלות למפתחים בחנויות אלטרנטיביות."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "השינוי המרכזי הוא ביטול ה-Core Technology Fee, שחייב 0.50 אירו על כל התקנה שנתית מעל מיליון, והחלפתו בעמלה של 5 אחוזים על מכירות דיגיטליות."
+          },
+          {
+            "speaker": "Dana",
+            "text": "המהלך הגיע בעקבות קנס של 500 מיליון אירו שהטילה הנציבות האירופית על Apple, בטענה שהעמלה הקודמת מנעה בפועל ניסויים והפצה מחוץ לחנות הראשית."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "למשחקי קז'ואל והיבריד-קז'ואל עם נפח הורדות רחב, המודל הישן יצר חשיפה כספית מסוכנת. עמלה של 5 אחוזים מהמכירות קושרת את התשלום להכנסות בלבד."
+          },
+          {
+            "speaker": "Dana",
+            "text": "זה שינוי משמעותי במדיניות הפלטפורמה, אבל בשטח, שנתיים אחרי כניסת ה-DMA, חנויות צד שלישי מחזיקות בפחות מ-1 אחוז מהפצת iOS באירופה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "אפילו שווקים נוספים שנפתחו לחנויות חיצוניות, כמו יפן בדצמבר 2025 וברזיל ביוני 2026, עדיין לא ייצרו שינוי בהיקפי ההפצה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "וחלק מהשחקניות כבר נשרו מהשוק; חברת MacPaw סגרה את Setapp Mobile בפברואר 2026 בגלל המורכבות התפעולית של דרישות Apple."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מי שנותרו הן חנויות כמו Epic Games Store, AltStore PAL, Aptoide, Skich וחנות בשם Onside, שהמנכ״ל שלה חתום על הטור הזה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "הוא מציג שני מנופים לשיפור הרווחיות: גביית עמלה מופחתת ועלויות רכישת משתמשים נמוכות יותר דרך הרשת."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "איך המספרים האלה נראים בהשוואה ל-App Store הרגילה באירופה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "ב-App Store העמלה עומדת על 26 אחוז על רכישות בתוך האפליקציה. Onside גובה 12 אחוז, וביחד עם 5 האחוזים של Apple מגיעים ל-17 אחוז."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "זה יתרון של 9 נקודות אחוז למפתח, בתנאי שיש דרך יעילה להביא שחקנים להתקין את החנות עצמה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "לפי נתונים פנימיים של Onside, עלות רכישת משתמש לחנות עומדת על כ-2 אירו, והם בנו כלי ייחוס שמחזיר נתוני המרה לרשתות הפרסום."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "2 אירו להתקנת חנות זה מספר מעניין, אבל הוא דורש מהמשתמש חיכוך כפול: קודם הורדת החנות מאתר, ואז הורדת המשחק ואימות notarisation של Apple."
+          },
+          {
+            "speaker": "Dana",
+            "text": "הם גם מציעים לממן ולנהל UA בעצמם למשחקים שכבר מוכיחים ביצועים חזקים ב-App Store, תמורת חלוקת הכנסות."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "זו הצעה שיווקית אופיינית לספק, והיא מתאימה בעיקר לכותרים מבוססים עם מוניטיזציה חזקה שיכולים לבדוק ערוץ הפצה נוסף."
+          },
+          {
+            "speaker": "Dana",
+            "text": "השאלה היא אם הפחתת העמלה ל-5 אחוזים תספיק למפעילים כדי לדחוף את נתח השוק של החנויות האלו מעבר לאחוז הבודד."
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "problems": [],
+        "status": "written"
+      },
+      "2": {
+        "publishable": true,
+        "stance": "NEUTRAL_REPORTING",
+        "headline": "נתוני האכיפה ב-App Store: אחוז ערעורים אפסי",
+        "key_points": [
+          "במהלך 2025 הסירה Apple כ-166,899 אפליקציות מה-App Store, כאשר מתוך 26,305 ערעורים שהוגשו הוחזרו 423 אפליקציות בלבד, שיעור הצלחה של 1.6%",
+          "Apple סגרה 193,035 חשבונות מפתחים, כאשר 192,702 מהם (99.8%) נסגרו בשל הונאה",
+          "מתוך 10,127 ערעורים על סגירת חשבון מפתח, רק 499 חשבונות הוחזרו לפעילות, שיעור הצלחה של 4.9%",
+          "סגירת חשבון מפתח מביאה להסרה מיידית של כל המשחקים והאפליקציות המשויכים לאותו חשבון",
+          "הגברת האכיפה מיוחסת להצפת החנות במאות אלפי אפליקציות כמעט זהות במהלך 2026 ולסיום הסבלנות למנגנוני paywalls מפוקפקים והנחות פיקטיביות"
+        ],
+        "caution": "הנתונים בדוח כוללים את כלל האפליקציות והחשבונות ב-App Store ואינם מספקים פילוח נפרד למשחקי מובייל לגיטימיים שנפגעו עקב שגיאות הגדרה לעומת גורמי ספאם והונאה",
+        "takeaway": "יש לבצע סקירת compliance קפדנית לכל מנגנוני המונטיזציה, ה-paywalls והמבצעים בתוך המשחק כדי למנוע סיכון חשיפה לסגירת חשבון",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "דוח השקיפות של Apple ל-2025, שפורסם ב-Gamigion, מציג הקשחה משמעותית במדיניות האכיפה וסגירת החשבונות ב-App Store."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מה הנתונים לגבי אפליקציות שהוסרו וכמה מתוכן הצליחו לחזור לחנות?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "Apple הסירה 166,899 אפליקציות. מתוך 26,305 ערעורים שהוגשו, היא החזירה 423 בלבד, שזה שיעור הצלחה של 1.6% בלבד."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "מה התמונה בגזרת חשבונות המפתחים עצמם?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "שם האכיפה חריפה עוד יותר: 193,035 חשבונות נסגרו, כאשר 192,702 מתוכם, כלומר 99.8%, נסגרו בעילת הונאה. מתוך 10,127 ערעורים, הוחזרו 499 חשבונות, שזה 4.9%."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "אובדן חשבון מפתח פירושו מחיקה מיידית של כל הפורטפוליו של הסטודיו. מה מניע את גל הסגירות הזה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "לפי הפרסום, הצפת החנות באפליקציות כמעט זהות ב-2026 הביאה את Apple לסיים את הסבלנות כלפי מנגנוני תחום אפור, כמו paywalls מפוקפקים והנחות פיקטיביות."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "השאלה הפתוחה היא כמה מהאכיפה הזו פוגעת בטעות במפעילים לגיטימיים שטעו בהגדרות, וכמה ממנה מופנית נטו נגד תעשיית ההונאות."
+          }
+        ],
+        "model": "gemini-3.5-flash",
+        "problems": [
+          "5 key points need more than 8 turns"
+        ],
+        "status": "written"
+      },
+      "3": {
+        "publishable": true,
+        "stance": "VENDOR_MARKETING",
+        "headline": "חסימת מפרסמים במונטיזציה: המחיר הסמוי של eCPM גבוה",
+        "key_points": [
+          "חסימת המפרסם Top Tycoon הובילה לירידה של 13% בסך הכנסות הפרסום של המשחק.",
+          "הערכת הנזק המקורית התבססה על מכפלת נתח החשיפות ב-eCPM הממוצע של AppLovin, והציגה הפסד מוערך של מאות דולרים ביום.",
+          "ההפסד בפועל הגיע לאלפי דולרים ביום מכיוון שהמפרסם שילם eCPM הגבוה משמעותית מהממוצע באפליקציה.",
+          "החברה המפרסמת שחררה 1,807 קריאייטיבים חדשים בחודש האחרון והציגה נתח הכנסות הגבוה בהרבה מנתח החשיפות שלה.",
+          "הפתרון שהוצע דורש מעקב ברמת ה-creative ID באמצעות ad callback של AppLovin כדי לחשב את סך ההכנסה מכל מודעות המפרסם ב-7 הימים האחרונים לפני החלטת חסימה."
+        ],
+        "caution": "הנתונים מבוססים על מקרה בוחן יחיד של יועץ שמקדם מוצר אופטימיזציה מסחרי מבוסס API, ואינם כוללים נתוני שימור שחקנים ארוכי טווח.",
+        "takeaway": "לפני חסימת מפרסם או קריאייטיב מתחרה, יש לחשב את סך ההכנסות הממשיות ממנו ב-7 הימים האחרונים באמצעות ad callback ולא להסתמך על ממוצע eCPM aggregate.",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "מאמר חדש ב-Gamigion מציג מקרה בוחן שבו חסימת מפרסם מתחרה הובילה לנפילה של 13% בסך הכנסות הפרסום של משחק מובייל."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "חסימת מתחרים היא פרקטיקה מקובלת כשרואים חריגה ב-churn, מה הניע אותם לחסום דווקא את המפרסם הזה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "הם חסמו את המשחק Top Tycoon, שהעלה 1,807 קריאייטיבים חדשים בחודש האחרון והעתיק את הגיימפליי של הלקוח, מה שגרם לעלייה חדה ב-churn של שחקנים."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "אם ה-churn עלה, הערכת הנזק הייתה אמורה להצדיק את החסימה. איפה הטעות בחישוב?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "הם הכפילו את נתח החשיפות של המפרסם ב-eCPM הממוצע שדיווחה AppLovin, וקיבלו הפסד מוערך של מאות דולרים בודדים ביום."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "ומדוע ההפסד בפועל היה גבוה יותר?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "כי ה-eCPM הממוצע הסווה את הנתונים הממשיים. Top Tycoon שילם מחירים גבוהים בהרבה מהממוצע, וההפסד בפועל הגיע לאלפי דולרים ביום."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "איך אפשר לזהות פער כזה בין נתח החשיפות לנתח ההכנסות לפני שמקבלים החלטת חסימה?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "הכותב מסביר כי ad callback של AppLovin מספק הכנסה מדויקת לכל מרשם לפי creative ID, מה שמאפשר לסכום את הכנסות המפרסם ב-7 הימים האחרונים."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "זה דורש להשוות את עלות ה-churn מול אובדן ההכנסה הישיר, אבל המאמר מקדם גם כלי אופטימיזציה מסחרי של המחבר, נכון?"
+          },
+          {
+            "speaker": "Dana",
+            "text": "כן, המחבר מקדם בסוף את המוצר Segmenta-ai לניהול bid floors ב-AppLovin MAX, וטוען לשיפור דו-ספרתי ב-8 ניסויים ראשונים."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "השאלה פתוחה היא כמה מפתח קז'ואל מוכן לספוג ב-churn של שחקנים לטווח ארוך תמורת eCPM גבוה בטווח הקצר."
+          }
+        ],
+        "model": "gemini-3.5-flash",
+        "problems": [],
+        "status": "written"
+      }
+    },
+    "plan": {
+      "through_line": "השבוע אנחנו רואים כיצד שינויים רגולטוריים, מדיניות פלטפורמות ודיוק במנגנוני מונטיזציה מגדירים מחדש את סיכויי ההישרדות והצמיחה של משחקי מובייל.",
+      "angles": {
+        "0": "מציג את הסיכון הרגולטורי הגובר באירופה וכיצד מגבלות על מטבעות משחק מחייבות התאמה מוקדמת של מנגנוני ה-Monetization.",
+        "1": "ניתוח הכדאיות הכלכלית של חנויות אפליקציות אלטרנטיביות באירופה בעקבות עדכון עמלות ה-Core Technology Commission של Apple.",
+        "2": "תזכורת למורכבות ניהול הסיכונים מול App Store ולאחוז האפסי של ערעורים שהתקבלו, מה שמחייב ניהול Compliance קפדני.",
+        "3": "לקח קריטי ב-Ad Monetization שמראה כיצד חסימה אגרסיבית של מודעות מתחרים עלולה לפגוע ב-eCPM וברווחיות המשחק.",
+        "4": "תובנה עמוקה עבור מפתחי Casual ו-Hybrid-Casual על החשיבות של עומק ה-Monetization וה-LiveOps לעומת ה-Core Loop בלבד.",
+        "5": "מהלך אסטרטגי של Playtika הבוחרת להישאר עצמאית ולהתמקד ב-EBITDA ובגידול ברווחי משחקי Casual קיימים.",
+        "6": "מבט רוחבי על מגמות בפרסום ופעילות M&A כדי להבין היכן מושקע הכסף ואיפה ה-Ad Revenue הגבוה ביותר.",
+        "7": "זווית חדשנית על הפיכת מנועי AI לערוץ Discoverability ו-Organic Traffic חדש עבור משחקי המובייל שלך."
+      }
+    },
+    "source_alerts": []
+  }
+}
