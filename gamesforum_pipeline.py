@@ -54,24 +54,11 @@ DIGESTS = ROOT / "digests"
 STATE_FILE = ROOT / "state.json"
 ASSETS_DIR = runtime.CODE_ROOT / "assets"
 
-# A browser UA, not a self-identifying bot string: the 2026-09-14 run hit
-# an HTTP 403 fetching Gamigion's Substack feed specifically (every other
-# source, on the same UA, worked fine) -- Substack's front door blocks
-# obvious non-browser clients like the old "compatible; bens-digest/6.3"
-# string. This won't get past real bot-detection (TLS fingerprinting, JS
-# challenges), but it's the standard first fix for a plain UA-based block,
-# and it can only make other sources more compatible, not less.
+# A browser User-Agent: some sites (Substack's front door) block obvious bot strings.
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
-# These three have to nest, innermost first, or the whole retry design is
-# theatre. The 2026-09-21 run proved it: RUN_DEADLINE_SEC was 2400s (40
-# min) while weekly-digest.yml's "Run pipeline" step times out at 30, so
-# _check_deadline() could never fire first -- the step was always killed
-# mid-flight instead of exiting cleanly, losing everything it had already
-# built. The budget now reads: one attempt (TTS_TIMEOUT) < the whole run
-# (RUN_DEADLINE_SEC = 45 min) < the step (50 min) < the job (55 min). Raised
-# from 25/30/35 on 2026-11-09, when the show's owner chose to wait longer for
-# the strong model rather than publish a short episode from a weaker one.
+# Timeouts nest, innermost first: one attempt < the whole run (RUN_DEADLINE_SEC, 45 min) <
+# the Actions step (50) < the job (55). See llm.py.
 
 # TTS gets its own, shorter per-attempt ceiling. Real successful chunks in
 # production have taken 1-4 minutes; the calls that hang never come back at
@@ -142,11 +129,9 @@ def fetch_article(url: str) -> dict | None:
 
 # ---------------------------------------------------------------- the intro, written last
 #
-# The stories are written first (segments.py), one call per story. The intro is
-# written only afterwards, with the finished stories in hand, so that its
-# preview describes what is really said: the welcome, a moment of host banter,
-# and a teaser. It degrades instead of failing the run: no intro -> a plain
-# welcome plus a one-line list of the stories.
+# Written after the stories, so its preview describes what is really said: the welcome, a beat
+# of banter, a teaser. It degrades instead of failing the run: a plain welcome plus a one-line
+# list of the stories.
 
 INTRO_SCHEMA = {
     "type": "OBJECT",
@@ -202,13 +187,8 @@ def intro_problems(turns: list[dict]) -> list[str]:
         problems.append("it repeats the welcome line")
     problems += script_quality.script_problems(turns)
 
-    # Style rules. Prefixed STYLE so write_intro() can tell them apart from
-    # structural faults: a structural fault means the intro is unusable, a
-    # style fault earns one retry but is accepted if it persists -- a
-    # slightly hyped intro still beats the plain fallback. The first live
-    # run (2026-10-04) produced exactly these, despite the prompt asking
-    # otherwise: a generic "a week where..." opener with the word מטורפים,
-    # two turns opening with an agreement word, and three Dana turns in a row.
+    # Style faults (prefixed STYLE) earn one retry but are accepted if they persist: a slightly
+    # hyped intro still beats the plain fallback. Structural faults make the intro unusable.
     text = " ".join((t.get("text") or "") for t in turns).lower()
     hype = [s for s in script_quality.HYPE_STEMS if s in text]
     if hype:
@@ -419,25 +399,12 @@ def add_intro(data: dict) -> dict:
 
 # ---------------------------------------------------------------- Gemini TTS
 
-# finishReason values other than STOP mean the model stopped generating
-# audio before it reached the end of the transcript it was given (hit its
-# own output-length ceiling, a safety filter, etc). The API still returns
-# whatever partial inlineData it produced, so this can't be told apart from
-# a normal successful response just by looking at "is there audio bytes" --
-# without this check gemini_tts_chunk() happily returns a clipped-mid-word
-# recording as if it were the full chunk. This is what produced the
-# 2026-09-07 episode's audio cutting off mid-sentence: one chunk was long
-# enough to hit the ceiling, and nothing downstream noticed.
+# A finishReason other than STOP means the model stopped before the end of the transcript but the
+# API still returns the partial audio: it must be discarded, not shipped (2026-09-07: a clipped episode).
 class TTSTruncatedError(RuntimeError):
     pass
 
-# 8 was never a survivable number: at HTTP_TIMEOUT (300s) per hung attempt
-# plus sleeps escalating to 175s, one chunk could legitimately spend ~52
-# minutes before giving up -- longer than the entire job budget, for one
-# quarter of one episode's audio. 2026-09-21 spent 20 minutes on chunk 1
-# alone that way and died on chunk 3. _check_deadline() at the top of each
-# attempt is the real bound now; this just stops the loop from being
-# absurd on its own terms.
+# Attempts per chunk are bounded by the run deadline (llm.check_deadline), not by this count.
 _tts_state = {"fallback_used": False}
 
 
@@ -590,14 +557,8 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
     USAGE_LOG["tts_chunks"] = len(chunks)
 
     def synthesize_with_split(chunk_text: str, label: str) -> bytes:
-        # A chunk that keeps hitting the model's output ceiling (see
-        # TTSTruncatedError) won't magically fit on a plain retry -- the
-        # text is the same length every time. Halving it along turn
-        # boundaries and synthesizing each half separately is what actually
-        # gets under the ceiling; recursion handles a half that's still too
-        # long. A single turn can't be split without cutting a sentence
-        # mid-word, so that's the base case where we give up loudly instead
-        # of shipping broken audio.
+        # A chunk that keeps hitting the output ceiling is halved along turn boundaries and each
+        # half voiced separately; a single turn cannot be split, so that is where it fails loudly.
         try:
             return gemini_tts_chunk(chunk_text)
         except TTSTruncatedError:
@@ -822,6 +783,9 @@ def preflight(audio: bool = True) -> None:
         raise RuntimeError("GEMINI_API_KEY is required")
     if LANG not in {"he", "en"}:
         raise ValueError("DIGEST_LANG must be he or en")
+    from urllib.parse import urlsplit
+    if urlsplit(BASE_URL).scheme not in {"https", "http"} or not urlsplit(BASE_URL).netloc:
+        raise ValueError("PODCAST_BASE_URL must be an absolute http(s) URL (set the repository variable)")
     if not 0 < max(HTTP_TIMEOUT, TTS_TIMEOUT) < RUN_DEADLINE_SEC:
         raise ValueError("API and TTS timeouts must be positive and below RUN_DEADLINE_SEC")
     if audio:

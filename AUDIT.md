@@ -1,4 +1,56 @@
-# System review: 2026-11-13
+# System review: 2026-11-13, and what was done about it (2026-11-14)
+
+## Status of every item
+
+Done in the commits of 2026-11-14 (see CHANGELOG). "Verified" means covered by a test in this
+repository; nothing below has run against the live sources or models yet, so the first real weeks are
+the real test (what to watch is in OPERATIONS.md).
+
+| Item | Status | Where |
+| --- | --- | --- |
+| 3.1 Gamesforum dates | Done, verified on fixtures | `article_parser.find_published`; first-seen fallback `discovery.record_first_seen`, `observe_sources` (daily); end-to-end replay in `test_dates_and_yield.py`. Real Gamesforum pages could not be fetched from the review environment, so the page-date patterns are generic |
+| 3.2 Per-source yield and alert | Done | `discovery.source_yield`, `reports/source_yield.json`, `source_health.yield_alerts` |
+| 3.3 PocketGamer.com | Disabled (config kept) | `profile.toml` |
+| 3.3 Email adapter | Kept (it is the route for newsletters without a feed); address removed from the file, config from secrets | `sources.py`, `profile.toml` |
+| 3.3 Probe prints a ready block | Done | `probe_source.py`, README and OPERATIONS name it as the first step |
+| 4.1 Count calls per model | Done | `llm.CALLS`, `work/usage.json`, in `work/plan.json` and `reports/<date>-run.json` |
+| 4.1 Refuse a stage that does not fit | Done as a budget guard (per call, not a forecast): a model out of budget is skipped, none left pauses the run | `llm.budget_left`, `llm.call_model`, `stages.Paused` |
+| 4.2 Batch the review | Done: one call for all stories | `segments.review_segments` |
+| 4.3 One call for title, outro (and now bridges) | Done. The intro stays a separate call: its prompt and validators are tuned | `segments.build_frame` |
+| 4.4 One rewrite per story | Done (one for coverage, one for facts; a story still failing is cut) | `segments.Writer`, `review_segments` |
+| 4.5 Split the run across quota days | Done, and spread over the whole week | `stages.py`, `[schedule]` |
+| 4.6 Working default models, no `GEMINI_TEXT_MODEL` | Done | `llm.py` |
+| 5.1 One `llm.py`, one fallback chain | Done | `llm.py`; `discovery._scoring_call` uses it |
+| 5.1 Stage files, no `adopt_recent` | Done: the stages share `work/` (committed, visible), `adopt_recent` removed. Not separate subcommands: one daily entry point decides by date and state | `stages.py`, `checkpoint.py` |
+| 5.2 Leftovers | Done: airtime, `next_title`, empty prep questions, `SITE`, stale docstrings, contradictory prompt lines, personal address | see CHANGELOG |
+| 5.3 One weekly alert instead of per-run mail | Done | `weekly-check.yml`, `stages.run` exit policy |
+| 5.3 Source health as a warning | Done | `weekly-digest.yml` |
+| 5.3 Failed runs commit ledger, reports, work | Done | `weekly-digest.yml` (`if: always()`) |
+| 5.3 Actions versions | Done (checkout v5, setup-python v6, upload-artifact v5, cache stays v4) | workflows |
+| 5.3 Audio out of git | **Not done, on purpose**: it needs a feed-URL migration that cannot be tested from here. `check_week.py` warns at 600 MB (now 109 MB) | ARCHITECTURE.md |
+| 5.4 pytest | Done as a wrapper (every `test_*.py` is one pytest test, FAIL lines in the report); the checks inside stay as scripts | `check_suite.py`, `pytest.ini` |
+| 5.4 End-to-end test | Done: whole weeks with fakes, and the undated-source replay | `test_stages.py`, `test_dates_and_yield.py` |
+| 5.4 Collapse documents | Done: README, OPERATIONS, ARCHITECTURE, AUDIT; PLAN.md folded in; incident prose in code comments shortened | docs |
+| 5.5 Process rules | Written down (cannot be enforced by code) | OPERATIONS.md |
+| 6.1 Episode-level editing | Done: plan before writing, bridges after review, theme to the intro and outro | `segments.py`, ARCHITECTURE.md |
+| 6.2 Hold back a weak-written episode | Done | `stages.Run.hold_back` |
+| 6.3 `feedback.md` | Done | `stages.load_feedback` |
+| 6.4 Pronunciation log | Done (a list in the editorial report; you add the wrong ones) | `proofread.py` |
+| 6.5 Second speech model | Done (`TTS_FALLBACK_MODEL`, default `gemini-2.5-pro-preview-tts`); its voice quality is untested | `gamesforum_pipeline.py` |
+| 6.6 English titles in show notes | Done: Hebrew headline above each source link | `show_notes` |
+| Owner 2 PocketGamer.com | Done (disabled) | |
+| Owner 3 variables | Documented; they could not be read from here | README |
+| Owner 6 paid key | Not needed unless two Mondays fail on quota after this | |
+| Owner 7 / privacy: email and name | Removed from every file (mailbox address was in `profile.toml` and the changelog; show name is now `SHOW_NAME`, default unchanged). **Git history still has seven commits under a personal name and email**; that needs a history rewrite and a force-push of `main`, or GitHub's email-privacy settings for future commits (OPERATIONS.md) | |
+
+What is still unproven: the first live weeks (the model's plan, the bridges and the proofreading are
+validated by rules, not yet judged by ear), and whether eight stories fit the free quota. Listen to
+the first two episodes and write your notes in `feedback.md`.
+
+---
+
+# Original review (2026-11-13)
+
 
 Replaces the 2026-10-13 audit (in git history). Written for the developers who
 will work on this next, with a short section for the owner at the end.
