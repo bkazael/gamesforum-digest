@@ -19,10 +19,21 @@ FILES = sorted(p.name for p in ROOT.glob("test_*.py"))
 
 
 @pytest.mark.parametrize("name", FILES)
-def test_script(name):
+def test_script(name, tmp_path):
+    # Every file writes its outputs (work/, reports/, state...) to a scratch directory, never to the
+    # repository: an earlier test run once committed a fake week's work/ into main.
     done = subprocess.run([sys.executable, name], cwd=ROOT, capture_output=True, text=True, timeout=300,
-                          env={**__import__("os").environ, "GEMINI_API_KEY": "test-key"})
+                          env={**__import__("os").environ, "GEMINI_API_KEY": "test-key",
+                               "PODCAST_OUTPUT_DIR": str(tmp_path)})
     out = done.stdout + done.stderr
     failed = [line for line in out.splitlines()
               if line.startswith(("FAIL", "ERROR", "Traceback", "AssertionError"))]
     assert done.returncode == 0 and not failed, "\n".join(failed[:20]) or out[-2500:]
+
+
+def test_the_tests_left_the_published_files_alone():
+    """Runs last: no test may have written into the repository's own work and output paths."""
+    out = subprocess.run(["git", "status", "--porcelain", "--", "work", "reports", "ledger", "episodes",
+                          "digests", "seen.json", "state.json", "memory.json", "feed.xml"],
+                         cwd=ROOT, capture_output=True, text=True)
+    assert out.returncode != 0 or not out.stdout.strip(), "tests wrote into the repository:\n" + out.stdout
