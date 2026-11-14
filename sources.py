@@ -213,12 +213,9 @@ _HEADER_CHROME = re.compile(
 def from_email(source: dict) -> list[dict]:
     """Pull recent "new post" emails from a dedicated inbox, read-only.
 
-    Every message in this mailbox is assumed to be a subscription email for
-    this one source -- that's why the setup instructions call for a
-    DEDICATED address, not a personal inbox. There is no from-address
-    filtering here on purpose: a dedicated inbox with nothing else in it
-    doesn't need it, and skipping it means one less thing that can silently
-    stop matching if a newsletter platform changes its sending address.
+    A dedicated inbox needs no filter; a shared one sets `sender` in profile.toml (an
+    IMAP FROM substring match) so that only this newsletter's mail is read and nothing
+    else in the mailbox becomes an "article".
 
     Messages are date-bounded, not marked read or changed. BODY.PEEK[] plus
     SELECT readonly=True keeps the mailbox untouched; downstream URL/history

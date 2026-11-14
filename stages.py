@@ -328,7 +328,7 @@ def run(today: dt.date) -> int:
         r.write(articles, data)
         if r.due("edit"):
             data = r.edit(articles, data)
-            if r.due("publish"):
+            if r.due("publish") and not os.environ.get("PIPELINE_SKIP_PUBLISH"):
                 r.publish(articles, data)
     except Paused as e:
         status = f"paused: {e}"

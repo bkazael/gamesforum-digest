@@ -6,7 +6,7 @@ six unrelated one-off episodes.
 The design constraint that shapes this file: it must never cost a Gemini
 call, and it must never be able to fail a run. Both follow from the same
 decision -- every memory entry is derived deterministically from
-`digest_summary`, which generate_podcast_content() already returns as part
+`digest_summary`, which the script stage already returns as part
 of the normal script-generation call. There is nothing left to ask an LLM
 for, so nothing here can time out, get rate-limited, or drift out of schema.
 
@@ -75,7 +75,7 @@ def load_recent_context(limit: int | None = None) -> str:
     """Format the last N episodes for the script prompt.
 
     Returns "" (not a placeholder sentence) when there is no history yet, so
-    generate_podcast_content() can skip the whole prompt section on the
+    the script stage can skip the whole prompt section on the
     first run after this ships, rather than telling the model about an
     empty past.
     """
@@ -121,7 +121,7 @@ def build_entry(episode_title: str, digest_summary: list[dict],
     """Derive a memory entry from digest_summary. No LLM call.
 
     digest_summary is the structured per-topic breakdown
-    generate_podcast_content() already produces for the episode's show
+    the script stage already produces for the episode's show
     notes (title, key_takeaway, metrics_mentioned per topic). Reusing it
     here means a memory entry costs nothing extra to produce and can never
     itself fail to generate.

@@ -1,31 +1,28 @@
-"""Produce the episode's script as independent story segments.
+"""The episode's script, built from independent story segments and then tied together.
 
-Why segments (2026-11-09). The script used to be one call: six full articles
-in (~60k tokens), a whole episode out. A model asked for that much in one
-answer writes it short (902, 1,179 and 1,258 words on the last three weeks),
-a single timeout or 503 threw the whole thing away, and four more layers were
-added to repair it: a prep call, an intro call, a whole-draft review, a
-whole-draft redraft. Each layer was another large call that could fail.
+One call is one job, so that a timeout or a 503 costs one story, not the week:
 
-Now one call is one job:
+  plan      before writing: one small call orders the stories (best first, related
+            ones together) and gives the episode a theme and each story an angle.
+            Theme and angles carry no numbers, so they cannot smuggle in a fact.
+  write     one story per call: one article in, one conversation out (plus the points
+            it must cover). Free checks follow: every key point's number is said, the
+            Hebrew is Hebrew; one rewrite if they fail.
+  review    ONE call for all stories, each against its own article only. A blocking
+            factual or attribution error sends that story back for a single rewrite
+            and the rewritten ones are reviewed once more; a story that still fails is
+            cut and the rest publish. Non-blocking notes are applied when safe
+            (off-topic turns removed, typos fixed).
+  frame     ONE call: title, outro and one short link between each pair of neighbouring
+            stories. The links use only the two stories' own key points and are
+            validated (numbers, length, Hebrew), because the stories are written
+            apart and nothing else ties them into one episode.
 
-  segment   one article in, one conversation out (plus the points it must
-            cover). Small, about a minute, run three at a time.
-  checks    deterministic and free: every number the model listed as a key
-            point must be said; every number said must be in the article or
-            be double-checked by the reviewer.
-  review    one small call per segment against its own article only. A
-            blocking factual/attribution error is fixed by rewriting that
-            segment once; if it persists the segment is cut and the rest of
-            the episode still publishes.
-  frame     title and outro, from the segments' own takeaways. Never raises.
+Length comes from the material: each story must cover its key points, so a rich week
+is long and a thin one short, with no word target.
 
-Length comes from the material: each segment must cover its key points, so a
-rich week is long and a thin one short, with no word target. Each segment is
-saved the moment it is done; a later run resumes with the rest.
-
-This module knows nothing about HTTP, models or files: the pipeline passes in
-`call` (one Gemini JSON request) and `save` (the checkpoint).
+This module knows nothing about HTTP, files or the calendar: stages.py decides what runs
+on which day and passes in `call` (one model request) and `save` (the saved work).
 """
 from __future__ import annotations
 
@@ -583,10 +580,13 @@ def build_plan(articles: list[dict], *, call, models: dict, lang: str, log) -> d
     if sorted(order) != list(range(n)):
         log("  plan: the order was not a permutation of the stories; keeping score order")
         order = list(range(n))
-    best = max(range(n), key=lambda i: (articles[i].get("_score") or 0, -i))
+    full = [i for i in range(n) if not articles[i].get("partial")] or list(range(n))
+    best = max(full, key=lambda i: (articles[i].get("_score") or 0, -i))
     if order[0] != best:
         order.remove(best)
         order.insert(0, best)
+    # An email preview of a longer post (partial) never leads and is told last.
+    order = [i for i in order if not articles[i].get("partial")] + [i for i in order if articles[i].get("partial")]
     through = " ".join(str(raw.get("through_line") or "").split())
     if _DIGIT.search(through) or len(through.split()) > 40:
         through = ""
@@ -883,7 +883,7 @@ def assemble_episode(done: dict, articles: list[dict], *, call, models: dict,
         "writers": [s.get("model") for s in segs],
         # What write_intro() reads.
         "prep": {"articles": [{"key_points": s["key_points"]} for s in segs],
-                 "questions": [], "through_line": through},
+                 "through_line": through},
     }
 
 

@@ -75,9 +75,4 @@ def load_profile(path: Path = PROFILE_PATH) -> dict:
     voice = profile.get("voice", {})
     if voice.get("speaker_a", "Dana") == voice.get("speaker_b", "Yoni"):
         raise ValueError("The two speaker names must differ")
-    air = profile.get("airtime", {})
-    shares = [air.get(k, d) for k, d in (("lead_share", .30), ("second_share", .20),
-                                        ("remainder_share", .50))]
-    if any(x <= 0 for x in shares) or abs(sum(shares) - 1) > .001:
-        raise ValueError("airtime shares must be positive and sum to 1")
     return profile

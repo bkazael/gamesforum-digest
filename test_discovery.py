@@ -195,7 +195,7 @@ check("no source ends up more than cap_overflow (1) over its cap",
 check("a source is never swapped down to zero",
       by_src.get("GF", 0) >= 1, str(by_src))
 scores = [a["_score"] for a in result]
-check("the result is strongest-first (assign_airtime gives chosen[0] the lead share)",
+check("the result is strongest-first (the plan and the lead story rely on it)",
       scores == sorted(scores, reverse=True), str(scores))
 swapped_out = [a for a in field if str(a.get("_reject", "")).startswith("הוחלף")]
 check("a swapped-out article is explained in the ledger, not silently missing",
@@ -399,16 +399,14 @@ check("...and its articles are scored, so coverage is complete",
       len(_got) == len(_many), f"{len(_got)}/{len(_many)} scored")
 
 # ---------------------------------------------------------------- partial (email-preview) articles never lead
-_prof = {"airtime": {"lead_share": 0.4, "second_share": 0.25, "remainder_share": 0.35}}
 _arts = [{"title": "preview", "_score": 10, "partial": True},
          {"title": "full-a", "_score": 8}, {"title": "full-b", "_score": 7},
          {"title": "full-c", "_score": 6}]
-D.assign_airtime(_arts, _prof)
+D.order_chosen(_arts)
 check("a partial article is moved behind the full ones, whatever its score",
       [a["title"] for a in _arts] == ["full-a", "full-b", "full-c", "preview"],
       str([a["title"] for a in _arts]))
-check("...so it gets the smallest share, never the lead",
-      _arts[0]["_airtime"] == 0.4 and _arts[-1]["_airtime"] < 0.25, str([a["_airtime"] for a in _arts]))
+check("...so it never leads", _arts[0]["title"] == "full-a")
 check("the order inside the full articles is untouched (score order)",
       [a["_score"] for a in _arts[:3]] == [8, 7, 6])
 

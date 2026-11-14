@@ -24,7 +24,7 @@ test_memory.py) does not:
      warning. This check would have caught it without a live API call.
   3. discovery.select()'s actual return shape -- run end to end against
      fixture data, with only the network and the two Gemini calls
-     mocked -- has the keys generate_podcast_content() requires. That
+     mocked -- has the keys the script stage requires. That
      contract (url, title, text, source) is exactly the one that broke.
 
 What this file does NOT cover: TTS synthesis, ffmpeg mixing, and
@@ -187,7 +187,7 @@ with tempfile.TemporaryDirectory() as tmp:
 REQUIRED_KEYS = {"url", "title", "text", "source"}
 if chosen:
     missing = [REQUIRED_KEYS - set(a) for a in chosen]
-    check("every article select() returns has the keys generate_podcast_content() needs",
+    check("every article select() returns has the keys the script stage needs",
           all(not m for m in missing), f"missing: {missing}")
 
 email_survivor = next((a for a in chosen if a["url"].startswith("https://gamigion.substack.com")), None)

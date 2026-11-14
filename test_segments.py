@@ -342,6 +342,12 @@ check("a theme or angle containing a number is dropped (it could smuggle in a fa
       plan["through_line"] == "" and plan["angles"] == {})
 plan = S.build_plan(PLAN_ARTICLES, call=boom, models=MODELS, lang="he", log=quiet)
 check("a failed plan call never raises: given order, no theme", plan["order"] == [0, 1, 2, 3] and not plan["through_line"])
+partial_articles = [dict(a) for a in PLAN_ARTICLES]
+partial_articles[1]["partial"] = True          # the top-scored one is only an email preview
+plan = S.build_plan(partial_articles, call=plan_call({"order": [1, 2, 3, 4], "through_line": "x", "angles": []}),
+                    models=MODELS, lang="he", log=quiet)
+check("a partial (email-preview) story never leads and is told last, whatever its score",
+      plan["order"][0] == 3 and plan["order"][-1] == 1, str(plan["order"]))
 check("with fewer than three stories there is nothing to plan and no call is made",
       S.build_plan(PLAN_ARTICLES[:2], call=boom, models=MODELS, lang="he", log=quiet)["order"] == [0, 1])
 

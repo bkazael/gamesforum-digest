@@ -3,7 +3,7 @@
 
 python preview.py --discovery-only  # live sources, no model calls
 python preview.py                   # complete paid preview
-python preview.py --script-only     # paid script pipeline (stories, intro), no audio
+python preview.py --script-only     # paid script pipeline (plan, stories, review, frame, intro, proofread), no audio
 """
 from __future__ import annotations
 
@@ -38,43 +38,38 @@ def main():
     if not p.GEMINI_API_KEY:
         ap.error("Set GEMINI_API_KEY for a paid preview; use --discovery-only without one")
     p.preflight(audio=not args.script_only)
+    import datetime as dt
+    import checkpoint
+    import stages
+    today = dt.datetime.now(dt.timezone.utc).date()
+    # A preview runs every stage now, whatever the day (stages.py), in its own output
+    # directory. --script-only stops before the voice.
+    os.environ["PIPELINE_FORCE"] = "1"
     if args.script_only:
-        import datetime as dt
-        import checkpoint
-        import runtime
-        today = dt.datetime.now(dt.timezone.utc).date().isoformat()
-        resumed = checkpoint.load_content(today)
-        articles, data = resumed if resumed else (discovery.select(), {})
-        if not articles:
-            raise RuntimeError("No new stories qualify for a preview")
-        if not data.get("script"):
-            built = p.produce_script(articles, today, p.memory.load_recent_context(),
-                                     data.get("segments"))
-            data = {**built, "intro_done": False}
-            checkpoint.save_content(today, articles, data)
-        if data.get("intro_done") is False:
-            data = p.add_intro(data)
-            checkpoint.save_content(today, articles, data)
-        data = p.finalize_episode(data, today)
-        # What a reviewer needs from the log without downloading anything.
+        os.environ["PIPELINE_SKIP_PUBLISH"] = "1"
+    rc = stages.run(today)
+    if args.script_only:
+        loaded = checkpoint.load_content(stages.week_target(today).isoformat())
+        if not loaded or not loaded[1].get("script"):
+            raise RuntimeError("the preview did not produce a script; see the log above")
+        data = loaded[1]
         from script_quality import count_words
         print("::group::episode summary", flush=True)
         for k, s in sorted((data.get("segments") or {}).items(), key=lambda kv: int(kv[0])):
             print(f"story {int(k) + 1}: {s.get('status')} {len(s.get('script', []))} turns, "
-                  f"{count_words(s.get('script', []))} words, {len(s.get('key_points', []))} key points"
+                  f"{count_words(s.get('script', []))} words, {len(s.get('key_points', []))} key points, "
+                  f"by {s.get('model')}"
                   + (f", cut: {s.get('reason')}" if s.get("status") == "dropped" else "")
                   + f" | {s.get('headline')}", flush=True)
         total = count_words(data["script"])
-        print(f"total: {len(data['script'])} turns, {total} words, about {total / 140:.0f} min", flush=True)
+        print(f"total: {len(data['script'])} turns, {total} words, about {total / 140:.0f} min; "
+              f"{data.get('bridges_used', 0)} bridges; theme: {data.get('through_line') or '-'}", flush=True)
         print("::endgroup::", flush=True)
         print("::group::script", flush=True)
         for t in data["script"]:
             print(f"{t['speaker']}: {t['text']}", flush=True)
         print("::endgroup::", flush=True)
-        runtime.atomic_write(output / "digests" / f"{today}-script.md",
-            "\n".join(f"{t['speaker']}: {t['text']}" for t in data["script"]))
-        return 0
-    return p.main()
+    return rc
 
 
 if __name__ == "__main__":

@@ -833,8 +833,7 @@ def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[d
         log(f"  cap swap: {art['title'][:44]} ({art['_score']}) replaces "
             f"{weakest['title'][:44]} ({weakest['_score']})")
 
-    # assign_airtime() gives the lead share to chosen[0], so the order has to
-    # be strongest-first even after passes 2 and 3 appended out of order.
+    # Strongest-first, even after passes 2 and 3 appended out of order.
     chosen.sort(key=lambda a: a["_score"], reverse=True)
 
     if used:
@@ -842,31 +841,11 @@ def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[d
     return chosen
 
 
-def assign_airtime(chosen: list[dict], profile: dict) -> None:
-    """Translate rank into share of the episode.
-
-    Without this every item gets equal weight and the result sounds like a
-    list. The strongest story gets a narrative; the weakest gets a sentence.
-    """
-    air = profile.get("airtime", {})
-    lead = air.get("lead_share", 0.40)
-    second = air.get("second_share", 0.25)
-    rest_pool = air.get("remainder_share", 0.35)
-
-    # A partial article (an email preview of a longer post) goes last, with
-    # the smallest share: its unseen remainder could qualify or contradict
-    # what the preview says, so it never leads or carries a deep segment.
-    # Stable sort keeps the score order inside each group.
+def order_chosen(chosen: list[dict]) -> None:
+    """Strongest first, except that a partial article (an email preview of a longer
+    post) goes last: its unseen remainder could qualify or contradict what the preview
+    says, so it never leads. The stable sort keeps score order inside each group."""
     chosen.sort(key=lambda a: bool(a.get("partial")))
-    n = len(chosen)
-    for i, art in enumerate(chosen):
-        if i == 0:
-            share = lead if n > 1 else 1.0
-        elif i == 1:
-            share = second if n > 2 else 1.0 - lead
-        else:
-            share = rest_pool / max(n - 2, 1)
-        art["_airtime"] = round(share, 3)
 
 
 def select(dry_run: bool = False) -> list[dict]:
@@ -913,9 +892,9 @@ def select(dry_run: bool = False) -> list[dict]:
     log(f"  {len(found) - len(to_fetch)} blocked, {len(to_fetch)} to fetch")
 
     # Runtime safety valve: fetching is one sequential HTTP request per
-    # candidate, with retries on each. Fine at today's 4 sources; if more
+    # candidate, with retries on each. Fine at today's handful of sources; if more
     # get added later the fetch stage is where a much longer candidate list
-    # would first threaten the Action's 20-minute timeout. Cap it here,
+    # would first threaten the Action's timeout. Cap it here,
     # loudly, rather than let a slow run fail partway through TTS having
     # already spent the text-generation budget.
     max_fetch = thr.get("max_candidates_to_fetch", 150)
@@ -1071,14 +1050,14 @@ def select(dry_run: bool = False) -> list[dict]:
             art["_why"] += " · " + " · ".join(notes)
 
     chosen = select_stories(survivors, sources, thr)
-    assign_airtime(chosen, profile)
+    order_chosen(chosen)
     chosen_urls = {a["url"] for a in chosen}
 
     for art in survivors:
         in_ = art["url"] in chosen_urls
         why = art["_why"]
         if in_:
-            why = f"**{int(art['_airtime'] * 100)}% זמן אוויר** · {why}"
+            why = f"**נכנס** · {why}"
             if art.get("_note"):
                 why += f" · {art['_note']}"
         elif art.get("_reject"):
@@ -1098,7 +1077,7 @@ def select(dry_run: bool = False) -> list[dict]:
     log(f"ledger: {write_ledger(date, rows, profile)}")
     log(f"selected {len(chosen)} of {len(found)} candidates")
     for a in chosen:
-        log(f"  {a['_score']}/10  {int(a['_airtime'] * 100)}%  "
+        log(f"  {a['_score']}/10  "
             f"[{a['source']}] {a['title'][:52]}")
     return chosen
 

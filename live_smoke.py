@@ -13,7 +13,7 @@ A handful of real API calls, kept deliberately cheap:
   1. discovery.score_all() against ONE fixture candidate, with a fixture
      "already covered" topic -- this is the call that uses SCORE_SCHEMA, and
      it also exercises the scoring prompt's ALREADY COVERED section.
-  2. produce_script() on two fixture articles -- round-trips the segment,
+  2. segments.build_episode() on two fixture articles -- round-trips the segment,
      review and frame schemas (a story, its fact review, the title and outro).
   3. write_intro() -- round-trips INTRO_SCHEMA. A *fallback* here is treated
      as a failure: it means the real model's answer did not pass the
@@ -68,9 +68,7 @@ SECOND_ARTICLE = {
         "cost them an estimated 4% of monthly revenue. This is placeholder "
         "text for a smoke test and is not a real news article."
     ),
-    "_airtime": 0.4,
 }
-FIXTURE_ARTICLE["_airtime"] = 0.6
 
 
 def main() -> int:
@@ -104,7 +102,15 @@ def main() -> int:
     articles = [FIXTURE_ARTICLE, SECOND_ARTICLE]
 
     P.log("2/4: the stories (SEGMENT/REVIEW/FRAME schemas, real API calls)...")
-    data = P.produce_script(articles, "smoke-test", "", None, min_segments=1)
+    import llm
+    import segments
+    data = segments.build_episode(
+        articles, call=lambda pr, sc, *, model, tries, timeout: llm.call_model(
+            pr, sc, model=model, tries=tries, timeout=timeout),
+        save=lambda d: None,
+        models={"creative": llm.GEMINI_CREATIVE_MODEL, "review": llm.GEMINI_REVIEW_MODEL},
+        speakers=(P.SPEAKER_A, P.SPEAKER_B), lang=P.LANG, memory_context="", resume=None,
+        log=P.log, min_segments=1)
     prep = data["prep"]
     words = P.script_quality.count_words(data.get("script", []))
     P.log(f"  got {len(data.get('script', []))} turns, {words} words, "

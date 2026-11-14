@@ -266,16 +266,11 @@ def write_intro(data: dict, prep: dict | None) -> tuple[list[dict], str]:
         for n, s in enumerate(data.get("digest_summary", []), 1)
     )
     facts = ""
-    questions = ""
     if prep:
         pts = [p for a in prep["articles"][:3] for p in a["key_points"][:2]]
         facts = "\n".join(f"- {p}" for p in pts)
-        questions = "\n".join(
-            f"- {q['question']}" + ("" if q["answer_basis"] != "OPEN" else "  (left open)")
-            for q in prep["questions"]
-        )
-        if prep["through_line"]:
-            facts += f"\n- Through-line: {prep['through_line']}"
+        if prep.get("through_line"):
+            facts += f"\n- The episode's theme: {prep['through_line']}"
 
     if LANG == "he":
         # Same term policy as the script prompt: the editorial gate rejects a
@@ -313,9 +308,6 @@ and which one the last line hands over to; the other stories follow after it):
 
 FACTS YOU MAY USE (each is only usable with its subject spelled out):
 {facts or '(none)'}
-
-QUESTIONS THE EPISODE TAKES ON:
-{questions or '(none)'}
 
 THE RULE THAT MATTERS MOST: the listener has heard nothing yet. Every
 company, product, system or figure you mention must be explained in the same
@@ -704,19 +696,6 @@ def render_digest_md(data: dict, articles: list[dict], today: str, episode_title
         md.append(f"**Key Takeaway:** {item.get('key_takeaway', '')}\n")
         if item.get("metrics_mentioned"):
             md.append("**Metrics:** " + ", ".join(item["metrics_mentioned"]))
-        md.append("")
-    # The editorial prep's questions, so the show's reasoning is visible in
-    # the repo next to the episode it produced: what was asked, whether the
-    # material answered it, and which questions were honestly left open.
-    prep = data.get("prep")
-    if prep and prep.get("questions"):
-        md.append("## Discussion questions (editorial prep)")
-        for q in prep["questions"]:
-            md.append(f"- **{q['question']}**")
-            if q["answer_basis"] == "OPEN":
-                md.append("  - _Open: nothing in the material answers this._")
-            else:
-                md.append(f"  - [{q['answer_basis']}] {q['answer']}")
         md.append("")
     md.append("## Sources")
     for a in articles:

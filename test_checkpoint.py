@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory() as tmp:
              "published": dt.date(2026, 10, 2), "signals": {"words": 300},
              "_also": [{"title": "dup", "url": "u", "source": "x"}]},
             {"url": "https://example.test/c", "title": "C", "text": "t", "source": "MG",
-             "published": dt.datetime(2026, 10, 3, 8, 30), "_airtime": 0.4},
+             "published": dt.datetime(2026, 10, 3, 8, 30)},
             {"url": "https://example.test/d", "title": "D", "text": "t", "source": "GF",
              "published": None, "tags": {"a", "b"}},
         ]
@@ -123,7 +123,7 @@ with tempfile.TemporaryDirectory() as tmp:
                   and arts[1]["published"].startswith("2026-10-03T08:30"),
                   f"{arts[0]['published']!r} / {arts[1]['published']!r}")
             check("everything else about the articles survives untouched",
-                  arts[0]["_also"] == real_articles[0]["_also"] and arts[1]["_airtime"] == 0.4
+                  arts[0]["_also"] == real_articles[0]["_also"]
                   and arts[2]["published"] is None)
             check("a set (not JSON-native) is saved as a sorted list rather than failing the save",
                   arts[2]["tags"] == ["a", "b"])

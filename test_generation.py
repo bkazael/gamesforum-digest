@@ -38,11 +38,11 @@ print("\n--- Testing story assembly / intro-last ---")
 
 ARTICLES = [
     {"url": "https://example.test/eu-kids", "title": "Daily log-in bonuses under threat in EU Kids Act",
-     "source": "PG", "text": "EU Kids Act text. " * 30, "_airtime": 0.40, "published": dt.date(2026, 10, 2)},
+     "source": "PG", "text": "EU Kids Act text. " * 30, "published": dt.date(2026, 10, 2)},
     {"url": "https://example.test/youtube", "title": "YouTube rolls out Playables to 50 markets",
-     "source": "MG", "text": "Playables text. " * 30, "_airtime": 0.25, "published": dt.date(2026, 10, 2)},
+     "source": "MG", "text": "Playables text. " * 30, "published": dt.date(2026, 10, 2)},
     {"url": "https://example.test/tyrads", "title": "TyrAds and Nordeus partner on rewarded engagement",
-     "source": "GF", "text": "Partnership text. " * 30, "_airtime": 0.35, "published": dt.date(2026, 10, 2)},
+     "source": "GF", "text": "Partnership text. " * 30, "published": dt.date(2026, 10, 2)},
 ]
 
 # What segments.build_episode() hands write_intro() as `prep`.
@@ -81,7 +81,7 @@ check("write_intro asks for INTRO_SCHEMA with a short bounded call",
 ip = intro_seen["prompts"][0]
 check("the intro prompt is built from the FINISHED episode: its story list", "EU Kids Act" in ip and "YouTube Playables" in ip)
 check("the intro prompt carries the stories' striking facts and the through-line",
-      "EU Kids Act is a proposal" in ip and "Through-line" in ip)
+      "EU Kids Act is a proposal" in ip and "The episode's theme" in ip)
 check("the intro prompt asks for banter, a teaser, and a hand-over",
       "banter" in ip and "TEASER" in ip and "hands over" in ip)
 check("the intro prompt bans invented personal anecdotes", "invent personal anecdotes" in ip)

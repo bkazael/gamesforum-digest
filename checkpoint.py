@@ -57,13 +57,8 @@ def _json_default(obj):
 
 
 def save_content(date: str, articles: list[dict], data: dict) -> None:
-    """Store the selected articles + generated script for `date`.
-
-    Called right after generate_podcast_content() succeeds -- i.e. after
-    every Gemini *text* call the episode needs. Everything downstream of
-    this point (TTS, ffmpeg, feed) can be retried without spending another
-    text token.
-    """
+    """Store the selected articles and the episode's text work for `date` (the target
+    Monday). Called after every unit of work, so a stopped day loses nothing."""
     try:
         WORK_DIR.mkdir(exist_ok=True)
         runtime.atomic_write(_content_path(date),
