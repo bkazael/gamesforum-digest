@@ -26,6 +26,25 @@
     },
     "daily_budget": 16
    }
+  },
+  {
+   "date": "2026-11-14",
+   "did": [
+    "wrote 2 stories"
+   ],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-14",
+    "today": {
+     "gemini-3.8-flash": 6,
+     "gemini-3.5-flash": 4
+    },
+    "this_run": {
+     "gemini-3.8-flash": 6,
+     "gemini-3.5-flash": 4
+    },
+    "daily_budget": 16
+   }
   }
  ]
 }
