@@ -34,18 +34,16 @@ import proofread
 
 # ---------------------------------------------------------------- config
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_TEXT_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
-GEMINI_SCORING_MODEL = os.environ.get("GEMINI_SCORING_MODEL") or "gemini-2.5-flash-lite"
-# The model for stages where wording is the product -- script, intro, and
-# editorial review. Keep this separate from high-volume scoring so the latter
-# can use a model with more suitable throughput/cost characteristics.
-GEMINI_CREATIVE_MODEL = os.environ.get("GEMINI_CREATIVE_MODEL") or GEMINI_TEXT_MODEL
-TTS_MODEL = os.environ.get("TTS_MODEL", "gemini-2.5-flash-preview-tts")
-# The per-story fact review, the title and the outro. Its own model so that
-# scoring, review and writing each draw on their own free-tier daily quota
-# (~20 requests per model; see PLAN.md, section 2).
-GEMINI_REVIEW_MODEL = os.environ.get("GEMINI_REVIEW_MODEL") or "gemini-3.5-flash"
+from llm import (GEMINI_API_KEY, GEMINI_SCORING_MODEL, GEMINI_CREATIVE_MODEL, GEMINI_REVIEW_MODEL,
+                 TTS_MODEL, TTS_FALLBACK_MODEL, QUOTA_FALLBACKS, HTTP_TIMEOUT, TTS_TIMEOUT,
+                 RUN_DEADLINE_SEC, USAGE_LOG, log, live_model, swap_retired_model,
+                 explain_billing_error, retry_delay, gemini_json, GeminiQuotaExhausted,
+                 _QUOTA_SPENT, _UNHEALTHY, _MODEL_FAILS, UNHEALTHY_AFTER_FAILED_CALLS,
+                 FIRST_MODEL_TRIES, _is_transient)
+from llm import call_model as gemini_json_quota
+from llm import check_deadline as _check_deadline, remaining_timeout as _remaining_timeout
+from llm import retry_sleep as _retry_sleep
+import llm
 
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
 LANG = os.environ.get("DIGEST_LANG", "he")
@@ -75,22 +73,18 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 # (RUN_DEADLINE_SEC = 45 min) < the step (50 min) < the job (55 min). Raised
 # from 25/30/35 on 2026-11-09, when the show's owner chose to wait longer for
 # the strong model rather than publish a short episode from a weaker one.
-HTTP_TIMEOUT = int(os.environ.get("API_TIMEOUT_SEC", "300"))
 
 # TTS gets its own, shorter per-attempt ceiling. Real successful chunks in
 # production have taken 1-4 minutes; the calls that hang never come back at
 # all and just burn the full HTTP_TIMEOUT. 270s keeps the slowest observed
 # *successful* call comfortably inside the window while capping a hung one.
-TTS_TIMEOUT = int(os.environ.get("TTS_TIMEOUT_SEC", "270"))
 
-RUN_DEADLINE_SEC = int(os.environ.get("RUN_DEADLINE_SEC", "2700"))
 
 # One source of truth for the TTS chunk split, so test_episode.py's chunking
 # test can import this instead of hand-copying the number -- a copy is
 # exactly how that test drifted out of sync with production before (it
 # tested against 1500 while this was already 3800).
 TTS_CHUNK_CHAR_LIMIT = 3800
-_run_started = time.monotonic()
 
 def _load_voice() -> dict:
     cfg = {
@@ -114,81 +108,6 @@ _VOICE = _load_voice()
 SPEAKER_A, VOICE_A = _VOICE["speaker_a"], _VOICE["voice_a"]
 SPEAKER_B, VOICE_B = _VOICE["speaker_b"], _VOICE["voice_b"]
 DIRECTION = _VOICE["direction"].strip()
-
-USAGE_LOG = {"input_tokens": 0, "output_tokens": 0, "tts_chunks": 0}
-
-def log(*a):
-    print("[pipeline]", *a, flush=True)
-
-def _check_deadline():
-    elapsed = time.monotonic() - _run_started
-    if elapsed > RUN_DEADLINE_SEC:
-        # Deliberately loud and specific: this is the *graceful* exit, and
-        # it needs to be distinguishable at a glance from the ungraceful
-        # one (the Actions step timeout killing us mid-call). If you are
-        # reading this in a log, the run stopped itself on purpose, and any
-        # checkpoint written so far is intact for the next attempt.
-        raise RuntimeError(
-            f"Run exceeded its {RUN_DEADLINE_SEC}s deadline after "
-            f"{elapsed:.0f}s; aborting before the CI step gets killed. "
-            "Progress so far is checkpointed -- re-running resumes from it."
-        )
-
-def _remaining_timeout(requested: float) -> float:
-    _check_deadline()
-    return max(.1, min(requested, RUN_DEADLINE_SEC - (time.monotonic() - _run_started)))
-
-
-def _retry_sleep(seconds: float) -> None:
-    if seconds >= RUN_DEADLINE_SEC - (time.monotonic() - _run_started):
-        raise RuntimeError("Insufficient run budget for retry; resume from checkpoint")
-    time.sleep(seconds)
-
-
-# Google retires models per API key: a key from a newly created project gets
-# 404 "models/X is no longer available to new users. Please update your code
-# to use models/Y" for models older keys still reach (2026-10-27: a fresh key
-# hit this for 2.5-flash-lite, then 2.5-flash, one run apiece). The error
-# names the replacement, so take it for the rest of the run instead of
-# failing, and say so loudly enough that someone sets the variable.
-_MODEL_SWAPS: dict[str, str] = {}
-_SUGGESTED_MODEL_RE = re.compile(r"\buse models/([\w.\-]+)")
-
-
-def live_model(model: str) -> str:
-    return _MODEL_SWAPS.get(model, model)
-
-
-def swap_retired_model(model: str, code: int, detail: str, variable: str) -> bool:
-    """Switch `model` to Google's suggested replacement after a 404. True if switched."""
-    if code != 404 or model in _MODEL_SWAPS:
-        return False
-    m = _SUGGESTED_MODEL_RE.search(detail)
-    if not m or m.group(1) == model:
-        return False
-    _MODEL_SWAPS[model] = m.group(1)
-    print(f"::warning::{model} is not available to this API key; using {m.group(1)}, "
-          f"the replacement Google named. Set {variable} to make this explicit.", flush=True)
-    return True
-
-
-def explain_billing_error(code: int) -> None:
-    if code == 402:
-        print("::error::Gemini returned 402: the API key's project is on prepaid billing "
-              "and has no credit left. Top up in AI Studio, or use a key from a project "
-              "without billing (free tier).", flush=True)
-
-
-def retry_delay(code: int | None, attempt: int) -> float:
-    """Seconds to wait before retry number `attempt + 1` of a model call.
-
-    Patient on purpose: an overloaded or slow model recovers in minutes, not
-    seconds (2026-10-27 and 2026-11-09: 10-45s retries met the same 503 spell
-    every time), and the owner would rather wait than get a short episode from
-    a weaker model. 30s, 1, 2, 4, then 5 minutes.
-    """
-    return min(30 * 2 ** attempt, 300)
-
 
 def http_get(url: str, tries: int = 3) -> str:
     for attempt in range(tries):
@@ -221,175 +140,6 @@ def fetch_article(url: str) -> dict | None:
         return None
 
     return article_parser.extract(page, url, strip_tags)
-
-# ---------------------------------------------------------------- Gemini Text API
-
-def gemini_json(prompt: str, schema: dict | None = None, tries: int = 4,
-                timeout: int | None = None, model: str | None = None) -> dict:
-    """One schema-constrained Gemini call, retried on failure.
-
-    `tries` and `timeout` exist for the OPTIONAL stages (editorial prep, the
-    intro): at the default 6 x 300s a hung call can spend half an hour, which
-    is fine to say about a stage that must succeed but is exactly the trap
-    that burned the 2026-09-21 run on TTS. A stage whose failure just means
-    "fall back to the old behaviour" gets 2 short attempts, not a whole
-    run's budget.
-    """
-    if not GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY is required.")
-    attempt_timeout = timeout or HTTP_TIMEOUT
-    requested = model or GEMINI_TEXT_MODEL
-
-    gen_config = {"responseMimeType": "application/json"}
-    if schema:
-        gen_config["responseSchema"] = schema
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": gen_config
-    }
-
-    body = json.dumps(payload).encode()
-    attempt = -1
-    while attempt < tries - 1:
-        attempt += 1
-        _check_deadline()
-        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-               f"{live_model(requested)}:generateContent")
-        req = urllib.request.Request(
-            url, data=body,
-            headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
-        )
-        started = time.monotonic()
-        try:
-            with urllib.request.urlopen(req, timeout=_remaining_timeout(attempt_timeout)) as r:
-                data = json.loads(r.read())
-            cand = (data.get("candidates") or [{}])[0]
-            if cand.get("finishReason") not in (None, "STOP"):
-                raise ValueError(f"Incomplete text response: {cand.get('finishReason')}")
-            text = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts", [])
-                           if not p.get("thought"))
-            usage = data.get("usageMetadata", {})
-            USAGE_LOG["input_tokens"] += usage.get("promptTokenCount", 0)
-            USAGE_LOG["output_tokens"] += usage.get("candidatesTokenCount", 0)
-            USAGE_LOG["thinking_tokens"] = USAGE_LOG.get("thinking_tokens", 0) + usage.get("thoughtsTokenCount", 0)
-            log(f"    [Gemini responded in {time.monotonic() - started:.1f}s]")
-            result = json.loads(text)
-            if not isinstance(result, dict):
-                raise ValueError("Expected a JSON object from Gemini")
-            return result
-        except urllib.error.HTTPError as e:
-            detail = ""
-            try:
-                payload = json.loads(e.read().decode("utf-8", "replace"))
-                error = payload.get("error", {})
-                pieces = [str(error.get("status", "")), str(error.get("message", ""))]
-                for item in error.get("details", []):
-                    if isinstance(item, dict):
-                        pieces.extend(str(item.get(k, "")) for k in ("reason", "domain"))
-                        for violation in item.get("violations", []):
-                            if isinstance(violation, dict):
-                                pieces.extend(str(violation.get(k, "")) for k in
-                                              ("quotaMetric", "quotaId", "quotaValue"))
-                        metadata = item.get("metadata", {})
-                        if isinstance(metadata, dict):
-                            pieces.extend(str(metadata.get(k, "")) for k in
-                                          ("quota_metric", "quota_id", "quota_limit", "quota_limit_value"))
-                detail = ": " + " | ".join(dict.fromkeys(p for p in pieces if p))[:700]
-            except Exception:                              # noqa: BLE001
-                pass
-            log(f"    Gemini API attempt {attempt + 1}/{tries} failed: HTTP {e.code}{detail}")
-            if swap_retired_model(requested, e.code, detail, "GEMINI_*_MODEL"):
-                tries += 1                      # the switch itself costs no attempt
-                continue
-            explain_billing_error(e.code)
-            if e.code == 429 and re.search(
-                    r"per.?day|daily|requestsperday|free.?tier.?requests", detail, re.I):
-                raise GeminiQuotaExhausted(detail or "daily quota exhausted") from e
-            if e.code not in (408, 429, 500, 502, 503, 504) or attempt == tries - 1:
-                raise
-            _retry_sleep(retry_delay(e.code, attempt))
-        except Exception as e:
-            log(f"    Gemini API attempt {attempt + 1}/{tries} failed: {e}")
-            if attempt == tries - 1:
-                raise
-            _retry_sleep(retry_delay(None, attempt))
-    raise RuntimeError("unreachable")
-
-
-class GeminiQuotaExhausted(RuntimeError):
-    """A provider daily quota is exhausted; retrying the same run won't help."""
-
-
-# The free tier allows ~20 requests a day PER MODEL (2026-11-09: "limit: 20,
-# model: gemini-3.8-flash ... Please retry in 15h48m"), and a day with several
-# manual runs spends it. Waiting cannot fix that, so when -- and only when --
-# a model's daily quota is gone, its calls move to the next model in this
-# list for the rest of the run. Overload (503) and slowness are not handled
-# here: those are waited out on the same model. Each story is checked for
-# coverage whichever model wrote it, so a different model does not mean a
-# shorter episode.
-QUOTA_FALLBACKS = [m.strip() for m in (os.environ.get("GEMINI_QUOTA_FALLBACKS")
-                   or "gemini-3.5-flash,gemini-3.5-flash-lite").split(",") if m.strip()]
-_QUOTA_SPENT: set[str] = set()
-
-
-# A model that keeps timing out or answering 503 is as unusable as one whose
-# quota is gone, and on the free tier every attempt it fails still spends the
-# 20-a-day quota: 2026-11-11, gemini-3.8-flash timed out on four stories (4
-# tries each, 240s apiece) and used its whole day's quota in 35 minutes while
-# gemini-3.5-flash answered the same calls in 20 seconds. After this many
-# calls that exhausted their tries on such errors, the model is skipped for
-# the rest of the run.
-UNHEALTHY_AFTER_FAILED_CALLS = 2
-FIRST_MODEL_TRIES = 2
-_MODEL_FAILS: dict[str, int] = {}
-_UNHEALTHY: set[str] = set()
-
-
-def _is_transient(e: Exception) -> bool:
-    if isinstance(e, urllib.error.HTTPError):
-        return e.code in (408, 429, 500, 502, 503, 504)
-    # Timeouts, resets and DNS/connection errors; a RuntimeError is our own
-    # run-budget signal and must propagate.
-    return isinstance(e, (OSError, ValueError)) and not isinstance(e, GeminiQuotaExhausted)
-
-
-def gemini_json_quota(prompt: str, schema: dict | None = None, *, model: str,
-                      tries: int = 4, timeout: int | None = None) -> dict:
-    """gemini_json that moves to the next model when `model` cannot serve the call.
-
-    Moves on when the model's daily quota is spent, or when it exhausted its
-    (few) tries on timeouts/overload; after repeated failed calls the model is
-    skipped for the rest of the run. The last model in the chain gets all of
-    `tries` and its error is raised.
-    """
-    chain = [m for m in dict.fromkeys([model, *QUOTA_FALLBACKS])
-             if m not in _QUOTA_SPENT and m not in _UNHEALTHY] or [model]
-    for i, m in enumerate(chain):
-        last = i == len(chain) - 1
-        try:
-            result = gemini_json(prompt, schema, tries=tries if last else min(tries, FIRST_MODEL_TRIES),
-                                 timeout=timeout, model=m)
-            _MODEL_FAILS[m] = 0
-            return result
-        except GeminiQuotaExhausted:
-            _QUOTA_SPENT.add(m)
-            if last:
-                raise
-            print(f"::warning::{m}: daily request quota is spent; using {chain[i + 1]} "
-                  "for the rest of this run.", flush=True)
-        except Exception as e:                                  # noqa: BLE001
-            if last or not _is_transient(e):
-                raise
-            _MODEL_FAILS[m] = _MODEL_FAILS.get(m, 0) + 1
-            note = f"{m} did not answer ({type(e).__name__}); trying {chain[i + 1]} for this call"
-            if _MODEL_FAILS[m] >= UNHEALTHY_AFTER_FAILED_CALLS:
-                _UNHEALTHY.add(m)
-                note += f", and skipping {m} for the rest of this run"
-            print(f"::warning::{note}.", flush=True)
-    raise GeminiQuotaExhausted("every configured model's daily quota is spent")
-
 
 # ---------------------------------------------------------------- the intro, written last
 #
@@ -1167,9 +917,7 @@ def finalize_episode(data: dict, today: str) -> dict:
 
 
 def main() -> int:
-    global _run_started
-    _run_started = time.monotonic()
-    USAGE_LOG.update(input_tokens=0, output_tokens=0, thinking_tokens=0, tts_chunks=0)
+    llm.start_run()
     EPISODES.mkdir(parents=True, exist_ok=True)
     DIGESTS.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(exist_ok=True)
@@ -1325,7 +1073,7 @@ def main() -> int:
         "scoring": live_model(GEMINI_SCORING_MODEL), "creative": live_model(GEMINI_CREATIVE_MODEL),
         "review": live_model(GEMINI_REVIEW_MODEL),
         "tts": live_model(TTS_MODEL)}, "usage": USAGE_LOG,
-        "elapsed_seconds": round(time.monotonic() - _run_started, 1),
+        "elapsed_seconds": round(time.monotonic() - llm._run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),
         "editorial": data.get("editorial_review"),
         "artifacts": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()

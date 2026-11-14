@@ -17,6 +17,7 @@ import audio_tools
 import checkpoint
 import discovery
 import gamesforum_pipeline as p
+import llm
 import memory
 import runtime
 import sources
@@ -124,17 +125,17 @@ class ProductionTests(unittest.TestCase):
         response.read.return_value = json.dumps({"candidates": [{"finishReason": "STOP", "content": {
             "parts": [{"thought": True, "text": "not JSON"}, {"text": '{"ok": true}'}]}}],
             "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 3}}).encode()
-        with patch.object(p, "GEMINI_API_KEY", "secret-test"), patch.object(p, "USAGE_LOG", {
+        with patch.object(llm, "GEMINI_API_KEY", "secret-test"), patch.object(llm, "USAGE_LOG", {
                 "input_tokens": 0, "output_tokens": 0}), patch("urllib.request.urlopen", return_value=response) as call:
-            self.assertEqual(p.gemini_json("x"), {"ok": True})
-            self.assertEqual(p.USAGE_LOG["input_tokens"], 5)
+            self.assertEqual(llm.gemini_json("x"), {"ok": True})
+            self.assertEqual(llm.USAGE_LOG["input_tokens"], 5)
             self.assertNotIn("secret-test", call.call_args.args[0].full_url)
 
     def test_permanent_api_errors_do_not_retry(self):
-        with patch.object(p, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
+        with patch.object(llm, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
                 side_effect=urllib.error.HTTPError("https://api.test", 400, "invalid", {}, io.BytesIO())) as call:
             with self.assertRaises(urllib.error.HTTPError):
-                p.gemini_json("x")
+                llm.gemini_json("x")
             self.assertEqual(call.call_count, 1)
 
     def test_daily_quota_429_is_diagnosed_and_not_retried(self):
@@ -144,10 +145,10 @@ class ProductionTests(unittest.TestCase):
                 "violations": [{"quotaMetric": "generate_content_free_tier_requests_per_day",
                     "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}).encode()
         error = urllib.error.HTTPError("https://api.test", 429, "quota", {}, io.BytesIO(body))
-        with patch.object(p, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
-                side_effect=error) as call, patch.object(p, "_retry_sleep") as sleep:
+        with patch.object(llm, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
+                side_effect=error) as call, patch.object(llm, "retry_sleep") as sleep:
             with self.assertRaises(p.GeminiQuotaExhausted) as caught:
-                p.gemini_json("x")
+                llm.gemini_json("x")
             self.assertIn("requests_per_day", str(caught.exception))
             self.assertEqual(call.call_count, 1)
             sleep.assert_not_called()
@@ -157,10 +158,10 @@ class ProductionTests(unittest.TestCase):
             "message": "Quota exceeded for metric: generate_content_free_tier_requests, limit: 20",
             "details": []}}).encode()
         error = urllib.error.HTTPError("https://api.test", 429, "quota", {}, io.BytesIO(body))
-        with patch.object(p, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
-                side_effect=error) as call, patch.object(p, "_retry_sleep") as sleep:
+        with patch.object(llm, "GEMINI_API_KEY", "test"), patch("urllib.request.urlopen",
+                side_effect=error) as call, patch.object(llm, "retry_sleep") as sleep:
             with self.assertRaises(p.GeminiQuotaExhausted):
-                p.gemini_json("x")
+                llm.gemini_json("x")
             self.assertEqual(call.call_count, 1)
             sleep.assert_not_called()
 
@@ -174,10 +175,10 @@ class ProductionTests(unittest.TestCase):
         ok.__enter__ = Mock(return_value=io.BytesIO(json.dumps({"candidates": [{"finishReason": "STOP",
             "content": {"parts": [{"text": "{\"a\": 1}"}]}}]}).encode()))
         ok.__exit__ = Mock(return_value=False)
-        with patch.object(p, "GEMINI_API_KEY", "test"), patch.dict(p._MODEL_SWAPS, clear=True), \
+        with patch.object(llm, "GEMINI_API_KEY", "test"), patch.dict(llm._MODEL_SWAPS, clear=True), \
                 patch("urllib.request.urlopen", side_effect=[retired, ok]) as call, \
-                patch.object(p, "_retry_sleep") as sleep:
-            self.assertEqual(p.gemini_json("x", tries=1, model="gemini-2.5-flash"), {"a": 1})
+                patch.object(llm, "retry_sleep") as sleep:
+            self.assertEqual(llm.gemini_json("x", tries=1, model="gemini-2.5-flash"), {"a": 1})
             self.assertIn("models/gemini-3.8-flash:", call.call_args_list[1].args[0].full_url)
             self.assertEqual(p.live_model("gemini-2.5-flash"), "gemini-3.8-flash")
             sleep.assert_not_called()
@@ -185,10 +186,10 @@ class ProductionTests(unittest.TestCase):
     def test_404_without_a_named_replacement_still_fails(self):
         error = urllib.error.HTTPError("https://api.test", 404, "gone", {},
                                        io.BytesIO(b'{"error": {"message": "not found"}}'))
-        with patch.object(p, "GEMINI_API_KEY", "test"), patch.dict(p._MODEL_SWAPS, clear=True), \
+        with patch.object(llm, "GEMINI_API_KEY", "test"), patch.dict(llm._MODEL_SWAPS, clear=True), \
                 patch("urllib.request.urlopen", side_effect=error) as call:
             with self.assertRaises(urllib.error.HTTPError):
-                p.gemini_json("x", model="gemini-x")
+                llm.gemini_json("x", model="gemini-x")
             self.assertEqual(call.call_count, 1)
 
     def test_a_spent_daily_quota_moves_to_the_next_model_and_stays_there(self):
@@ -198,10 +199,10 @@ class ProductionTests(unittest.TestCase):
             if model == "primary":
                 raise p.GeminiQuotaExhausted("per day")
             return {"ok": model}
-        with patch.object(p, "gemini_json", side_effect=fake), patch.object(p, "_QUOTA_SPENT", set()), \
-                patch.object(p, "QUOTA_FALLBACKS", ["second", "third"]):
-            self.assertEqual(p.gemini_json_quota("x", {}, model="primary"), {"ok": "second"})
-            self.assertEqual(p.gemini_json_quota("y", {}, model="primary"), {"ok": "second"})
+        with patch.object(llm, "gemini_json", side_effect=fake), patch.object(llm, "_QUOTA_SPENT", set()), \
+                patch.object(llm, "QUOTA_FALLBACKS", ["second", "third"]):
+            self.assertEqual(llm.call_model("x", {}, model="primary"), {**{"ok": "second"}, "_model": "second"})
+            self.assertEqual(llm.call_model("y", {}, model="primary"), {**{"ok": "second"}, "_model": "second"})
         self.assertEqual(seen, ["primary", "second", "second"])
 
     def test_a_model_that_keeps_timing_out_is_skipped_for_the_rest_of_the_run(self):
@@ -211,48 +212,48 @@ class ProductionTests(unittest.TestCase):
             if model == "primary":
                 raise TimeoutError("The read operation timed out")
             return {"ok": model}
-        with patch.object(p, "gemini_json", side_effect=fake), patch.object(p, "_QUOTA_SPENT", set()), \
-                patch.object(p, "_UNHEALTHY", set()), patch.object(p, "_MODEL_FAILS", {}), \
-                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
-            self.assertEqual(p.gemini_json_quota("a", {}, model="primary", tries=4), {"ok": "second"})
-            self.assertEqual(p.gemini_json_quota("b", {}, model="primary", tries=4), {"ok": "second"})
-            self.assertEqual(p.gemini_json_quota("c", {}, model="primary", tries=4), {"ok": "second"})
+        with patch.object(llm, "gemini_json", side_effect=fake), patch.object(llm, "_QUOTA_SPENT", set()), \
+                patch.object(llm, "_UNHEALTHY", set()), patch.object(llm, "_MODEL_FAILS", {}), \
+                patch.object(llm, "QUOTA_FALLBACKS", ["second"]):
+            self.assertEqual(llm.call_model("a", {}, model="primary", tries=4), {**{"ok": "second"}, "_model": "second"})
+            self.assertEqual(llm.call_model("b", {}, model="primary", tries=4), {**{"ok": "second"}, "_model": "second"})
+            self.assertEqual(llm.call_model("c", {}, model="primary", tries=4), {**{"ok": "second"}, "_model": "second"})
         # two calls tried the primary (only twice each), then it was skipped
         self.assertEqual(seen, [("primary", 2), ("second", 4), ("primary", 2), ("second", 4), ("second", 4)])
 
     def test_the_last_model_keeps_its_error_and_all_its_tries(self):
         def fake(prompt, schema, tries, timeout, model):
             raise urllib.error.HTTPError("https://api.test", 503, "busy", {}, io.BytesIO())
-        with patch.object(p, "gemini_json", side_effect=fake) as call, patch.object(p, "_QUOTA_SPENT", set()), \
-                patch.object(p, "_UNHEALTHY", set()), patch.object(p, "_MODEL_FAILS", {}), \
-                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+        with patch.object(llm, "gemini_json", side_effect=fake) as call, patch.object(llm, "_QUOTA_SPENT", set()), \
+                patch.object(llm, "_UNHEALTHY", set()), patch.object(llm, "_MODEL_FAILS", {}), \
+                patch.object(llm, "QUOTA_FALLBACKS", ["second"]):
             with self.assertRaises(urllib.error.HTTPError):
-                p.gemini_json_quota("x", {}, model="primary", tries=4)
+                llm.call_model("x", {}, model="primary", tries=4)
         self.assertEqual([c.kwargs["tries"] for c in call.call_args_list], [2, 4])
 
     def test_a_budget_stop_is_not_mistaken_for_a_dead_model(self):
         def fake(prompt, schema, tries, timeout, model):
             raise RuntimeError("Insufficient run budget for retry")
-        with patch.object(p, "gemini_json", side_effect=fake) as call, patch.object(p, "_QUOTA_SPENT", set()), \
-                patch.object(p, "_UNHEALTHY", set()), patch.object(p, "_MODEL_FAILS", {}), \
-                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+        with patch.object(llm, "gemini_json", side_effect=fake) as call, patch.object(llm, "_QUOTA_SPENT", set()), \
+                patch.object(llm, "_UNHEALTHY", set()), patch.object(llm, "_MODEL_FAILS", {}), \
+                patch.object(llm, "QUOTA_FALLBACKS", ["second"]):
             with self.assertRaises(RuntimeError):
-                p.gemini_json_quota("x", {}, model="primary")
+                llm.call_model("x", {}, model="primary")
         self.assertEqual(call.call_count, 1)
 
     def test_every_model_out_of_quota_raises_the_quota_error(self):
         def fake(prompt, schema, tries, timeout, model):
             raise p.GeminiQuotaExhausted("per day")
-        with patch.object(p, "gemini_json", side_effect=fake), patch.object(p, "_QUOTA_SPENT", set()), \
-                patch.object(p, "QUOTA_FALLBACKS", ["second"]):
+        with patch.object(llm, "gemini_json", side_effect=fake), patch.object(llm, "_QUOTA_SPENT", set()), \
+                patch.object(llm, "QUOTA_FALLBACKS", ["second"]):
             with self.assertRaises(p.GeminiQuotaExhausted):
-                p.gemini_json_quota("x", {}, model="primary")
+                llm.call_model("x", {}, model="primary")
 
     def test_retries_wait_minutes_not_seconds_and_are_capped(self):
-        delays = [p.retry_delay(503, n) for n in range(8)]
+        delays = [llm.retry_delay(503, n) for n in range(8)]
         self.assertEqual(delays[:4], [30, 60, 120, 240])
         self.assertEqual(max(delays), 300)
-        self.assertEqual(p.retry_delay(None, 0), p.retry_delay(503, 0))
+        self.assertEqual(llm.retry_delay(None, 0), llm.retry_delay(503, 0))
 
     def test_a_failed_filter_graph_falls_back_instead_of_losing_the_voiced_episode(self):
         # 2026-11-11: the full mix died with "Invalid data found when processing
@@ -309,11 +310,45 @@ class ProductionTests(unittest.TestCase):
                                    pathlib.Path(tmp) / "e.wav", pathlib.Path(tmp) / "e.mp3")
 
     def test_request_timeout_cannot_outlive_run_budget(self):
-        with patch.object(p, "_run_started", 100), patch.object(p.time, "monotonic", return_value=155), \
-                patch.object(p, "RUN_DEADLINE_SEC", 60):
-            self.assertEqual(p._remaining_timeout(300), 5)
+        with patch.object(llm, "_run_started", 100), patch.object(llm.time, "monotonic", return_value=155), \
+                patch.object(llm, "RUN_DEADLINE_SEC", 60):
+            self.assertEqual(llm.remaining_timeout(300), 5)
             with self.assertRaises(RuntimeError):
-                p._retry_sleep(10)
+                llm.retry_sleep(10)
+
+    def test_every_attempt_is_counted_and_a_spent_budget_skips_the_model(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(llm, "GEMINI_API_KEY", "k"), \
+                patch.object(llm, "DAILY_BUDGET", 3), patch.object(llm, "QUOTA_FALLBACKS", ["second"]), \
+                patch.object(llm, "_QUOTA_SPENT", set()), patch.object(llm, "_UNHEALTHY", set()):
+            usage = pathlib.Path(tmp) / "usage.json"
+            llm.configure(usage)
+            llm.CALLS.clear()
+            response = Mock()
+            response.__enter__ = Mock(return_value=response)
+            response.__exit__ = Mock(return_value=False)
+            response.read.return_value = json.dumps({"candidates": [{"finishReason": "STOP", "content": {
+                "parts": [{"text": '{"ok": true}'}]}}]}).encode()
+            with patch("urllib.request.urlopen", return_value=response):
+                for _ in range(3):
+                    self.assertEqual(llm.call_model("x", {}, model="primary")["_model"], "primary")
+                self.assertEqual(llm.budget_left("primary"), 0)
+                self.assertEqual(llm.call_model("x", {}, model="primary")["_model"], "second")
+                self.assertEqual(llm.call_model("x", {}, model="primary")["_model"], "second")
+                self.assertEqual(llm.call_model("x", {}, model="primary")["_model"], "second")
+                with self.assertRaises(llm.GeminiQuotaExhausted):
+                    llm.call_model("x", {}, model="primary")
+            self.assertEqual(dict(llm.CALLS), {"primary": 3, "second": 3})
+            self.assertEqual(json.loads(usage.read_text())["calls"], {"primary": 3, "second": 3})
+            # A later run on the same quota day starts from what was spent.
+            llm.configure(usage)
+            self.assertEqual(llm.used_today("primary"), 3)
+            llm.configure(None)
+
+    def test_quota_day_follows_pacific_midnight(self):
+        before = dt.datetime(2026, 11, 14, 7, 59, tzinfo=dt.timezone.utc)
+        after = dt.datetime(2026, 11, 14, 8, 1, tzinfo=dt.timezone.utc)
+        self.assertEqual(llm.quota_day(before), "2026-11-13")
+        self.assertEqual(llm.quota_day(after), "2026-11-14")
 
     def test_hebrew_acronyms_are_translated_before_review(self):
         turns = [{"speaker": "Dana", "text": "ה-D2C עולה ב-MENA, ו-IAP יורד."}]

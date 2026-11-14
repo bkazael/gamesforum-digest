@@ -24,6 +24,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import discovery as D
+import llm
 
 FAILS = []
 
@@ -77,7 +78,7 @@ check("an unrelated article does not trip the heuristic",
 
 # ---------------------------------------------------------------- 2. false positive is NOT rejected
 
-D.gemini_json = lambda prompt, schema=None, **kwargs: {
+llm.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": False,
     "reasoning": "One is a lawsuit settlement, the other is a technical "
                  "policy change; different announcements.",
@@ -93,7 +94,7 @@ check("when Gemini says two heuristically-flagged articles are NOT the "
 
 # ---------------------------------------------------------------- 3. confirmed duplicate IS rejected, and the freed cap slot backfills
 
-D.gemini_json = lambda prompt, schema=None, **kwargs: {
+llm.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": True,
     "reasoning": "Both describe the same Google Play settlement.",
 }
@@ -113,7 +114,7 @@ check("this is the actual bug fix: the cap slot the duplicate would have "
 
 def _raise(prompt, schema=None, **kwargs):
     raise RuntimeError("simulated API error")
-D.gemini_json = _raise
+llm.gemini_json = _raise
 result = D.select_stories(
     [GOOGLE_SETTLEMENT, GOOGLE_REQUIREMENTS], SOURCES, THR
 )
@@ -126,7 +127,7 @@ check("a dedupe-confirmation API error fails open -- both articles are "
 THIRD = art("Google Play adds new safety controls for kids accounts",
             "Google Play rolls out parental controls and age verification.",
             6.5)
-D.gemini_json = lambda prompt, schema=None, **kwargs: {
+llm.gemini_json = lambda prompt, schema=None, **kwargs: {
     "same_story": False, "reasoning": "distinct announcements",
 }
 result = D.select_stories(
@@ -172,7 +173,7 @@ def cap_field():
     ]
 
 
-D.gemini_json = lambda prompt, schema=None, **kwargs: {"same_story": False, "reasoning": "distinct"}
+llm.gemini_json = lambda prompt, schema=None, **kwargs: {"same_story": False, "reasoning": "distinct"}
 
 field = cap_field()
 result = D.select_stories(field, CAP_SOURCES, CAP_THR)
@@ -354,14 +355,14 @@ def _daily_quota(prompt, schema=None, **kwargs):
     _quota_calls.append(kwargs)
     raise D.GeminiQuotaExhausted("GenerateRequestsPerDayPerProjectPerModel-FreeTier")
 
-D.gemini_json = _daily_quota
+llm.gemini_json = _daily_quota
 _score_profile = {"identity": {"who": "test"},
                   "interests": {"core": [], "deprioritize": []}}
 _score_candidates = [{"_idx": i, "title": "A mobile game update",
                       "text": "Game update data " * 100,
                       "signals": D.substance_signals("Game update data " * 100)}
                      for i in range(D.SCORE_BATCH + 1)]
-D._pipeline._QUOTA_SPENT.clear()
+llm._QUOTA_SPENT.clear()
 try:
     D.score_all(_score_profile, _score_candidates)
     check("a provider daily quota failure aborts scoring instead of retrying later batches", False)
@@ -369,9 +370,9 @@ except D.GeminiQuotaExhausted:
     models = [c.get("model") for c in _quota_calls]
     check("a spent daily quota tries each fallback model once, then aborts scoring "
           "instead of retrying later batches",
-          models == list(dict.fromkeys([D.GEMINI_SCORING_MODEL, *D._pipeline.QUOTA_FALLBACKS])),
+          models == list(dict.fromkeys([llm.GEMINI_SCORING_MODEL, *llm.QUOTA_FALLBACKS])),
           f"models tried: {models}")
-D._pipeline._QUOTA_SPENT.clear()
+llm._QUOTA_SPENT.clear()
 
 # ---------------------------------------------------------------- 13b. a failed batch gets one more try at the end
 # 2026-11-10: batch 2 failed after ten minutes of 503s, batches 3-4 then
@@ -387,7 +388,7 @@ def _second_batch_fails_once(prompt, schema=None, **kwargs):
     return {"articles": [{"id": i, "score": 7, "why": "w", "topic": "t", "axis": "a",
                           "reasoning": "r"} for i in ids]}
 
-D.gemini_json = _second_batch_fails_once
+llm.gemini_json = _second_batch_fails_once
 _many = [{"_idx": i, "title": f"A mobile game update {i}", "text": "Game update data " * 100,
           "signals": D.substance_signals("Game update data " * 100)}
          for i in range(D.SCORE_BATCH * 2 + 1)]

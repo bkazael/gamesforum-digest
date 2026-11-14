@@ -46,10 +46,9 @@ except ModuleNotFoundError:           # 3.10 and older
         )
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import gamesforum_pipeline as _pipeline    # noqa: E402
-from gamesforum_pipeline import (          # noqa: E402
-    fetch_article, gemini_json, log, GEMINI_SCORING_MODEL, GeminiQuotaExhausted,
-)
+import llm                                 # noqa: E402
+from llm import GeminiQuotaExhausted, log  # noqa: E402
+from gamesforum_pipeline import fetch_article    # noqa: E402
 from sources import collect                # noqa: E402
 import memory                              # noqa: E402
 import source_health                       # noqa: E402
@@ -57,6 +56,8 @@ import source_health                       # noqa: E402
 ROOT = runtime.OUTPUT_ROOT
 LEDGER = ROOT / "ledger"
 STATE_FILE = ROOT / "state.json"
+SEEN_FILE = ROOT / "seen.json"
+YIELD_FILE = ROOT / "reports" / "source_yield.json"
 PROFILE = runtime.PROFILE_PATH
 
 
@@ -344,21 +345,8 @@ SCORE_SCHEMA = {
 }
 
 def _scoring_call(prompt: str, schema: dict) -> dict:
-    """gemini_json on the scoring model; when its free-tier daily quota is
-    spent, the next model in the pipeline's QUOTA_FALLBACKS for the rest of
-    the run (the same rule the story calls follow)."""
-    chain = [m for m in dict.fromkeys([GEMINI_SCORING_MODEL, *_pipeline.QUOTA_FALLBACKS])
-             if m not in _pipeline._QUOTA_SPENT]
-    for i, m in enumerate(chain):
-        try:
-            return gemini_json(prompt, schema, model=m)
-        except GeminiQuotaExhausted:
-            _pipeline._QUOTA_SPENT.add(m)
-            if i == len(chain) - 1:
-                raise
-            print(f"::warning::{m}: daily request quota is spent; scoring with {chain[i + 1]}",
-                  flush=True)
-    raise GeminiQuotaExhausted("every configured model's daily quota is spent")
+    """A scoring call: the scoring model, then the shared fallback chain (llm.py)."""
+    return llm.call_model(prompt, schema, model=llm.GEMINI_SCORING_MODEL, tries=4)
 
 
 # Batch size for scoring. Seventy-plus articles in one call is where the
@@ -609,6 +597,118 @@ ruling, launch, or figures -- not merely related or about the same company?"""
         return False
 
 
+# ------------------------------------------------------------ first-seen dates
+
+# A source whose pages carry no readable publication date (Gamesforum: 14-18
+# links a week, every one rejected as UNDATED from 2026-10-19) is not dropped:
+# the day its link FIRST appeared in the listing stands in for the date. The
+# first time a source is seen at all, everything it lists is recorded as old,
+# because the listing mixes this week's articles with older ones; the links
+# that appear afterwards are new.
+
+def load_seen() -> dict:
+    try:
+        data = json.loads(SEEN_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def record_first_seen(items: list[dict], seen: dict, today: dt.date, max_age_days: int) -> int:
+    """Record the first-seen day of every undated item. `seen` maps source ->
+    {canonical url: iso date}. Returns how many links were newly recorded."""
+    new = 0
+    by_source: dict[str, list[dict]] = {}
+    for it in items:
+        if not it.get("published"):
+            by_source.setdefault(it["source"], []).append(it)
+    for source, group in by_source.items():
+        table = seen.setdefault(source, {})
+        bootstrap = not table
+        stamp = (today - dt.timedelta(days=max_age_days + 1)) if bootstrap else today
+        for it in group:
+            url = runtime.canonical_url(it["url"])
+            if url not in table:
+                table[url] = stamp.isoformat()
+                new += 1
+        if bootstrap:
+            log(f"  [{source}] first sight: {len(group)} undated links recorded as already "
+                "published; links that appear from now on count from the day they appear")
+    return new
+
+
+def first_seen_date(seen: dict, source: str, url: str) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(seen.get(source, {}).get(runtime.canonical_url(url), ""))
+    except ValueError:
+        return None
+
+
+def prune_seen(seen: dict, today: dt.date, keep_days: int = 60) -> None:
+    limit = (today - dt.timedelta(days=keep_days)).isoformat()
+    for table in seen.values():
+        for url in [u for u, d in table.items() if d < limit]:
+            del table[url]
+
+
+def observe_sources() -> int:
+    """Daily, no model call: list the sources whose articles have no date and
+    record the links that appeared since the last look, so that their first-seen
+    day is the day they appeared and not the day the weekly selection ran."""
+    profile = load_profile()
+    thr = profile["thresholds"]
+    sources = [s for s in profile["sources"] if s.get("enabled", True) and s.get("kind") == "html"]
+    if not sources:
+        return 0
+    items, _, _ = collect(sources, thr["max_age_days"])
+    seen = load_seen()
+    today = dt.date.today()
+    n = record_first_seen(items, seen, today, thr["max_age_days"])
+    prune_seen(seen, today)
+    runtime.atomic_write(SEEN_FILE, json.dumps(seen, indent=1, ensure_ascii=False, sort_keys=True))
+    log(f"observed {len(items)} listed links, {n} new")
+    return n
+
+
+VERDICT_COLUMNS = {"BLOCKED": "blocked", "SKIPPED": "skipped", "UNREADABLE": "unreadable",
+                   "STALE": "stale", "UNDATED": "undated", "THIN": "too_short",
+                   "UNSCORED": "unscored", "OUT": "scored", "IN": "scored"}
+
+
+def source_yield(rows: list[dict]) -> dict:
+    """Per source, where its candidates went: listed, then one count per way of
+    being dropped, then scored and selected. A source is healthy only if what it
+    lists can reach an episode (2026-11-11: a source listed 14-18 links a week for
+    four episodes and every one was UNDATED)."""
+    out: dict[str, dict] = {}
+    for r in rows:
+        y = out.setdefault(r["source"], dict.fromkeys(
+            ["listed", "blocked", "skipped", "unreadable", "stale", "undated",
+             "too_short", "unscored", "scored", "selected"], 0))
+        y["listed"] += 1
+        col = VERDICT_COLUMNS.get(r.get("verdict"))
+        if col:
+            y[col] += 1
+        if r.get("verdict") == "IN":
+            y["selected"] += 1
+    return out
+
+
+def record_yield(date: str, rows: list[dict], sources: list[dict]) -> list[str]:
+    """Append this run's yield to reports/source_yield.json and return the alerts
+    (see source_health.yield_alerts)."""
+    try:
+        history = json.loads(YIELD_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        history = []
+    history = [h for h in history if h.get("date") != date]
+    history.append({"date": date, "sources": source_yield(rows)})
+    history = history[-8:]
+    YIELD_FILE.parent.mkdir(exist_ok=True)
+    runtime.atomic_write(YIELD_FILE, json.dumps(history, indent=1, ensure_ascii=False))
+    return source_health.yield_alerts(history, [s["name"] for s in sources])
+
+
 def select_stories(scored: list[dict], sources: list[dict], thr: dict) -> list[dict]:
     """Rank once; take each candidate if it clears the per-source cap AND is
     not a CONFIRMED duplicate of something already kept -- both checked
@@ -786,6 +886,11 @@ def select(dry_run: bool = False) -> list[dict]:
         log(f"  SOURCE ALERT: {line}")
     found = [i for i in all_items if runtime.canonical_url(i["url"]) not in done]
     log(f"  {len(found)} unseen candidates")
+    seen = load_seen()
+    if not dry_run:
+        record_first_seen(found, seen, dt.date.today(), thr["max_age_days"])
+        prune_seen(seen, dt.date.today())
+        runtime.atomic_write(SEEN_FILE, json.dumps(seen, indent=1, ensure_ascii=False, sort_keys=True))
 
     rows: list[dict] = []
     survivors: list[dict] = []
@@ -865,7 +970,8 @@ def select(dry_run: bool = False) -> list[dict]:
             })
             continue
         art["source"] = cand["source"]
-        art["published"] = art.get("published") or cand.get("published")
+        art["published"] = (art.get("published") or cand.get("published")
+                            or first_seen_date(seen, cand["source"], cand["url"]))
         published = art["published"]
         if ((published and not cutoff <= published <= dt.date.today())
                 or (not published and thr.get("require_publication_date", False))):
@@ -985,6 +1091,10 @@ def select(dry_run: bool = False) -> list[dict]:
 
     rows.sort(key=lambda r: (r["score"] is None, -(r["score"] or 0)))
     date = dt.date.today().isoformat()
+    for line in record_yield(date, rows, sources):
+        log(f"  SOURCE ALERT: {line}")
+        alerts.append(line)
+    source_health.record(alerts)
     log(f"ledger: {write_ledger(date, rows, profile)}")
     log(f"selected {len(chosen)} of {len(found)} candidates")
     for a in chosen:

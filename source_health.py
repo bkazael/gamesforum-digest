@@ -104,6 +104,27 @@ def check(sources: list[dict], raw_item_counts: dict[str, int]) -> list[str]:
     return alerts
 
 
+def yield_alerts(history: list[dict], names: list[str]) -> list[str]:
+    """A source that lists candidates but gets none of them scored, in two runs
+    in a row, is not feeding the show even though its fetch "works"."""
+    alerts = []
+    if len(history) < 2:
+        return alerts
+    last, before = history[-1]["sources"], history[-2]["sources"]
+    for name in names:
+        a, b = last.get(name), before.get(name)
+        if not a or not b:
+            continue
+        if a["listed"] > 0 and b["listed"] > 0 and a["scored"] == 0 and b["scored"] == 0:
+            reasons = {k: a[k] for k in ("blocked", "unreadable", "stale", "undated", "too_short",
+                                          "skipped") if a.get(k)}
+            alerts.append(
+                f"{name}: {a['listed']} candidates listed but none scored, two runs in a row "
+                f"(dropped as: {reasons or 'unknown'}). The source fetches but cannot feed an "
+                "episode; see reports/source_yield.json.")
+    return alerts
+
+
 def record(alerts: list[str]) -> None:
     """Persist this run's alerts so the workflow's later step can read them."""
     runtime.atomic_write(ALERTS_FILE, json.dumps(alerts, ensure_ascii=False, indent=2))

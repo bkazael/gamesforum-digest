@@ -81,9 +81,14 @@ block = [
   "in association with", "sponsored", "esports nations",
 ]
 
+# Disabled 2026-11-13: a consumer site. In six weeks its 25 weekly candidates were
+# guides, reviews and "free coins" link pages: 16 blocked by title, the rest
+# scored 0.6-2.8, and none was ever selected. It cost fetches and scoring-batch
+# space every week. Set enabled = true to bring it back.
 [[sources]]
 name = "PocketGamer.com"
 kind = "rss"
+enabled = false
 urls = ["https://www.pocketgamer.com/index.rss"]
 weight = 0.55
 max_per_episode = 1
@@ -129,8 +134,8 @@ kind = "email"
 enabled = false
 urls = ["https://gamigion.substack.com/feed"]  # domain only; never fetched
 mailbox = "INBOX"
-# The inbox (emilycar.pa@gmail.com) is a general assistant address, not a
-# dedicated one, so only messages from Gamigion's Substack are read.
+# The mailbox address and its app password are repository secrets, never written
+# here. If the inbox is shared, only messages from this sender are read.
 sender = "gamigion"
 weight = 1.0
 max_per_episode = 2

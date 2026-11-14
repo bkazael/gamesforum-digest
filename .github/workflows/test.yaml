@@ -44,6 +44,7 @@ jobs:
           python test_script_quality.py
           python test_segments.py
           python test_proofread.py
+          python test_dates_and_yield.py
           python test_generation.py
           python test_production.py
           python test_ci_coverage.py
