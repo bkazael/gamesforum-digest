@@ -29,8 +29,6 @@ import runtime
 import article_parser
 import audio_tools
 import speech as speech_tools
-import source_health
-import proofread
 
 # ---------------------------------------------------------------- config
 
@@ -47,8 +45,9 @@ import llm
 
 BASE_URL = os.environ.get("PODCAST_BASE_URL", "").rstrip("/")
 LANG = os.environ.get("DIGEST_LANG", "he")
+# The show's name. Set the repository variable SHOW_NAME to change it.
+SHOW_NAME = os.environ.get("SHOW_NAME") or "Ben's Weekly Digest"
 
-SITE = "https://www.globalgamesforum.com"
 ROOT = runtime.OUTPUT_ROOT
 EPISODES = ROOT / "episodes"
 DIGESTS = ROOT / "digests"
@@ -173,9 +172,9 @@ def welcome_turn() -> dict:
     model, because it is the brand and must be identical every week."""
     if LANG == "he":
         return {"speaker": SPEAKER_A,
-                "text": "ברוכים הבאים ל-Ben's Weekly Digest. אני דנה, ואיתי יוני."}
+                "text": f"ברוכים הבאים ל-{SHOW_NAME}. אני דנה, ואיתי יוני."}
     return {"speaker": SPEAKER_A,
-            "text": "Welcome to Ben's Weekly Digest. I'm Dana, and with me is Yoni."}
+            "text": f"Welcome to {SHOW_NAME}. I'm Dana, and with me is Yoni."}
 
 
 INTRO_MIN_TURNS, INTRO_MAX_TURNS = 3, 12
@@ -750,7 +749,7 @@ def build_feed():
         notes = meta.get("notes") or meta.get("summary", "")
         plain = xml_escape(re.sub(r"<[^>]+>", " ", notes).strip()[:900])
 
-        title = xml_escape(meta.get('title', f"Ben's Weekly Digest {date_str}"))
+        title = xml_escape(meta.get('title', f"{SHOW_NAME} {date_str}"))
 
         items.append(f"""    <item>
       <title>{title}</title>
@@ -767,7 +766,7 @@ def build_feed():
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>Ben's Weekly Digest</title>
+    <title>{xml_escape(SHOW_NAME)}</title>
     <link>{xml_escape(BASE_URL)}</link>
     <description>Weekly mobile-gaming briefing.</description>
     <language>{'he' if LANG == 'he' else 'en'}</language>
@@ -784,7 +783,6 @@ def build_feed():
 
 # ---------------------------------------------------------------- main
 
-SHOW_NAME = "Ben's Weekly Digest"
 
 
 def show_title(episode_title: str) -> str:
@@ -826,68 +824,21 @@ def preflight(audio: bool = True) -> None:
                 raise RuntimeError(f"Install {tool} before generating an episode")
 
 
-def publication_complete(today: str) -> bool:
-    """A playable file alone is not a committed publication transaction."""
-    required = [EPISODES / f"{today}.mp3", EPISODES / f"{today}.json",
-                DIGESTS / f"{today}.md", DIGESTS / f"{today}-script.md", ROOT / "feed.xml"]
-    if not all(p.exists() and p.stat().st_size > 0 for p in required):
-        return False
-    try:
-        manifest = json.loads((ROOT / "reports" / f"{today}-run.json").read_text())
-        fingerprints = manifest.get("artifacts", {})
-        intact = all(fingerprints.get(str(p.relative_to(ROOT)))
-                     == hashlib.sha256(p.read_bytes()).hexdigest() for p in required)
-        return (manifest.get("status") == "complete" and intact
-                and f"bens-digest-{today}</guid>" in (ROOT / "feed.xml").read_text()
-                and json.loads(STATE_FILE.read_text()).get("last_run") == today)
-    except (OSError, ValueError):
-        return False
-
-
-CATCH_UP_WINDOW_DAYS = 4
-
-
-def recent_episode(today: str, days: int = CATCH_UP_WINDOW_DAYS) -> str | None:
-    """The date of an episode published in the `days` before `today`, if any.
-
-    The workflow also fires on Tuesday and Wednesday so a Monday lost to a
-    Google outage (2026-11-10: 35 minutes of 503s on scoring, then the stories)
-    still gets its episode that week. Those catch-up firings must do nothing
-    when the week already has one. Four days: a Wednesday catch-up is five
-    days before the next Monday, which must still run.
-    """
-    day = dt.date.fromisoformat(today)
-    for mp3 in sorted(EPISODES.glob("????-??-??.mp3"), reverse=True):
+def episode_published_for(target: dt.date, window_days: int = 4) -> str | None:
+    """The date of an episode already published for the week whose Monday is `target`
+    (published on the Monday itself or up to `window_days` later), or None."""
+    for mp3 in sorted(EPISODES.glob("????-??-??.mp3")):
         try:
             published = dt.date.fromisoformat(mp3.stem)
         except ValueError:
             continue
-        if 0 < (day - published).days <= days:
+        meta = mp3.with_suffix(".json")
+        if 0 <= (published - target).days <= window_days and mp3.stat().st_size > 0 and meta.exists():
             return mp3.stem
     return None
 
 
-def produce_script(articles: list[dict], today: str, memory_context: str,
-                   resume: dict | None, min_segments: int | None = None) -> dict:
-    """The stories, title, outro and digest summary (no intro yet). One Gemini
-    call per story, three at a time; each finished story is checkpointed."""
-    import segments
-
-    def call(prompt, schema, *, model, tries, timeout):
-        return gemini_json_quota(prompt, schema, model=model, tries=tries, timeout=timeout)
-
-    def save(done: dict) -> None:
-        checkpoint.save_content(today, articles, {"segments": done})
-
-    log(f"writing {len(articles)} stories, {segments.WORKERS} at a time...")
-    return segments.build_episode(
-        articles, call=call, save=save, resume=resume, log=log,
-        models={"creative": GEMINI_CREATIVE_MODEL, "review": GEMINI_REVIEW_MODEL},
-        speakers=(SPEAKER_A, SPEAKER_B), lang=LANG, memory_context=memory_context,
-        **({"min_segments": min_segments} if min_segments else {}))
-
-
-def finalize_episode(data: dict, today: str) -> dict:
+def finalize_episode(data: dict, key: str) -> dict:
     """Last checks before audio, no model calls: the script is whole, and the
     per-story review is written to reports/ so what was cut and why is visible."""
     script = data.get("script")
@@ -906,161 +857,82 @@ def finalize_episode(data: dict, today: str) -> dict:
         "model": live_model(GEMINI_REVIEW_MODEL),
         "notes": notes,
         "proofread": data.get("proofread"),
+        "through_line": data.get("through_line"),
+        "bridges_used": data.get("bridges_used"),
+        "writers": data.get("writers"),
     }
-    runtime.atomic_write(ROOT / "reports" / f"{today}-editorial.json", json.dumps({
+    runtime.atomic_write(ROOT / "reports" / f"{key}-editorial.json", json.dumps({
         **data["editorial_review"],
         "segments": {k: {kk: v.get(kk) for kk in
-                         ("status", "reason", "stance", "headline", "key_points", "caution", "review")}
+                         ("status", "reason", "stance", "headline", "key_points", "caution",
+                          "review", "edits", "model")}
                      for k, v in sorted(stories.items(), key=lambda kv: int(kv[0]))},
     }, ensure_ascii=False, indent=2))
     return data
 
 
-def main() -> int:
-    llm.start_run()
+def show_notes(articles: list[dict], data: dict) -> str:
+    """The episode description: the first takeaway, then each story's Hebrew
+    headline above the link to its source."""
+    first = (data.get("digest_summary") or [{}])[0].get("key_takeaway") or "Weekly Gaming Digest"
+    kept = data.get("kept")
+    headlines = {}
+    if kept is not None:
+        for pos, i in enumerate(kept):
+            headlines[pos] = ((data.get("segments") or {}).get(str(i)) or {}).get("headline", "")
+    items = []
+    for pos, a in enumerate(articles):
+        credited = [a] + a.get("_also", [])
+        head = headlines.get(pos)
+        label = f"<strong>{xml_escape(head)}</strong><br/>" if head else ""
+        links = "; ".join(
+            f'<a href="{xml_escape(c["url"], {chr(34): "&quot;"})}">{xml_escape(c["title"])}</a> '
+            f'<em>({xml_escape(c.get("source", ""))})</em>' for c in credited)
+        items.append(f"<li>{label}{links}</li>")
+    return (f"<p>{xml_escape(first)}</p><p><strong>Sources ({len(articles)}):</strong></p>"
+            f"<ol>{''.join(items)}</ol>")
+
+
+def publish_episode(articles: list[dict], data: dict, key: str, today: str,
+                    week_history: list | None = None) -> None:
+    """Voice, assemble, and publish the finished script: digest, audio, feed, state,
+    memory, run report. `key` names the saved work (the target Monday); `today` is
+    the publication date and names the files. Raises on any failure; nothing is
+    marked published until every file is written."""
     EPISODES.mkdir(parents=True, exist_ok=True)
     DIGESTS.mkdir(parents=True, exist_ok=True)
     ASSETS_DIR.mkdir(exist_ok=True)
-
     state = json.loads(STATE_FILE.read_text()) if STATE_FILE.exists() else {}
     done: set[str] = set(state.get("processed", []))
 
-    # NOT "+ '-v2'": that suffix was a one-off manual fix (see CHANGELOG,
-    # 2026-09-02 guid incident) for republishing an ALREADY-LIVE date under
-    # a fresh RSS guid. Baking it into every run here would permanently
-    # name every future episode "-v2" -- build_feed()'s regex-based date
-    # parsing (also from that incident) supports any suffix or none, so a
-    # plain date is exactly what a normal, first-time weekly run needs.
-    today = dt.datetime.now(dt.timezone.utc).date().isoformat()
-
-    # Idempotence guard, which is what makes an automatic retry safe: the
-    # workflow fires a few times on Monday so a bad Gemini day heals
-    # itself without anyone noticing it, and every firing after a
-    # successful one has to be a cheap no-op rather than a second episode
-    # for the same date. Set FORCE_REGENERATE=1 to rebuild a date on
-    # purpose (as on 2026-08-31, when an episode had to be regenerated
-    # after a selection bug).
-    force = os.environ.get("FORCE_REGENERATE", "").lower() in {"1", "true", "yes"}
-    if publication_complete(today) and not force:
-        log(f"episode for {today} already exists; nothing to do. "
-            "(set FORCE_REGENERATE=1 to rebuild it deliberately)")
-        return 0
-    if force:
-        checkpoint.clear(today)
-    earlier = recent_episode(today)
-    if earlier and dt.date.fromisoformat(today).weekday() != 0 and not force:
-        log(f"this week already has an episode ({earlier}); a catch-up run has nothing to do.")
-        return 0
-
-    # Resume first, before spending anything. An earlier attempt today may have
-    # finished some or all of the stories (each is checkpointed the moment it
-    # is done), so a retry pays only for what is missing. See checkpoint.py.
-    adopted = checkpoint.adopt_recent(today)
-    if adopted:
-        log(f"continuing the unfinished episode of {adopted} (a catch-up run)")
-    resumed = checkpoint.load_content(today)
-    if resumed:
-        articles, data = resumed
-        source_health.record(data.get("source_alerts", []))
-        log(f"resuming from checkpoint: {len(articles)} articles, "
-            f"{len(data.get('segments') or {})} stories written, "
-            f"{len(data.get('script') or [])} script turns assembled")
-    else:
-        from discovery import select
-        articles = select()
-        data = {}
-        if not articles:
-            log("No articles cleared relevance threshold. Exiting clean.")
-            state["last_run"] = today
-            runtime.atomic_write(STATE_FILE, json.dumps(state, indent=2, ensure_ascii=False))
-            return 0
-        # Save the selection itself: scoring is ~5 paid calls, and a run that
-        # fails before its first story finishes must not buy it again.
-        data = {"segments": {}}
-        checkpoint.save_content(today, articles, data)
-
-    # 1. The stories, one call each (segments.py). Skipped when the checkpoint
-    # already holds the assembled script. The checkpoint always keeps the full
-    # selection: which stories survive review is recorded in data["kept"] as
-    # indexes into it.
-    selected = articles
-    if not data.get("script"):
-        built = produce_script(selected, today, memory.load_recent_context(), data.get("segments"))
-        data = {**built, "source_alerts": source_health.pending_alerts(),
-                # Explicitly False: a resumed run knows the intro is still owed
-                # and a legacy checkpoint without the key never gets a second greeting.
-                "intro_done": False,
-                # Same idea for the proofreading pass (proofread.py): a legacy
-                # checkpoint without the key, whose speech may already be cached,
-                # is never re-proofread, so its cached chunks stay valid.
-                "proofread_done": False}
-        checkpoint.save_content(today, selected, data)
-
-    # The intro is written LAST, once the stories it previews exist. Never
-    # raises (it falls back to a plain welcome), so this cannot fail a run.
-    if data.get("intro_done") is False:
-        data = add_intro(data)
-        checkpoint.save_content(today, selected, data)
-
-    # Proofreading: one call over the whole episode, after the intro so it reads
-    # what the listener hears. Never raises; see proofread.py.
-    if data.get("proofread_done") is False:
-        data["script"], data["proofread"] = proofread.proofread_episode(
-            data["script"], call=lambda *a, **k: gemini_json_quota(*a, **k),
-            model=GEMINI_CREATIVE_MODEL, lang=LANG, log=log)
-        data["proofread_done"] = True
-        checkpoint.save_content(today, selected, data)
-
-    data = finalize_episode(data, today)
-
-    # Stories that did not survive review are not part of the published episode.
-    kept = data.get("kept")
-    articles = [a for i, a in enumerate(selected) if kept is None or i in kept]
-
     episode_title = data.get("episode_title", "Weekly Gaming Digest")
     full_title = show_title(episode_title)
-
-    # 2. Save Digest & Script
     runtime.atomic_write(DIGESTS / f"{today}.md", render_digest_md(data, articles, today, full_title))
-    script_text = "\n".join(f"{turn['speaker']}: {turn['text']}" for turn in data["script"])
-    runtime.atomic_write(DIGESTS / f"{today}-script.md", script_text)
+    runtime.atomic_write(DIGESTS / f"{today}-script.md",
+                         "\n".join(f"{t['speaker']}: {t['text']}" for t in data["script"]))
 
-    # 3. Audio Synthesis via Gemini TTS + Ducking Jingle Assembly
-    wav_path = EPISODES / f"{today}.wav"
-    mp3_path = EPISODES / f"{today}.mp3"
-    synthesize_audio(data["script"], wav_path, mp3_path, date=today)
+    wav_path, mp3_path = EPISODES / f"{today}.wav", EPISODES / f"{today}.mp3"
+    synthesize_audio(data["script"], wav_path, mp3_path, date=key)
     duration = get_duration(mp3_path)
     words = script_quality.count_words(data["script"])
     wpm = round(words / max(duration - 7, 1) * 60, 1)
     if not 65 <= wpm <= 230:
         raise RuntimeError(f"Audio duration is implausible for script ({wpm} words/min); inspect before publication")
 
-    # 4. Save Metadata & Update RSS
-    first_para = data["digest_summary"][0]["key_takeaway"] if data.get("digest_summary") else "Weekly Gaming Digest"
-    credited = []
-    for a in articles:
-        credited.extend([a] + a.get("_also", []))
-    notes_links = "".join(f'<li><a href="{xml_escape(a["url"], {chr(34): "&quot;"})}">{xml_escape(a["title"])}</a> <em>({xml_escape(a.get("source", ""))})</em></li>' for a in credited)
-    notes = f"<p>{xml_escape(first_para)}</p><p><strong>Sources ({len(articles)}):</strong></p><ol>{notes_links}</ol>"
-
-    runtime.atomic_write(mp3_path.with_suffix(".json"),
-        json.dumps({
-            "title": full_title,
-            "summary": first_para,
-            "notes": notes,
-            "duration": duration,
-            "sources": [{"title": a["title"], "url": a["url"], "source": a.get("source", "")} for a in articles]
-        }, ensure_ascii=False, indent=2),
-    )
-
+    first_para = (data.get("digest_summary") or [{}])[0].get("key_takeaway") or "Weekly Gaming Digest"
+    runtime.atomic_write(mp3_path.with_suffix(".json"), json.dumps({
+        "title": full_title, "summary": first_para, "notes": show_notes(articles, data),
+        "duration": duration,
+        "sources": [{"title": a["title"], "url": a["url"], "source": a.get("source", "")} for a in articles],
+    }, ensure_ascii=False, indent=2))
     build_feed()
 
     state["processed"] = sorted(done | {a["url"] for a in articles})
     state["last_run"] = today
     runtime.atomic_write(STATE_FILE, json.dumps(state, indent=2, ensure_ascii=False))
 
-    # Written only after everything above succeeded, so a failed run never
-    # leaves a phantom episode in the show's memory.
+    # Only after everything above succeeded, so a failed run never leaves a
+    # phantom episode in the show's memory.
     entry = memory.build_entry(full_title, data.get("digest_summary", []))
     entry["date"] = today
     memory.append_entry(entry)
@@ -1068,32 +940,31 @@ def main() -> int:
     published_files = [mp3_path, mp3_path.with_suffix(".json"), DIGESTS / f"{today}.md",
                        DIGESTS / f"{today}-script.md", ROOT / "feed.xml"]
     runtime.atomic_write(ROOT / "reports" / f"{today}-run.json", json.dumps({
-        "status": "complete", "date": today, "words": words, "duration_seconds": duration,
-        "words_per_minute": wpm, "models": {"text": live_model(GEMINI_TEXT_MODEL),
-        "scoring": live_model(GEMINI_SCORING_MODEL), "creative": live_model(GEMINI_CREATIVE_MODEL),
-        "review": live_model(GEMINI_REVIEW_MODEL),
-        "tts": live_model(TTS_MODEL)}, "usage": USAGE_LOG,
+        "status": "complete", "date": today, "target": key, "words": words,
+        "duration_seconds": duration, "words_per_minute": wpm,
+        "models": {"scoring": live_model(GEMINI_SCORING_MODEL), "creative": live_model(GEMINI_CREATIVE_MODEL),
+                   "review": live_model(GEMINI_REVIEW_MODEL), "tts": live_model(TTS_MODEL)},
+        "usage": llm.USAGE_LOG, "calls": llm.usage_report(),
+        "week": week_history or [],
         "elapsed_seconds": round(time.monotonic() - llm._run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),
         "editorial": data.get("editorial_review"),
         "artifacts": {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                       for path in published_files},
         "sources": [{"title": a["title"], "url": a["url"], "published": a.get("published"),
-                     "score": a.get("_score"), "airtime": a.get("_airtime")} for a in articles],
+                     "score": a.get("_score")} for a in articles],
     }, ensure_ascii=False, indent=2, default=str))
-
-    # Last thing, deliberately: while any of the above can still fail, the
-    # checkpoint is the thing that makes the retry cheap. Only a fully
-    # published episode has earned the right to delete it.
-    checkpoint.clear(today)
-
+    checkpoint.clear(key)
     log("Finished run cleanly using Gemini API.")
-    return 0
+
+
+def main() -> int:
+    """One daily run of the weekly pipeline: see stages.py."""
+    import stages
+    return stages.run(dt.datetime.now(dt.timezone.utc).date())
+
 
 if __name__ == "__main__":
     from urllib.parse import urlsplit
-    if urlsplit(BASE_URL).scheme not in {"https", "http"} or not urlsplit(BASE_URL).netloc:
-        sys.exit("PODCAST_BASE_URL must be an absolute http(s) URL")
     runtime.load_profile()
-    preflight()
     sys.exit(main())

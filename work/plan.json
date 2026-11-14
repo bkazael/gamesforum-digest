@@ -1,0 +1,45 @@
+{
+ "target": "2026-11-16",
+ "published": null,
+ "holds": 0,
+ "held": null,
+ "last_error": null,
+ "history": [
+  {
+   "date": "2026-11-14",
+   "did": [
+    "selected 3 stories",
+    "wrote 3 stories"
+   ],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-13",
+    "today": {},
+    "this_run": {},
+    "daily_budget": 16
+   }
+  },
+  {
+   "date": "2026-11-14",
+   "did": [],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-13",
+    "today": {},
+    "this_run": {},
+    "daily_budget": 16
+   }
+  },
+  {
+   "date": "2026-11-14",
+   "did": [],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-13",
+    "today": {},
+    "this_run": {},
+    "daily_budget": 16
+   }
+  }
+ ]
+}

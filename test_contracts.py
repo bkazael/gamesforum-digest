@@ -59,6 +59,7 @@ try:
     import sources as S
     import memory as M
     import source_health as SH
+    import llm
     check("gamesforum_pipeline, discovery, sources, memory, source_health all import together", True)
 except Exception as e:
     check("gamesforum_pipeline, discovery, sources, memory, source_health all import together",
@@ -68,10 +69,10 @@ except Exception as e:
 
 check("discovery.select exists and is callable",
       hasattr(D, "select") and callable(D.select))
-check("gamesforum_pipeline.gemini_json exists (no leftover claude_json alias)",
-      hasattr(P, "gemini_json") and not hasattr(P, "claude_json"))
-check("discovery imports gemini_json directly (not the old claude_json alias)",
-      D.gemini_json is P.gemini_json)
+check("llm.gemini_json exists and the pipeline re-exports it (no leftover claude_json alias)",
+      hasattr(llm, "gemini_json") and P.gemini_json is llm.gemini_json and not hasattr(P, "claude_json"))
+check("discovery scores through llm.call_model, the one fallback chain (no private copy of it)",
+      hasattr(D, "llm") and not hasattr(D, "gemini_json") and not hasattr(D, "_pipeline"))
 
 # ---------------------------------------------------------------- 2. schema casing
 
@@ -166,11 +167,13 @@ with tempfile.TemporaryDirectory() as tmp:
     # a feature here, since it also proves the checked-in config is valid
     # TOML with the sections select() expects.
     D.STATE_FILE = tmp_path / "state.json"
+    D.SEEN_FILE = tmp_path / "seen.json"
+    D.YIELD_FILE = tmp_path / "reports" / "source_yield.json"
     D.LEDGER = tmp_path / "ledger"
     SH.ALERTS_FILE = tmp_path / "source_alerts.json"
     D.collect = fake_collect
     D.fetch_article = fake_fetch_article
-    D.gemini_json = fake_gemini_json_score
+    llm.gemini_json = fake_gemini_json_score
 
     try:
         chosen = D.select()
@@ -192,12 +195,25 @@ check("the already-fetched (email) candidate survived stage 3 without a re-fetch
       email_survivor is not None and email_survivor["text"] == FIXTURE_TEXT,
       f"got {email_survivor}")
 
-# ---------------------------------------------------------------- 4. select() -> produce_script()
+# ---------------------------------------------------------------- 4. select() -> the script
 
 def turns(n, text="פתיחה"):
     """A well-formed, terminated conversation of n turns."""
     return [{"speaker": P.SPEAKER_A if i % 2 == 0 else P.SPEAKER_B,
              "text": f"{text} מספר {i} בשיחה על הכתבה."} for i in range(n)]
+
+import segments as SG
+
+
+def produce_script(articles, today, memory_context, resume, min_segments=None):
+    """What stages.py does over several days, here all at once (segments.build_episode)."""
+    return SG.build_episode(
+        articles, call=lambda p, s, *, model, tries, timeout: llm.call_model(
+            p, s, model=model, tries=tries, timeout=timeout),
+        save=lambda d: None, models={"creative": llm.GEMINI_CREATIVE_MODEL, "review": llm.GEMINI_REVIEW_MODEL},
+        speakers=(P.SPEAKER_A, P.SPEAKER_B), lang=P.LANG, memory_context=memory_context, resume=resume,
+        log=lambda m: None, min_segments=min_segments or SG.MIN_SEGMENTS)
+
 
 def model_stub(script=None, key_points=None, issues=None, log=None):
     """gemini_json stand-in that answers each kind of call by its schema:
@@ -215,14 +231,14 @@ def model_stub(script=None, key_points=None, issues=None, log=None):
             return {"issues": issues or []}
         if "episode_title" in props:
             return {"episode_title": "פרק לדוגמה", "outro": [
-                {"speaker": P.SPEAKER_A, "text": "זה היה הפרק, תודה שהאזנתם."}]}
+                {"speaker": P.SPEAKER_A, "text": "זה היה הפרק, תודה שהאזנתם."}], "bridges": []}
         raise AssertionError(f"unexpected schema {sorted(props)}")
     return fn
 
 if chosen:
-    P.gemini_json = model_stub()
+    llm.gemini_json = model_stub()
     try:
-        data = P.produce_script(chosen, "2026-08-31-test", "", None, min_segments=1)
+        data = produce_script(chosen, "2026-08-31-test", "", None, min_segments=1)
         check("produce_script() runs on select()'s real output",
               bool(data.get("script")), "empty script")
         check("every selected story becomes a segment of the script",
@@ -261,8 +277,8 @@ if chosen:
     # (a) repairable: restored locally, one request for the story.
     broken = turns(15) + [{"speaker": P.SPEAKER_A, "text": "ההוצאות ירדו בארה"}]
     log = []
-    P.gemini_json = model_stub(script=broken, log=log)
-    d = P.produce_script(one, "2026-10-05-test", "", None, min_segments=1)
+    llm.gemini_json = model_stub(script=broken, log=log)
+    d = produce_script(one, "2026-10-05-test", "", None, min_segments=1)
     check("a repairable cut-off acronym costs no rewrite", len(story_calls(log)) == 1, f"{len(story_calls(log))} story calls")
     check("...and the acronym is restored in the output",
           any(t["text"] == "ההוצאות ירדו בארה״ב." for t in d["script"]))
@@ -278,8 +294,8 @@ if chosen:
         if "key_points" in (schema or {}).get("properties", {}):
             out["script"] = seq.pop(0)
         return out
-    P.gemini_json = two_drafts
-    d = P.produce_script(one, "2026-10-05-test", "", None, min_segments=1)
+    llm.gemini_json = two_drafts
+    d = produce_script(one, "2026-10-05-test", "", None, min_segments=1)
     calls = story_calls(log)
     check("an unrecognised cut-off turn costs exactly one rewrite", len(calls) == 2, f"{len(calls)} story calls")
     check("the rewrite prompt names what was wrong and carries the draft",
@@ -289,8 +305,8 @@ if chosen:
 
     # (c) broken both times: never a third story request, never an exception.
     log = []
-    P.gemini_json = model_stub(script=bad, log=log)
-    d = P.produce_script(one, "2026-10-05-test", "", None, min_segments=1)
+    llm.gemini_json = model_stub(script=bad, log=log)
+    d = produce_script(one, "2026-10-05-test", "", None, min_segments=1)
     check("a story that stays broken is capped at two requests", len(story_calls(log)) == 2, f"{len(story_calls(log))} calls")
     check("...and still ships, with the fragment closed instead of left hanging",
           any(t["text"].endswith(".") and t["text"].startswith("הם הכריזו") for t in d["script"]))
@@ -299,164 +315,141 @@ if chosen:
 
 if chosen:
     log = []
-    P.gemini_json = model_stub(log=log)
-    P.produce_script(chosen[:1], "2026-08-31-test", "- פרק מ-2026-08-24 (Fixture Prior): כלום.", None, min_segments=1)
+    llm.gemini_json = model_stub(log=log)
+    produce_script(chosen[:1], "2026-08-31-test", "- פרק מ-2026-08-24 (Fixture Prior): כלום.", None, min_segments=1)
     check("a non-empty memory_context is inserted into the actual prompt sent to Gemini",
           any("Fixture Prior" in p for p in story_calls(log)))
     log = []
-    P.gemini_json = model_stub(log=log)
-    P.produce_script(chosen[:1], "2026-08-31-test", "", None, min_segments=1)
+    llm.gemini_json = model_stub(log=log)
+    produce_script(chosen[:1], "2026-08-31-test", "", None, min_segments=1)
     check("an empty memory_context adds no PREVIOUS EPISODES section",
           not any("PREVIOUS EPISODES" in p for p in story_calls(log)))
 
-# ---------------------------------------------------------------- 6. resuming must not re-buy anything
+# ---------------------------------------------------------------- 6. a finished script is voiced and published without a single model call
 #
-# The expensive half of a run is text generation: discovery's scoring
-# batches, the dedupe confirmations, and the one big script call. When a
-# checkpoint for today exists, main() must reach audio synthesis without
-# touching any of them. Getting this wrong is silent and expensive -- the
-# episode still comes out correct, it just quietly costs a second full set
-# of Gemini calls, which is exactly how 2026-09-14/15 burned a whole day's
-# free-tier allowance producing one episode. So this asserts on the thing
-# that actually matters: that those functions are never called at all.
+# The expensive half of a run is text generation. When the week's script is already
+# saved (work/), the Monday run must reach the voice without touching the model or the
+# selection. Getting this wrong is silent and expensive: the episode still comes out
+# right, it just spends a second set of quota. So this asserts the thing that matters:
+# the model and select() are never called.
 
 import checkpoint as CP
+import datetime as _dt
+import stages as ST
 
-with tempfile.TemporaryDirectory() as tmp:
-    tmp_path = pathlib.Path(tmp)
-    saved = (CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE,
-             P.synthesize_audio, P.get_duration, P.build_feed, P.gemini_json)
-    CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
-    P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
-    P.STATE_FILE = tmp_path / "state.json"
-    P.ASSETS_DIR = tmp_path / "assets"
+MON = _dt.date(2026, 11, 23)
+TUE = _dt.date(2026, 11, 24)
 
-    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
-    CP.save_content(today, FIXTURE_CANDIDATES,
-                    {"episode_title": "Resumed", "digest_summary": [],
-                     "intro_done": True,
-                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום חברים."},
-                                {"speaker": P.SPEAKER_B, "text": "שלום."}]})
 
-    def boom(*_a, **_k):
-        raise AssertionError("resumed run made a Gemini text call")
-
-    audio_calls = []
-    P.gemini_json = boom
-    def fake_resume_audio(_script, _wav, mp3_path, date=None):
-        audio_calls.append(date)
-        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
-    P.synthesize_audio = fake_resume_audio
-    P.get_duration = lambda *_a, **_k: 8
-    def fake_build_feed():
-        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
-    P.build_feed = fake_build_feed
-    P.memory.append_entry = lambda *_a, **_k: None
-    import discovery as _D
-    _D.select = boom
-
-    try:
-        rc = P.main()
-        check("main() resumes from a checkpoint without any Gemini text call", rc == 0)
-        check("a resumed run still reaches audio synthesis",
-              audio_calls == [today], f"synthesize_audio called with {audio_calls}")
-        check("a fully successful resumed run clears its checkpoint",
-              CP.load_content(today) is None)
-    except AssertionError as e:
-        check("main() resumes from a checkpoint without any Gemini text call",
-              False, str(e))
-    except Exception as e:
-        check("main() resumes from a checkpoint without raising",
-              False, f"{type(e).__name__}: {e}")
-    finally:
-        (CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE,
-         P.synthesize_audio, P.get_duration, P.build_feed, P.gemini_json) = saved
-
-# ---------------------------------------------------------------- 7. the idempotence guard
-#
-# weekly-digest.yml fires three times on Monday so a transient Gemini
-# failure heals itself. That is only safe if a firing after a successful
-# one is a no-op -- otherwise Monday quietly produces three episodes. But
-# the guard's *other* failure direction is far worse: if it triggers when
-# it shouldn't, no episode is ever published again and everything still
-# reports success. Both directions are checked here.
-
-with tempfile.TemporaryDirectory() as tmp:
-    tmp_path = pathlib.Path(tmp)
-    saved = (P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR, CP.CHECKPOINT_DIR)
+def _env(tmp_path):
+    saved = (CP.WORK_DIR, CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR,
+             P.synthesize_audio, P.get_duration, P.build_feed, P.preflight, llm.gemini_json,
+             P.memory.append_entry, ST.FEEDBACK_FILE)
+    CP.WORK_DIR, CP.CHECKPOINT_DIR = tmp_path / "work", tmp_path / ".checkpoint"
     P.EPISODES, P.DIGESTS, P.ROOT = tmp_path / "ep", tmp_path / "dg", tmp_path
     P.STATE_FILE, P.ASSETS_DIR = tmp_path / "state.json", tmp_path / "assets"
-    CP.CHECKPOINT_DIR = tmp_path / ".checkpoint"
-    P.EPISODES.mkdir(parents=True, exist_ok=True)
-    today = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).date().isoformat()
+    ST.FEEDBACK_FILE = tmp_path / "feedback.md"
+    P.preflight = lambda audio=True: None
+    P.memory.append_entry = lambda *_a, **_k: None
+    return saved
 
-    import discovery as _D
-    real_select = _D.select
+
+def _restore(saved):
+    (CP.WORK_DIR, CP.CHECKPOINT_DIR, P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR,
+     P.synthesize_audio, P.get_duration, P.build_feed, P.preflight, llm.gemini_json,
+     P.memory.append_entry, ST.FEEDBACK_FILE) = saved
+
+
+import discovery as _D
+_real_select, _real_observe = _D.select, _D.observe_sources
+
+
+def boom(*_a, **_k):
+    raise AssertionError("a model call or a selection was made")
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = pathlib.Path(tmp)
+    saved = _env(tmp_path)
+    audio_calls = []
+    llm.gemini_json = boom
+    _D.select, _D.observe_sources = boom, lambda: 0
+
+    def fake_audio(_script, _wav, mp3_path, date=None):
+        audio_calls.append(date)
+        pathlib.Path(mp3_path).write_bytes(b"fake MP3")
+
+    P.synthesize_audio = fake_audio
+    P.get_duration = lambda *_a, **_k: 20
+    P.build_feed = lambda: (P.ROOT / "feed.xml").write_text("feed")
+    CP.save_content(MON.isoformat(), FIXTURE_CANDIDATES,
+                    {"episode_title": "Resumed", "digest_summary": [{"title": "t", "key_takeaway": "k"}],
+                     "intro_done": True, "proofread_done": True, "kept": [0, 1, 2],
+                     "script": [{"speaker": P.SPEAKER_A, "text": "שלום חברים, " * 10 + "."},
+                                {"speaker": P.SPEAKER_B, "text": "שלום."}],
+                     "segments": {str(i): {"status": "ok", "headline": "כותרת"} for i in range(3)}})
+    try:
+        rc = ST.run(MON)
+        check("a Monday run with a saved script publishes without any model call or selection", rc == 0)
+        check("...and reaches audio synthesis under the week's key", audio_calls == [MON.isoformat()],
+              f"synthesize_audio called with {audio_calls}")
+        check("...and clears the week's saved work", CP.load_content(MON.isoformat()) is None)
+        check("the episode is credited with the three kept stories",
+              len(__import__("json").loads((P.EPISODES / f"{MON.isoformat()}.json").read_text())["sources"]) == 3)
+    except AssertionError as e:
+        check("a Monday run with a saved script makes no model call", False, str(e))
+    except Exception as e:
+        check("a Monday run with a saved script runs", False, f"{type(e).__name__}: {e}")
+    finally:
+        _D.select, _D.observe_sources = _real_select, _real_observe
+        _restore(saved)
+
+# ---------------------------------------------------------------- 7. a published week is never rebuilt
+#
+# The daily runs fire Friday to Wednesday. A run after a published episode must be a
+# cheap no-op, and the guard's other failure direction is far worse: if it triggers when
+# it shouldn't, no episode is ever published again and everything still looks green.
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = pathlib.Path(tmp)
+    saved = _env(tmp_path)
+    P.EPISODES.mkdir(parents=True, exist_ok=True)
     select_calls = []
     _D.select = lambda *a, **k: select_calls.append(1) or []
-
+    _D.observe_sources = lambda: 0
+    llm.gemini_json = boom
     try:
-        # Today's episode already on disk -> stop before spending anything.
-        (P.EPISODES / f"{today}.mp3").write_bytes(b"already published")
-        (P.EPISODES / f"{today}.json").write_text("{}")
-        P.DIGESTS.mkdir(parents=True, exist_ok=True)
-        (P.DIGESTS / f"{today}.md").write_text("digest")
-        (P.DIGESTS / f"{today}-script.md").write_text("script")
-        (P.ROOT / "feed.xml").write_text(f"bens-digest-{today}</guid>")
-        P.STATE_FILE.write_text(__import__("json").dumps({"last_run": today}))
-        (P.ROOT / "reports").mkdir()
-        __import__("hashlib")
-        required = [P.EPISODES / f"{today}.mp3", P.EPISODES / f"{today}.json",
-                    P.DIGESTS / f"{today}.md", P.DIGESTS / f"{today}-script.md", P.ROOT / "feed.xml"]
-        hashes = {str(path.relative_to(P.ROOT)): __import__("hashlib").sha256(path.read_bytes()).hexdigest()
-                  for path in required}
-        (P.ROOT / "reports" / f"{today}-run.json").write_text(
-            __import__("json").dumps({"status": "complete", "artifacts": hashes}))
-        rc = P.main()
-        check("a rerun after a published episode exits 0 without re-running discovery",
-              rc == 0 and not select_calls, f"rc={rc}, select calls={len(select_calls)}")
-
-        # FORCE_REGENERATE must still allow a deliberate rebuild -- that is
-        # how 2026-08-31's bad episode was replaced.
-        select_calls.clear()
-        os.environ["FORCE_REGENERATE"] = "1"
-        P.main()
-        check("FORCE_REGENERATE=1 overrides the guard and runs discovery again",
-              len(select_calls) == 1, f"select calls={len(select_calls)}")
-        os.environ.pop("FORCE_REGENERATE")
-
-        # And with no episode for today, the guard must stay out of the way.
-        select_calls.clear()
-        (P.EPISODES / f"{today}.mp3").unlink()
-        P.main()
-        check("with no episode yet, the guard does not block the run",
-              len(select_calls) == 1, f"select calls={len(select_calls)}")
+        (P.EPISODES / f"{MON.isoformat()}.mp3").write_bytes(b"already published")
+        (P.EPISODES / f"{MON.isoformat()}.json").write_text("{}")
+        check("a Tuesday run after Monday's episode exits 0 without discovery",
+              ST.run(TUE) == 0 and not select_calls, f"select calls={len(select_calls)}")
+        check("an orphan mp3 without its metadata is not a publication",
+              P.episode_published_for(_dt.date(2026, 11, 30)) is None)
+        (P.EPISODES / f"{MON.isoformat()}.json").unlink()
+        check("...so a Tuesday run with only an orphan mp3 goes on to select",
+              ST.run(TUE) == 0 and len(select_calls) == 1, f"select calls={len(select_calls)}")
     except Exception as e:
-        check("idempotence guard behaves", False, f"{type(e).__name__}: {e}")
+        check("the published-week guard behaves", False, f"{type(e).__name__}: {e}")
     finally:
-        _D.select = real_select
-        os.environ.pop("FORCE_REGENERATE", None)
-        (P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR, CP.CHECKPOINT_DIR) = saved
+        _D.select, _D.observe_sources = _real_select, _real_observe
+        _restore(saved)
 
-# ---------------------------------------------------------------- 7b. catch-up runs on Tuesday and Wednesday
-# A Monday lost to an outage is retried on Tue/Wed; those runs must do nothing
-# when the week already has an episode, and must not block next Monday.
+# ---------------------------------------------------------------- 7b. which episode belongs to which week
 
 with tempfile.TemporaryDirectory() as tmp:
     saved_ep = P.EPISODES
     P.EPISODES = pathlib.Path(tmp)
     try:
-        (P.EPISODES / "2026-11-09.mp3").write_bytes(b"x")
-        check("a Tuesday after a published Monday sees the week's episode",
-              P.recent_episode("2026-11-10") == "2026-11-09")
-        check("the next Monday is not blocked by last week's episode",
-              P.recent_episode("2026-11-16") is None)
-        (P.EPISODES / "2026-11-09.mp3").unlink()
-        (P.EPISODES / "2026-11-11.mp3").write_bytes(b"x")
-        check("...nor by a Wednesday catch-up episode five days earlier",
-              P.recent_episode("2026-11-16") is None)
-        check("today's own episode is not 'recent' (the idempotence guard handles it)",
-              P.recent_episode("2026-11-11") is None)
+        for d in ("2026-11-09", "2026-11-11"):
+            (P.EPISODES / f"{d}.mp3").write_bytes(b"x")
+            (P.EPISODES / f"{d}.json").write_text("{}")
+        check("an episode published on the Monday belongs to that week", P.episode_published_for(_dt.date(2026, 11, 9)) == "2026-11-09")
+        check("a Wednesday catch-up still counts for its week", P.episode_published_for(_dt.date(2026, 11, 9)) is not None
+              and P.episode_published_for(_dt.date(2026, 11, 11)) == "2026-11-11")
+        check("the next week's Monday is not covered by last week's episodes",
+              P.episode_published_for(_dt.date(2026, 11, 16)) is None)
+        check("an episode from before the target Monday never counts",
+              P.episode_published_for(_dt.date(2026, 11, 12)) is None)
     finally:
         P.EPISODES = saved_ep
 

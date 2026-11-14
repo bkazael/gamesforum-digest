@@ -36,9 +36,9 @@ jobs:
     # people to ignore it.
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -80,7 +80,7 @@ jobs:
 
       - name: Upload smoke output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: validation-${{ inputs.mode }}-${{ github.run_attempt }}
           path: |

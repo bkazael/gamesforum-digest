@@ -1,33 +1,21 @@
 #!/usr/bin/env python3
 """
-Resume support for a partially-completed run.
+Saved work for the episode being built.
 
-The problem this exists to solve, concretely: on 2026-09-21 the pipeline
-spent ~3 minutes on discovery and scoring (4 batched Gemini calls), ~2
-minutes generating a 1915-word script (1 more Gemini call), then
-successfully synthesized 2 of 4 audio chunks -- and threw *all* of it away
-because chunk 3 hung and the CI step hit its timeout. The next attempt
-would have started from zero and spent the same quota again. That is also
-exactly how 2026-09-14/15 burned through a whole day's free-tier request
-allowance on a single episode: two full attempts, one published episode.
+Two kinds of state, kept in two places on purpose:
 
-So: each expensive stage writes its result under CHECKPOINT_DIR, keyed by
-the episode date, the moment it succeeds. A later run for the same date
-picks up whatever is already there and only does what's missing. A run
-that finishes cleanly calls clear() and leaves nothing behind.
+  WORK_DIR (`work/`, committed to git by the daily run)
+      The week's text work: the selected articles, the plan, every story, the
+      assembled script. Small JSON, visible in the repository, and it survives
+      across the days the episode takes. It is what makes "write three stories
+      today, three tomorrow" possible.
 
-Design notes:
-  - Keyed by date, so yesterday's half-finished run can never be mistaken
-    for today's. A new day starts genuinely fresh.
-  - Audio chunks are stored as raw PCM, indexed by position, because
-    synthesize_audio() concatenates them in order -- a chunk is only
-    reusable if we know exactly where it belongs.
-  - Nothing here may raise into the caller's happy path: a corrupt or
-    unreadable checkpoint means "no checkpoint", never a failed run. The
-    worst case has to stay "redo the work", which is just today's
-    behaviour.
-  - CHECKPOINT_DIR is gitignored. It is scratch state for one episode in
-    flight, not project history.
+  CHECKPOINT_DIR (`.checkpoint/`, kept in the GitHub Actions cache, gitignored)
+      Synthesized audio chunks (tens of MB of PCM). Only the publish day needs
+      them, to survive a failed ffmpeg or a timeout without paying for speech again.
+
+Keyed by the episode's target date. Nothing here may raise into the caller's
+happy path: a corrupt or unreadable file means "nothing saved", never a failed run.
 """
 
 from __future__ import annotations
@@ -39,10 +27,11 @@ import runtime
 
 ROOT = runtime.OUTPUT_ROOT
 CHECKPOINT_DIR = ROOT / ".checkpoint"
+WORK_DIR = ROOT / "work"
 
 
 def _content_path(date: str) -> pathlib.Path:
-    return CHECKPOINT_DIR / f"{date}-content.json"
+    return WORK_DIR / f"{date}-content.json"
 
 
 def _chunk_path(date: str, index: int) -> pathlib.Path:
@@ -76,7 +65,7 @@ def save_content(date: str, articles: list[dict], data: dict) -> None:
     text token.
     """
     try:
-        CHECKPOINT_DIR.mkdir(exist_ok=True)
+        WORK_DIR.mkdir(exist_ok=True)
         runtime.atomic_write(_content_path(date),
             json.dumps({"articles": articles, "data": data},
                        ensure_ascii=False, indent=2, default=_json_default),
@@ -105,33 +94,6 @@ def load_content(date: str) -> tuple[list[dict], dict] | None:
         return articles, data
     except Exception:
         return None
-
-
-def adopt_recent(date: str, days: int = 3) -> str | None:
-    """Take over the unfinished episode of a day in the last `days`.
-
-    A Tuesday or Wednesday catch-up run (weekly-digest.yml) continues Monday's
-    paid work instead of buying it again: the selection and every finished
-    story move to today's name. Returns the adopted date, or None. Speech
-    chunks are not moved; they are keyed by their text and are cheap next to
-    the stories.
-    """
-    import datetime as _dt
-    if _content_path(date).exists():
-        return None
-    today = _dt.date.fromisoformat(date)
-    for path in sorted(CHECKPOINT_DIR.glob("????-??-??-content.json"), reverse=True):
-        try:
-            earlier = _dt.date.fromisoformat(path.name[:10])
-        except ValueError:
-            continue
-        if 0 < (today - earlier).days <= days:
-            try:
-                path.replace(_content_path(date))
-                return earlier.isoformat()
-            except OSError:
-                return None
-    return None
 
 
 def save_chunk(date: str, index: int, pcm: bytes, identity: str | None = None) -> None:
@@ -166,13 +128,13 @@ def load_chunk(date: str, index: int, identity: str | None = None) -> bytes | No
 
 
 def clear(date: str) -> None:
-    """Drop every checkpoint for `date`. Call only after a full success."""
+    """Drop every saved file for `date`. Call only after a full success."""
     try:
-        for path in CHECKPOINT_DIR.glob(f"{date}-*"):
-            path.unlink(missing_ok=True)
-        # Tidy the directory away too once it has nothing left in it, so a
-        # healthy repo has no .checkpoint/ lying around at all.
+        path = _content_path(date)
+        path.unlink(missing_ok=True)
+        for p in CHECKPOINT_DIR.glob(f"{date}-*"):
+            p.unlink(missing_ok=True)
         if CHECKPOINT_DIR.exists() and not any(CHECKPOINT_DIR.iterdir()):
             shutil.rmtree(CHECKPOINT_DIR, ignore_errors=True)
-    except Exception:
+    except Exception:                                   # noqa: BLE001
         pass

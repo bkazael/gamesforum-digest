@@ -1,0 +1,23 @@
+name: Weekly check (is there an episode?)
+
+# The one alert. The daily runs retry on their own, so a red run on a normal day
+# would only be noise; this check, late on the last chance day, fails (and so emails
+# the owner) only if the week's episode does not exist.
+on:
+  schedule:
+    - cron: "43 21 * * 3"      # Wednesday 21:43 UTC, 14:43 Pacific
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python check_week.py

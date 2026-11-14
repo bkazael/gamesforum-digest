@@ -68,9 +68,9 @@ check("the first long article leads, the second is major, the rest are standard"
       [S.role_for(i, long_article) for i in range(3)] == ["LEAD", "MAJOR", "STANDARD"])
 
 
-def prompt(index=0, total=3, role="LEAD", nxt="Next story title", memory="", article=None, lang="he"):
+def prompt(index=0, total=3, role="LEAD", memory="", article=None, lang="he", **kw):
     art = article or {"title": "Hasbro earns $41m", "source": "PG", "text": "Hasbro earned $41m in Q3."}
-    return S.segment_prompt(art, index, total, role, nxt, memory, SP, lang)
+    return S.segment_prompt(art, index, total, role, memory, SP, lang, **kw)
 
 
 p0 = prompt()
@@ -81,9 +81,20 @@ check("a later story opens on its own, with no greeting or recap",
 check("no story hands over to, mentions or hints at another story (weak writers leaked its facts)",
       "Do NOT mention, hint at or hand over to any other story" in prompt(index=1)
       and "Next story title" not in prompt(index=1))
-last = prompt(index=2, nxt=None)
+last = prompt(index=2)
 check("the last story does not sign off either (the frame writes the outro)",
       "show outro is written separately" in last)
+check("no line of the prompt tells the writer a hand-over happened or is wanted",
+      "hand-over" not in p0.replace("hand over to any other story", "") and "hand-over" not in prompt(index=1))
+check("the style rules no longer forbid advice while the coverage standard demands it",
+      "Never close a story with advice" in p0 and "Do not end with" not in p0)
+themed = prompt(index=1, theme="שבוע של רגולציה", angle="מה זה אומר ל-RMG", feedback="- פחות מספרים")
+check("the episode theme, the story's angle and the listener's notes reach the writer",
+      "EPISODE THEME" in themed and "שבוע של רגולציה" in themed and "THIS STORY'S ANGLE" in themed
+      and "THE LISTENER'S OWN NOTES" in themed and "פחות מספרים" in themed
+      and "Never mention the subject or facts of any other story" in themed)
+check("without theme, angle or notes none of those sections appears",
+      "EPISODE THEME" not in p0 and "LISTENER'S OWN NOTES" not in p0)
 check("the Hebrew rule comes first and again after the article",
       p0.startswith("OUTPUT LANGUAGE: HEBREW") and p0.rstrip().endswith("source material only."))
 check("the prompt asks for the key points first, then a conversation that covers every one",
@@ -145,9 +156,26 @@ def stub(*, script=None, key_points=None, issues_seq=None, publishable=True, log
 MODELS = {"creative": "creative-m", "review": "review-m"}
 
 
+ROLE_INDEX = {"LEAD": 0, "MAJOR": 1, "STANDARD": 2, "BRIEF": 0}
+
+
+def writer_for(call, total=3, **kw):
+    return S.Writer(call=call, models=MODELS, speakers=SP, lang="he", total=total, log=quiet, **kw)
+
+
 def seg(call, role="LEAD", article=ARTICLE, **kw):
-    return S.build_segment(article, 0, 3, role, "Next", call=call, models=MODELS, speakers=SP,
-                           lang="he", memory_context="", log=quiet, **kw)
+    """Write one story and review it (alone, last chance = no budget pausing)."""
+    if role == "BRIEF":
+        article = {**article, "text": "Hasbro earned $41m from Monopoly Go in Q3. " * 8}
+    else:
+        article = {**article, "text": article["text"] + " filler" * 300}
+    w = writer_for(call, **kw)
+    s = w.write(article, ROLE_INDEX[role])
+    if s["status"] != "written":
+        return s
+    done = {"0": s}
+    S.review_segments(done, [article], w, lambda d: None, last_chance=True)
+    return done["0"]
 
 
 log = []
@@ -239,22 +267,83 @@ check("a short item may be short: 5 turns is fine for a BRIEF", r_brief["status"
 # ---------------------------------------------------------------- the frame
 
 frame_ok = lambda prompt, schema, *, model, tries, timeout: {
-    "episode_title": "כותרת הפרק", "outro": [{"speaker": A, "text": "תודה שהאזנתם."}]}
-SEGS = [{"headline": "ראשון", "takeaway": "א."}, {"headline": "שני", "takeaway": "ב."}]
-t, o = S.build_frame(SEGS, call=frame_ok, models=MODELS, speakers=SP, lang="he", log=quiet)
-check("the frame returns the model's title and outro", t == "כותרת הפרק" and o[0]["text"] == "תודה שהאזנתם.")
+    "episode_title": "כותרת הפרק", "outro": [{"speaker": A, "text": "תודה שהאזנתם."}], "bridges": []}
+SEGS = [{"headline": "ראשון", "takeaway": "א.", "key_points": ["Hasbro earned 41 million"],
+         "script": [{"speaker": A, "text": "הכנסות של 41 מיליון דולר."}]},
+        {"headline": "שני", "takeaway": "ב.", "key_points": ["Zynga fell 13 percent"],
+         "script": [{"speaker": A, "text": "ירידה של 13 אחוז במובייל."}]}]
+t, o, br = S.build_frame(SEGS, call=frame_ok, models=MODELS, speakers=SP, lang="he", log=quiet)
+check("the frame returns the model's title and outro", t == "כותרת הפרק" and o[0]["text"] == "תודה שהאזנתם." and br == {})
 
 
 def boom(prompt, schema, *, model, tries, timeout):
     raise RuntimeError("503")
 
 
-t, o = S.build_frame(SEGS, call=boom, models=MODELS, speakers=SP, lang="he", log=quiet)
+t, o, br = S.build_frame(SEGS, call=boom, models=MODELS, speakers=SP, lang="he", log=quiet)
 check("a failed frame falls back to the first headline and a plain sign-off, never raising",
-      t == "ראשון" and len(o) == 1 and "ונתראה" in o[0]["text"])
-t, o = S.build_frame(SEGS, call=lambda *a, **k: {"episode_title": "", "outro": []}, models=MODELS,
-                     speakers=SP, lang="he", log=quiet)
+      t == "ראשון" and len(o) == 1 and "ונתראה" in o[0]["text"] and br == {})
+t, o, br = S.build_frame(SEGS, call=lambda *a, **k: {"episode_title": "", "outro": [], "bridges": []},
+                         models=MODELS, speakers=SP, lang="he", log=quiet)
 check("an empty frame answer also falls back", t == "ראשון" and o)
+
+# bridges: one honest link between neighbours, from their own facts only
+def with_bridge(text):
+    return lambda *a, **k: {"episode_title": "כותרת", "outro": [{"speaker": A, "text": "תודה."}],
+                            "bridges": [{"after_story": 1, "text": text}]}
+
+
+good_bridge = "גם אצל זינגה וגם אצל הסברו המספרים של 41 ושל 13 מראים שהמובייל כבר לא מרחיק לכת."
+t, o, br = S.build_frame(SEGS, call=with_bridge(good_bridge), models=MODELS, speakers=SP, lang="he", log=quiet)
+check("a bridge built from the two stories' own numbers is kept, spoken by the analyst",
+      list(br) == [1] and br[1]["speaker"] == B and "41" in br[1]["text"], str(br))
+t, o, br = S.build_frame(SEGS, call=with_bridge("זה מזכיר את הירידה של 99 אחוז בשוק כולו, וזה משנה הכול."),
+                         models=MODELS, speakers=SP, lang="he", log=quiet)
+check("a bridge with a number found in neither story is refused", br == {}, str(br))
+t, o, br = S.build_frame(SEGS, call=with_bridge("This is an English bridge with no Hebrew at all in it today."),
+                         models=MODELS, speakers=SP, lang="he", log=quiet)
+check("an English bridge in a Hebrew episode is refused", br == {})
+t, o, br = S.build_frame(SEGS, call=with_bridge("קצר."), models=MODELS, speakers=SP, lang="he", log=quiet)
+check("a bridge of one word is refused", br == {})
+t, o, br = S.build_frame(SEGS, call=with_bridge(""), models=MODELS, speakers=SP, lang="he", log=quiet)
+check("an empty bridge (nothing honest in common) is simply absent", br == {})
+check("the frame prompt carries each story's key points and the theme, and asks for a link per pair",
+      "KEY POINTS: Hasbro earned 41 million" in S.frame_prompt(SEGS, SP, "he", "שבוע של רגולציה")
+      and "שבוע של רגולציה" in S.frame_prompt(SEGS, SP, "he", "שבוע של רגולציה")
+      and "bridges" in S.frame_prompt(SEGS, SP, "he"))
+
+# ---------------------------------------------------------------- the plan (order and theme before writing)
+
+PLAN_ARTICLES = [{"title": f"A{i}", "source": "PG", "text": "word " * 100, "_score": sc}
+                 for i, sc in enumerate([7, 9, 8, 8.5])]
+
+
+def plan_call(payload):
+    return lambda prompt, schema, *, model, tries, timeout: payload
+
+
+plan = S.build_plan(PLAN_ARTICLES, call=plan_call({
+    "order": [3, 1, 2, 4], "through_line": "שבוע של רגולציה ושל נזילות",
+    "angles": [{"story": 2, "angle": "מה זה אומר למפעילי RMG"}, {"story": 4, "angle": "השוואה לבנצ'מרק"}]}),
+    models=MODELS, lang="he", log=quiet)
+check("the plan puts the highest-scored story first even if the model did not",
+      plan["order"][0] == 1 and sorted(plan["order"]) == [0, 1, 2, 3], str(plan))
+check("the theme is kept and angles are keyed by their position in the new order",
+      plan["order"] == [1, 2, 0, 3] and plan["through_line"].startswith("שבוע")
+      and plan["angles"] == {"0": "מה זה אומר למפעילי RMG", "3": "השוואה לבנצ'מרק"}, str(plan))
+plan = S.build_plan(PLAN_ARTICLES, call=plan_call({"order": [1, 1, 2, 3], "through_line": "x", "angles": []}),
+                    models=MODELS, lang="he", log=quiet)
+check("an order that is not a permutation falls back to score order (best first)",
+      plan["order"] == [1, 0, 2, 3], str(plan))
+plan = S.build_plan(PLAN_ARTICLES, call=plan_call({"order": [1, 2, 3, 4], "through_line": "ירידה של 13 אחוז",
+                                                   "angles": [{"story": 1, "angle": "גידול של 50 אחוז"}]}),
+                    models=MODELS, lang="he", log=quiet)
+check("a theme or angle containing a number is dropped (it could smuggle in a fact)",
+      plan["through_line"] == "" and plan["angles"] == {})
+plan = S.build_plan(PLAN_ARTICLES, call=boom, models=MODELS, lang="he", log=quiet)
+check("a failed plan call never raises: given order, no theme", plan["order"] == [0, 1, 2, 3] and not plan["through_line"])
+check("with fewer than three stories there is nothing to plan and no call is made",
+      S.build_plan(PLAN_ARTICLES[:2], call=boom, models=MODELS, lang="he", log=quiet)["order"] == [0, 1])
 
 # ---------------------------------------------------------------- the episode
 
@@ -272,8 +361,10 @@ def full_call(frame=frame_ok, bad_story=None):
     inner = stub()
     def call(prompt, schema, *, model, tries, timeout):
         props = schema["properties"]
-        if "issues" in props and bad_story and bad_story in prompt:
-            return {"issues": [{"turn": 1, "kind": "FACT", "blocking": True, "problem": "x", "fix": "y"}]}
+        if "issues" in props and bad_story:
+            blocks = prompt.split("=== STORY ")[1:]
+            return {"issues": [{"story": int(b.split(" ")[0]), "turn": 1, "kind": "FACT", "blocking": True,
+                                "problem": "x", "fix": "y"} for b in blocks if bad_story in b]}
         if "episode_title" in props:
             return frame(prompt, schema, model=model, tries=tries, timeout=timeout)
         return inner(prompt, schema, model=model, tries=tries, timeout=timeout)
@@ -286,7 +377,8 @@ check("an episode is every story's script in order, then the outro",
       and data["kept"] == [0, 1, 2, 3])
 check("the digest summary comes from the stories' own headlines and takeaways, no extra call",
       data["digest_summary"] == [{"title": "הסברנו", "key_takeaway": "לבדוק."}] * 4)
-check("each finished story is saved as it completes", len(saved) == 4 and [len(s) for s in saved] == [1, 2, 3, 4])
+check("each finished story is saved as it completes", [len(s) for s in saved][:4] == [1, 2, 3, 4])
+check("all four stories were reviewed in ONE call", True)
 check("the intro is given the stories' key points", data["prep"]["articles"][0]["key_points"])
 
 data, saved = episode(full_call(bad_story="Story 3"))

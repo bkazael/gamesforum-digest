@@ -35,6 +35,7 @@ import difflib
 import re
 import unicodedata
 
+import llm
 import script_quality
 import speech as speech_tools
 
@@ -72,6 +73,7 @@ REVIEW_SCHEMA = {
             "items": {
                 "type": "OBJECT",
                 "properties": {
+                    "story": {"type": "INTEGER"},
                     "turn": {"type": "INTEGER"},
                     "kind": {"type": "STRING",
                              "enum": ["FACT", "ATTRIBUTION", "OFF_TOPIC", "TYPO", "OTHER"]},
@@ -82,7 +84,7 @@ REVIEW_SCHEMA = {
                     # nothing else changed.
                     "replacement": {"type": "STRING"},
                 },
-                "required": ["turn", "kind", "blocking", "problem", "fix"],
+                "required": ["story", "turn", "kind", "blocking", "problem", "fix"],
             },
         },
     },
@@ -94,14 +96,35 @@ FRAME_SCHEMA = {
     "properties": {
         "episode_title": {"type": "STRING"},
         "outro": {"type": "ARRAY", "items": TURN_SCHEMA},
+        # One short link between neighbouring stories: after_story N sits between
+        # story N and story N+1 (numbers as in the prompt, from 1).
+        "bridges": {"type": "ARRAY", "items": {
+            "type": "OBJECT",
+            "properties": {"after_story": {"type": "INTEGER"}, "text": {"type": "STRING"}},
+            "required": ["after_story", "text"],
+        }},
     },
-    "required": ["episode_title", "outro"],
+    "required": ["episode_title", "outro", "bridges"],
+}
+
+PLAN_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "order": {"type": "ARRAY", "items": {"type": "INTEGER"}},
+        "through_line": {"type": "STRING"},
+        "angles": {"type": "ARRAY", "items": {
+            "type": "OBJECT",
+            "properties": {"story": {"type": "INTEGER"}, "angle": {"type": "STRING"}},
+            "required": ["story", "angle"],
+        }},
+    },
+    "required": ["order", "through_line", "angles"],
 }
 
 def schemas(speakers: tuple[str, str]) -> dict:
     """The three response schemas with the hosts' names as the only legal speakers."""
     out = {"segment": copy.deepcopy(SEGMENT_SCHEMA), "review": copy.deepcopy(REVIEW_SCHEMA),
-           "frame": copy.deepcopy(FRAME_SCHEMA)}
+           "frame": copy.deepcopy(FRAME_SCHEMA), "plan": copy.deepcopy(PLAN_SCHEMA)}
     for turn in (out["segment"]["properties"]["script"]["items"],
                  out["frame"]["properties"]["outro"]["items"]):
         turn["properties"]["speaker"]["enum"] = list(speakers)
@@ -216,8 +239,9 @@ HOW THEY TALK
 - Questions are short, plain, one clause. Never a compound interview question.
 - Do not open turns with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן) -- respond by
   adding to what was just said or questioning it.
-- Do not end with "operators should ..." / "developers must ..."; end on an observation, a
-  number, an open question, or the hand-over.
+- Never close a story with advice ("operators should ...", "developers must ..."). What an
+  operator could check or test is said inside the conversation, as a plain observation or
+  a question; the story itself ends on an observation, a number or an open question.
 - A company's own announcement, an executive's byline, or a vendor promoting its product is
   ATTRIBUTED, never endorsed ("according to the company", "by their own numbers"); never
   repeat its slogan as an insight. Say plainly what the article does not show.
@@ -234,31 +258,43 @@ HOW THEY TALK
 """
 
 
-def segment_prompt(article: dict, index: int, total: int, role: str, next_title: str | None,
-                   memory_context: str, speakers: tuple[str, str], lang: str) -> str:
+def segment_prompt(article: dict, index: int, total: int, role: str, memory_context: str,
+                   speakers: tuple[str, str], lang: str, theme: str = "", angle: str = "",
+                   feedback: str = "") -> str:
     a, b = speakers
     top, bottom, lang_inst = _lang(lang)
     r = ROLES[role]
     lo, hi = r["turns"]
-    first, last = index == 0, index == total - 1
+    first = index == 0
     if first:
         position = (f"The welcome and a preview are recorded separately, BEFORE this segment. "
                     f"Do not greet or introduce the show or the hosts. {a}'s first turn opens "
                     "the story directly, in one natural sentence a listener who just heard "
                     "the preview can follow.")
     else:
-        position = (f"The previous story has just ended with a hand-over. Open this story "
-                    f"directly in one natural sentence naming it. {a} speaks first. No "
-                    "greeting, no recap, no 'let's move on'.")
-    # No hand-over to the next story, last story or not. Twice (2026-11-10 and
-    # 11-11) a hand-over line carried a fact or the subject of the NEXT story into
-    # this one -- "Take-Two fell 13%" inside a Monopoly Go story -- and the fact
-    # reviewer rightly cut or flagged it; weaker writers cannot name a topic
-    # without borrowing from it. Each story opens by naming itself (see POSITION),
-    # which is all the transition the listener needs.
+        position = ("The previous story has just ended; the editor may add one short linking "
+                    f"line before your first turn. Open this story directly in one natural "
+                    f"sentence naming it. {a} speaks first. No greeting, no recap, no "
+                    "'let's move on'.")
+    # The writer never links to another story: twice (2026-11-10 and 11-11) a
+    # hand-over carried a fact of the NEXT story into this one ("Take-Two fell
+    # 13%" inside a Monopoly Go story). The link between stories is written
+    # afterwards, from verified key points only (build_frame), and validated.
     ending = ("End plainly on this story's own point: an observation, a number, or an open "
               "question. Do NOT mention, hint at or hand over to any other story, and do not "
               "sign off: the next story opens itself and the show outro is written separately.")
+    context = ""
+    if theme:
+        context += ("\nEPISODE THEME (context for tone only; add no fact from it): " + theme + "\n")
+    if angle:
+        context += ("THIS STORY'S ANGLE (what to emphasise for this listener; every fact still "
+                    "comes only from the article): " + angle + "\n")
+    if theme or angle:
+        context += ("Where it is natural, one phrase may tie this story to the theme. Never "
+                    "mention the subject or facts of any other story.\n")
+    if feedback:
+        context += ("\nTHE LISTENER'S OWN NOTES ON RECENT EPISODES (taste and pacing only, never "
+                    "facts; follow them where they apply):\n" + feedback + "\n")
     memory = ""
     if memory_context:
         memory = ("\nPREVIOUS EPISODES (continuity on ongoing STORYLINES only; mention one "
@@ -275,7 +311,7 @@ def segment_prompt(article: dict, index: int, total: int, role: str, next_title:
 THIS SEGMENT: story {index + 1} of {total}, {r['text']}.
 POSITION: {position}
 {ending}
-{memory}{partial}
+{context}{memory}{partial}
 DO THESE IN ORDER
 1. publishable: false ONLY if the article is pure advertising or event promotion with no
    listener value. Otherwise true.
@@ -309,46 +345,52 @@ SOURCE: {article.get('source', '')}
 {bottom}"""
 
 
-def review_prompt(article: dict, script: list[dict], suspects: list[str],
-                  speakers: tuple[str, str]) -> str:
-    turns = "\n".join(f"{i}. {t['speaker']}: {t['text']}" for i, t in enumerate(script, 1))
-    sus = ""
-    if suspects:
-        sus = ("\nThese numbers are spoken but appear nowhere in the article text; check each "
-               "carefully (a correct derived figure such as a difference is fine, an "
-               "invented one is a FACT error): " + ", ".join(suspects) + "\n")
-    return f"""You are the fact editor of a podcast. Below is ONE article and the two-host
-conversation written from it. Report only real problems.
+def review_prompt(entries: list[dict], speakers: tuple[str, str]) -> str:
+    """One review for several stories at once. Each entry: {"story": n (from 1),
+    "article": {...}, "script": [...], "suspects": [...]}."""
+    blocks = []
+    for e in entries:
+        sus = ""
+        if e.get("suspects"):
+            sus = ("\nThese numbers are spoken but appear nowhere in this article's text; check "
+                   "each carefully (a correct derived figure such as a difference is fine, an "
+                   "invented one is a FACT error): " + ", ".join(e["suspects"]) + "\n")
+        art = e["article"]
+        blocks.append(f"=== STORY {e['story']} ===\nARTICLE: {art['title']} ({art.get('source', '')})\n"
+                      f"{art['text']}\n{sus}\nCONVERSATION (turn numbers are for this story):\n"
+                      f"{_numbered(e['script'])}\n")
+    return f"""You are the fact editor and copy editor of a podcast. Below are several stories.
+Each has ONE article and the two-host conversation written from it. Check every conversation
+against ITS OWN article only, and report only real problems. Put the story number in "story"
+and the turn number within that story in "turn".
 
-FACT (blocking when it materially misleads): the conversation states something the article
+FACT (blocking when it materially misleads): the conversation states something its article
 does not support: a wrong or invented number, a wrong comparison base, a wrong party, a
 proposal presented as law, a result presented as certain.
 ATTRIBUTION (blocking when it materially misleads): a company's or vendor's own claim
 presented as established fact.
-OFF_TOPIC (never blocking): a turn that brings in something unrelated to this article
+OFF_TOPIC (never blocking): a turn that brings in something unrelated to its article
 (another game, company or story). Name the turn; it will be deleted.
 TYPO (never blocking): a misspelt or wrong word. Put the WHOLE turn again in "replacement"
 with only that word corrected, nothing else changed.
 OTHER: anything else (wording, repetition). Never blocking.
 
 Opinions and analysis by the hosts are fine when they are framed as opinion. Return an
-empty list if the conversation is faithful. For each issue give the turn number, and a
-specific correction.
-{sus}
-ARTICLE: {article['title']} ({article.get('source', '')})
-{article['text']}
+empty list if every conversation is faithful.
 
-CONVERSATION:
-{turns}
-"""
+{chr(10).join(blocks)}"""
 
 
-def frame_prompt(segments: list[dict], speakers: tuple[str, str], lang: str) -> str:
+def frame_prompt(segments: list[dict], speakers: tuple[str, str], lang: str,
+                 through_line: str = "") -> str:
     a, b = speakers
     top, bottom, lang_inst = _lang(lang)
-    stories = "\n".join(f"{n}. {s['headline']} -- {s['takeaway']}"
-                        for n, s in enumerate(segments, 1))
-    return f"""{top}Two jobs for a weekly mobile-games podcast hosted by {a} (anchor) and {b} (analyst).
+    stories = "\n".join(
+        f"{n}. {s['headline']} -- {s['takeaway']}\n   KEY POINTS: "
+        + " | ".join(s.get("key_points") or [])
+        for n, s in enumerate(segments, 1))
+    theme = f"\nTHE EPISODE'S THEME: {through_line}\n" if through_line else ""
+    return f"""{top}Three jobs for a weekly mobile-games podcast hosted by {a} (anchor) and {b} (analyst).
 
 1. episode_title: a short, catchy, specific title for this episode (under 12 words) from the
    stories below. No hype words, no clickbait, no day of the week.
@@ -356,12 +398,46 @@ def frame_prompt(segments: list[dict], speakers: tuple[str, str], lang: str) -> 
    most worth acting on, in plain spoken sentences, {b} adds one short human remark, and
    {a} signs off with thanks for listening and a goodbye until next week. Calm tone, no
    hype, no exclamations. Do not introduce the hosts. Use only what is in the stories.
-
+3. bridges: the stories were written separately, so the listener needs a thread between
+   them. For each pair of neighbouring stories (after_story N = between story N and N+1)
+   write ONE spoken turn by {b}, 12-30 words, that links them honestly: a shared pattern, a
+   contrast, a consequence. Use ONLY facts in the KEY POINTS of those two stories; no number
+   and no company name that is not in them. It must make sense on its own, must not repeat
+   what was just said, and ends the previous story's mood while pointing at the next without
+   announcing it ("בוא נעבור" is not a link). If two neighbouring stories have nothing honest
+   in common, return an empty text for that bridge. Provide a bridge entry for every pair.
+{theme}
 STORIES, in running order:
 {stories}
 
 {lang_inst}
 Never use the ASCII double-quote character (") in the text; every turn ends with full punctuation.
+{bottom}"""
+
+
+def plan_prompt(articles: list[dict], lang: str) -> str:
+    top, bottom, _ = _lang(lang)
+    lines = []
+    for n, art in enumerate(articles, 1):
+        gist = " ".join((art.get("text") or "").split()[:70])
+        lines.append(f"{n}. [{art.get('source', '')}, score {art.get('_score', '?')}] "
+                     f"{art['title']}\n   {gist}")
+    return f"""{top}You are the producer of a weekly mobile-games podcast for the owner of a
+casual / hybrid-casual / real-money-skill-games company. These stories were selected for
+this week's episode. Decide how to tell them as ONE episode rather than a list.
+
+1. order: all story numbers, in running order. The highest-scored story opens; after that
+   group stories that belong together (the same theme, the same kind of event) next to each
+   other, and put a lighter or more surprising story where the episode needs relief. Use
+   every number exactly once.
+2. through_line: one short sentence in the output language naming what this week's stories
+   have in common or what the week says about the industry. No numbers, no company names.
+3. angles: for each story, one short sentence in the output language on what to emphasise
+   for THIS listener (a decision, a risk, a benchmark, a competitor move), and, if it is
+   real, how it relates to the theme. No numbers.
+
+STORIES:
+{chr(10).join(lines)}
 {bottom}"""
 
 
@@ -476,20 +552,80 @@ def apply_review_edits(script: list[dict], issues: list[dict], floor: int,
     return script, done
 
 
-def build_segment(article: dict, index: int, total: int, role: str, next_title: str | None,
-                  *, call, models: dict, speakers: tuple[str, str], lang: str,
-                  memory_context: str, log) -> dict:
-    """Write, check, review and (once) repair one story. Never returns a segment
-    that failed review: that one comes back with status 'dropped'."""
-    tag = f"[story {index + 1}/{total}]"
-    sch = schemas(speakers)
-    base = segment_prompt(article, index, total, role, next_title, memory_context, speakers, lang)
+# ---------------------------------------------------------------- the plan (before writing)
 
-    def write(extra: str = "") -> dict:
-        raw = call(base + extra, sch["segment"], model=models["creative"],
-                   tries=SEGMENT_TRIES, timeout=SEGMENT_TIMEOUT)
-        script, structural = _clean_script(raw.get("script"), speakers)
-        script, _ = speech_tools.translate_hebrew_terms(script, lang)
+_DIGIT = re.compile(r"\d")
+
+
+def build_plan(articles: list[dict], *, call, models: dict, lang: str, log) -> dict:
+    """How the episode is told as one piece: the running order (highest-scored story
+    first, related stories next to each other), a one-sentence theme, and an angle
+    per story. One small call. Anything unusable falls back to score order, no theme.
+
+    Theme and angles carry no numbers, so they cannot smuggle a fact into a story.
+    Returns {"order": [indexes into `articles`], "through_line": str,
+    "angles": {position (str): angle}}.
+    """
+    n = len(articles)
+    plan = {"order": list(range(n)), "through_line": "", "angles": {}}
+    if n < 3:
+        return plan
+    try:
+        raw = call(plan_prompt(articles, lang), schemas(("", ""))["plan"], model=models["review"],
+                   tries=SMALL_TRIES, timeout=150)
+    except Exception as e:                                      # noqa: BLE001
+        log(f"  plan failed ({type(e).__name__}); stories stay in score order, no theme")
+        return plan
+    try:
+        order = [int(x) - 1 for x in raw.get("order") or []]
+    except (TypeError, ValueError):
+        order = []
+    if sorted(order) != list(range(n)):
+        log("  plan: the order was not a permutation of the stories; keeping score order")
+        order = list(range(n))
+    best = max(range(n), key=lambda i: (articles[i].get("_score") or 0, -i))
+    if order[0] != best:
+        order.remove(best)
+        order.insert(0, best)
+    through = " ".join(str(raw.get("through_line") or "").split())
+    if _DIGIT.search(through) or len(through.split()) > 40:
+        through = ""
+    angles = {}
+    for item in raw.get("angles") or []:
+        try:
+            orig = int(item.get("story")) - 1
+            text = " ".join(str(item.get("angle") or "").split())
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if 0 <= orig < n and text and not _DIGIT.search(text) and len(text.split()) <= 45:
+            angles[str(order.index(orig))] = text
+    log(f"  plan: order {[i + 1 for i in order]}, theme: {through[:90] or '(none)'}")
+    return {"order": order, "through_line": through, "angles": angles}
+
+
+# ---------------------------------------------------------------- writing one story
+
+class Writer:
+    """Writes and rewrites single stories. Everything a story needs besides its
+    article is held here, so the stage runner can write a few stories a day and
+    come back later for the rewrites."""
+
+    def __init__(self, *, call, models: dict, speakers: tuple[str, str], lang: str, total: int,
+                 memory_context: str = "", theme: str = "", angles: dict | None = None,
+                 feedback: str = "", log=print):
+        self.call, self.models, self.speakers, self.lang = call, models, speakers, lang
+        self.total, self.memory_context, self.theme = total, memory_context, theme
+        self.angles, self.feedback, self.log = angles or {}, feedback, log
+        self.sch = schemas(speakers)
+
+    def _generate(self, article: dict, index: int, extra: str = "") -> dict:
+        role = role_for(index, article)
+        base = segment_prompt(article, index, self.total, role, self.memory_context, self.speakers,
+                              self.lang, self.theme, self.angles.get(str(index), ""), self.feedback)
+        raw = self.call(base + extra, self.sch["segment"], model=self.models["creative"],
+                        tries=SEGMENT_TRIES, timeout=SEGMENT_TIMEOUT)
+        script, structural = _clean_script(raw.get("script"), self.speakers)
+        script, _ = speech_tools.translate_hebrew_terms(script, self.lang)
         script = [{**t, "text": strip_stray_script(t["text"])} for t in script]
         seg = {
             "publishable": bool(raw.get("publishable", True)),
@@ -499,80 +635,143 @@ def build_segment(article: dict, index: int, total: int, role: str, next_title: 
             "caution": str(raw.get("caution") or "").strip(),
             "takeaway": str(raw.get("takeaway") or "").strip(),
             "script": script,
+            "model": raw.get("_model"),
         }
-        seg["problems"] = structural + segment_problems(seg, role, speakers, lang)
+        seg["problems"] = structural + segment_problems(seg, role, self.speakers, self.lang)
         return seg
 
-    def revise_note(seg: dict, problems: list[str]) -> str:
-        return ("\n\nA PREVIOUS DRAFT OF THIS SEGMENT WAS NOT ACCEPTED because:\n- "
-                + "\n- ".join(problems[:6])
-                + "\nHere is that draft. Return the FULL segment again (all fields), keeping "
-                  "what was right and fixing every point above. No facts outside the "
-                  "article, no filler.\n\nPREVIOUS DRAFT:\n" + _numbered(seg["script"]))
-
-    seg = write()
-    log(f"  {tag} {len(seg['script'])} turns, {len(seg['key_points'])} key points")
-    if seg["problems"]:
-        for p in seg["problems"]:
-            log(f"  {tag} problem: {p}")
-        retry = write(revise_note(seg, seg["problems"]))
-        log(f"  {tag} after one rewrite: {len(retry['script'])} turns")
-        # Keep the better of the two: fewer problems, then more turns.
-        if (len(retry["problems"]), -len(retry["script"])) <= (len(seg["problems"]), -len(seg["script"])):
-            seg = retry
-    if seg["problems"]:
-        # Whatever is still malformed after one rewrite is closed with a full
-        # stop rather than shipped as a cut-off fragment.
-        seg["script"], _ = script_quality.close_remaining(seg["script"])
-    if not seg["publishable"]:
-        log(f"::warning::{tag} not publishable (promotion without listener value): {article['title'][:70]}")
-        return {**seg, "status": "dropped", "reason": "promotion without listener value"}
-    if not seg["script"]:
-        raise RuntimeError(f"{tag} came back with no script")
-
-    # Review against this article only: small, fast, and a lite model is enough.
-    for attempt in (1, 2):
-        suspects = unsupported_numbers(article["text"], seg["key_points"], seg["script"])
-        try:
-            review = call(review_prompt(article, seg["script"], suspects, speakers),
-                          sch["review"], model=models["review"], tries=SMALL_TRIES, timeout=150)
-            issues = [i for i in review.get("issues") or [] if isinstance(i, dict)]
-        except Exception as e:                                  # noqa: BLE001
-            # 2026-11-10: one reviewer outage ended a run whose stories were
-            # written. Without a review the free numbers check decides: a story
-            # that says a number found in neither its article nor its key points
-            # is cut, anything else ships with a note that it was not reviewed.
-            if suspects:
-                log(f"::warning::{tag} review unavailable and it says numbers not in the "
-                    f"article ({', '.join(suspects)}); cutting it")
-                return {**seg, "status": "dropped",
-                        "reason": f"unreviewed, unsupported numbers: {', '.join(suspects)}"}
-            log(f"::warning::{tag} review unavailable ({type(e).__name__}); its numbers all "
-                "match the article, keeping it unreviewed")
-            seg["review"] = [{"turn": 0, "kind": "OTHER", "blocking": False,
-                              "problem": "not reviewed (reviewer unavailable)", "fix": ""}]
-            break
-        blocking = [i for i in issues if i.get("blocking") and i.get("kind") in ("FACT", "ATTRIBUTION")]
-        seg["review"] = issues
-        for i in issues:
-            if not i.get("blocking"):
-                log(f"  {tag} note (turn {i.get('turn')}): {str(i.get('problem'))[:140]}")
-        if not blocking:
-            break
-        notes = [f"turn {i.get('turn')}: {i.get('problem')} -> {i.get('fix')}" for i in blocking]
-        for n in notes:
-            log(f"  {tag} blocking {'(rewriting)' if attempt == 1 else '(cutting the story)'}: {n[:160]}")
-        if attempt == 2:
-            return {**seg, "status": "dropped", "reason": "unresolved factual problem: " + "; ".join(notes)[:300]}
-        seg = {**write(revise_note(seg, notes)), "review": []}
+    def write(self, article: dict, index: int) -> dict:
+        """Write a story, with one rewrite if it fails the free checks. Status is
+        "written" (waiting for review) or "dropped"."""
+        tag = f"[story {index + 1}/{self.total}]"
+        seg = self._generate(article, index)
+        self.log(f"  {tag} {len(seg['script'])} turns, {len(seg['key_points'])} key points "
+                 f"({seg.get('model') or 'model unknown'})")
+        if seg["problems"]:
+            for p in seg["problems"]:
+                self.log(f"  {tag} problem: {p}")
+            retry = self._generate(article, index, revise_note(seg, seg["problems"]))
+            self.log(f"  {tag} after one rewrite: {len(retry['script'])} turns")
+            if (len(retry["problems"]), -len(retry["script"])) <= (len(seg["problems"]), -len(seg["script"])):
+                seg = retry
+        if seg["problems"]:
+            # Whatever is still malformed is closed with a full stop, not shipped cut off.
+            seg["script"], _ = script_quality.close_remaining(seg["script"])
+        if not seg["publishable"]:
+            self.log(f"::warning::{tag} not publishable (promotion without listener value): "
+                     f"{article['title'][:70]}")
+            return {**seg, "status": "dropped", "reason": "promotion without listener value"}
         if not seg["script"]:
-            raise RuntimeError(f"{tag} came back with no script after a fact rewrite")
-    seg["script"], seg["edits"] = apply_review_edits(
-        seg["script"], seg.get("review") or [], ROLES[role]["floor"], lambda m: log(f"{tag}{m}"))
-    return {**seg, "status": "ok"}
+            raise RuntimeError(f"{tag} came back with no script")
+        return {**seg, "status": "written"}
+
+    def rewrite(self, article: dict, index: int, seg: dict, notes: list[str]) -> dict:
+        new = self._generate(article, index, revise_note(seg, notes))
+        if not new["script"]:
+            raise RuntimeError(f"[story {index + 1}/{self.total}] came back with no script after a fact rewrite")
+        return {**new, "review": [], "status": "rewritten"}
 
 
-# ---------------------------------------------------------------- the frame
+def revise_note(seg: dict, problems: list[str]) -> str:
+    return ("\n\nA PREVIOUS DRAFT OF THIS SEGMENT WAS NOT ACCEPTED because:\n- "
+            + "\n- ".join(problems[:6])
+            + "\nHere is that draft. Return the FULL segment again (all fields), keeping "
+              "what was right and fixing every point above. No facts outside the "
+              "article, no filler.\n\nPREVIOUS DRAFT:\n" + _numbered(seg["script"]))
+
+
+# ---------------------------------------------------------------- one review for all stories
+
+def review_segments(done: dict, articles: list[dict], writer: Writer, save, *,
+                    last_chance: bool = False) -> None:
+    """Review every written story in ONE call, then act on it. `done` is mutated.
+
+    Statuses: written (waits for review) -> ok, or needs_rewrite (notes kept) ->
+    rewritten (waits for the second review) -> ok, or dropped. A story is rewritten
+    at most once. When the day's model budget runs out the stories keep their status
+    and the next run continues (GeminiQuotaExhausted is raised); on the last chance
+    day a missing review falls back to the free numbers check instead.
+    """
+    log, speakers = writer.log, writer.speakers
+    for _ in range(3):
+        # 1. rewrites owed from an earlier review
+        for k in sorted((k for k, v in done.items() if v["status"] == "needs_rewrite"), key=int):
+            i, seg = int(k), done[k]
+            try:
+                done[k] = writer.rewrite(articles[i], i, seg, seg.get("fix_notes") or [])
+            except llm.GeminiQuotaExhausted:
+                if not last_chance:
+                    raise
+                done[k] = {**seg, "status": "dropped", "reason": "unresolved factual problem: "
+                           + "; ".join(seg.get("fix_notes") or [])[:300]}
+            save(done)
+        waiting = sorted((int(k) for k, v in done.items() if v["status"] in ("written", "rewritten")))
+        if not waiting:
+            return
+        entries = [{"story": i + 1, "article": articles[i], "script": done[str(i)]["script"],
+                    "suspects": unsupported_numbers(articles[i]["text"], done[str(i)]["key_points"],
+                                                    done[str(i)]["script"])} for i in waiting]
+        try:
+            review = writer.call(review_prompt(entries, speakers), writer.sch["review"],
+                                 model=writer.models["review"], tries=SMALL_TRIES, timeout=240)
+            issues = [x for x in review.get("issues") or [] if isinstance(x, dict)]
+        except llm.GeminiQuotaExhausted:
+            if not last_chance:
+                raise
+            issues = None
+            log("::warning::review: no model budget left on the last day; falling back to the numbers check")
+        except Exception as e:                                  # noqa: BLE001
+            issues = None
+            log(f"::warning::review unavailable ({type(e).__name__}); falling back to the numbers check")
+        if issues is None:
+            # No reviewer: a story that says a number found in neither its article nor
+            # its key points is cut; anything else ships with a note that it was not reviewed.
+            for e in entries:
+                k, seg = str(e["story"] - 1), done[str(e["story"] - 1)]
+                if e["suspects"]:
+                    done[k] = {**seg, "status": "dropped",
+                               "reason": f"unreviewed, unsupported numbers: {', '.join(e['suspects'])}"}
+                else:
+                    seg["review"] = [{"turn": 0, "kind": "OTHER", "blocking": False,
+                                      "problem": "not reviewed (reviewer unavailable)", "fix": ""}]
+                    seg["script"], seg["edits"] = apply_review_edits(seg["script"], [], 0)
+                    done[k] = {**seg, "status": "ok"}
+            save(done)
+            return
+        by_story: dict[int, list[dict]] = {}
+        for x in issues:
+            try:
+                n = int(x.get("story") or (entries[0]["story"] if len(entries) == 1 else 0))
+            except (TypeError, ValueError):
+                continue
+            by_story.setdefault(n, []).append(x)
+        for e in entries:
+            k = str(e["story"] - 1)
+            seg, iss = done[k], by_story.get(e["story"], [])
+            seg["review"] = iss
+            tag = f"[story {e['story']}/{writer.total}]"
+            for x in iss:
+                if not x.get("blocking"):
+                    log(f"  {tag} note (turn {x.get('turn')}): {str(x.get('problem'))[:140]}")
+            blocking = [x for x in iss if x.get("blocking") and x.get("kind") in ("FACT", "ATTRIBUTION")]
+            if not blocking:
+                seg["script"], seg["edits"] = apply_review_edits(
+                    seg["script"], iss, ROLES[role_for(int(k), articles[int(k)])]["floor"],
+                    lambda m, t=tag: log(f"{t}{m}"))
+                done[k] = {**seg, "status": "ok"}
+                continue
+            notes = [f"turn {x.get('turn')}: {x.get('problem')} -> {x.get('fix')}" for x in blocking]
+            for nt in notes:
+                log(f"  {tag} blocking ({'cutting the story' if seg['status'] == 'rewritten' else 'rewriting'}): {nt[:160]}")
+            if seg["status"] == "rewritten":
+                done[k] = {**seg, "status": "dropped",
+                           "reason": "unresolved factual problem: " + "; ".join(notes)[:300]}
+            else:
+                done[k] = {**seg, "status": "needs_rewrite", "fix_notes": notes}
+        save(done)
+
+
+# ---------------------------------------------------------------- title, outro and the links between stories
 
 def fallback_outro(speakers: tuple[str, str], lang: str) -> list[dict]:
     a, b = speakers
@@ -581,65 +780,73 @@ def fallback_outro(speakers: tuple[str, str], lang: str) -> list[dict]:
     return [{"speaker": a, "text": "That is this week's episode. Thanks for listening, see you next week."}]
 
 
-def build_frame(segments: list[dict], *, call, models: dict, speakers: tuple[str, str],
-                lang: str, log) -> tuple[str, list[dict]]:
-    """Title and outro. Falls back to the first headline and a plain sign-off."""
+def validate_bridge(text: str, before: dict, after: dict, speaker: str, lang: str) -> dict | None:
+    """The link turn between two stories, or None. Its numbers must come from those
+    two stories, it must be short, spoken Hebrew, and one clean turn."""
+    turns, problems = _clean_script([{"speaker": speaker, "text": text}], (speaker,))
+    if problems or len(turns) != 1:
+        return None
+    turn = turns[0]
+    words = turn["text"].split()
+    if not 5 <= len(words) <= 45:
+        return None
+    pool = set()
+    for seg in (before, after):
+        pool |= numerals(" ".join(seg.get("key_points") or [])) | numerals(
+            " ".join(t["text"] for t in seg["script"]))
+    if numerals(turn["text"]) - pool:
+        return None
+    if lang == "he":
+        letters = re.findall(r"[A-Za-z\u05d0-\u05ea]", turn["text"])
+        if letters and sum(1 for c in letters if c >= "\u05d0") / len(letters) < 0.5:
+            return None
+    if turn["text"].strip().startswith(script_quality.AGREEMENT_OPENERS):
+        return None
+    turn["text"] = strip_stray_script(turn["text"])
+    return turn
+
+
+def build_frame(segs: list[dict], *, call, models: dict, speakers: tuple[str, str], lang: str,
+                log, through_line: str = "") -> tuple[str, list[dict], dict[int, dict]]:
+    """Title, outro and bridges, in one call. Returns (title, outro, bridges) where
+    bridges[k] is the turn to play before story k (0-based among `segs`, k >= 1).
+    A failed or unusable answer falls back to the first headline and a plain
+    sign-off, with no bridges."""
+    title, outro, bridges = segs[0]["headline"], fallback_outro(speakers, lang), {}
     try:
-        raw = call(frame_prompt(segments, speakers, lang), schemas(speakers)["frame"], model=models["review"],
-                   tries=SMALL_TRIES, timeout=150)
-        title = str(raw.get("episode_title") or "").strip()
-        outro, _ = _clean_script(raw.get("outro"), speakers)
-        outro, _ = speech_tools.translate_hebrew_terms(outro, lang)
-        outro, _ = script_quality.trim_agreement_openers(outro, keep=0)
-        if title and 1 <= len(outro) <= 6:
-            return title, outro
-        log("  frame: unusable title/outro; using the fallback")
+        raw = call(frame_prompt(segs, speakers, lang, through_line), schemas(speakers)["frame"],
+                   model=models["review"], tries=SMALL_TRIES, timeout=180)
     except Exception as e:                                      # noqa: BLE001
-        log(f"  frame failed ({type(e).__name__}: {e}); using the fallback title and outro")
-    return segments[0]["headline"], fallback_outro(speakers, lang)
+        log(f"  frame failed ({type(e).__name__}: {e}); using the fallback title and outro, no bridges")
+        return title, outro, bridges
+    got_title = str(raw.get("episode_title") or "").strip()
+    got_outro, _ = _clean_script(raw.get("outro"), speakers)
+    got_outro, _ = speech_tools.translate_hebrew_terms(got_outro, lang)
+    got_outro, _ = script_quality.trim_agreement_openers(got_outro, keep=0)
+    if got_title and 1 <= len(got_outro) <= 6:
+        title, outro = got_title, got_outro
+    else:
+        log("  frame: unusable title/outro; using the fallback")
+    for item in raw.get("bridges") or []:
+        try:
+            n = int(item.get("after_story"))
+        except (AttributeError, TypeError, ValueError):
+            continue
+        if not 1 <= n < len(segs) or n in bridges:
+            continue
+        turn = validate_bridge(str(item.get("text") or ""), segs[n - 1], segs[n], speakers[1], lang)
+        if turn:
+            bridges[n] = turn
+    log(f"  frame: {len(bridges)} of {max(len(segs) - 1, 0)} bridges kept")
+    return title, outro, bridges
 
 
-# ---------------------------------------------------------------- the episode
-
-def build_episode(articles: list[dict], *, call, save, models: dict, speakers: tuple[str, str],
-                  lang: str, memory_context: str, resume: dict | None, log,
-                  min_segments: int = MIN_SEGMENTS) -> dict:
-    """The script (without the intro) for `articles`, plus title and digest summary.
-
-    `resume` is the `segments` mapping of an earlier, interrupted attempt:
-    story index (as str) -> finished segment. `save(segments)` is called as
-    each story finishes. Raises if a story cannot be produced after the
-    patient retries (the finished ones are already saved), or if fewer than
-    `min_segments` stories survive review.
-    """
+def assemble_episode(done: dict, articles: list[dict], *, call, models: dict,
+                     speakers: tuple[str, str], lang: str, plan: dict | None, log,
+                     min_segments: int = MIN_SEGMENTS) -> dict:
+    """The script (without the intro) from finished stories: story turns with
+    bridges between them, then the outro; plus title and digest summary."""
     total = len(articles)
-    done: dict[str, dict] = {k: v for k, v in (resume or {}).items()
-                             if v.get("status") in ("ok", "dropped")}
-    todo = [i for i in range(total) if str(i) not in done]
-    if done:
-        log(f"  resuming: {len(done)} of {total} stories already written")
-
-    def job(i: int) -> dict:
-        nxt = articles[i + 1]["title"] if i + 1 < total else None
-        return build_segment(articles[i], i, total, role_for(i, articles[i]), nxt,
-                             call=call, models=models, speakers=speakers, lang=lang,
-                             memory_context=memory_context, log=log)
-
-    failure: Exception | None = None
-    with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as pool:
-        futures = {pool.submit(job, i): i for i in todo}
-        for fut in concurrent.futures.as_completed(futures):
-            i = futures[fut]
-            try:
-                done[str(i)] = fut.result()
-            except Exception as e:                              # noqa: BLE001
-                log(f"::warning::story {i + 1}/{total} failed: {type(e).__name__}: {e}")
-                failure = failure or e
-                continue
-            save(done)
-    if failure:
-        raise failure
-
     kept = [(i, done[str(i)]) for i in range(total) if done[str(i)]["status"] == "ok"]
     dropped = [(i, done[str(i)]) for i in range(total) if done[str(i)]["status"] == "dropped"]
     for i, s in dropped:
@@ -647,18 +854,23 @@ def build_episode(articles: list[dict], *, call, save, models: dict, speakers: t
     if len(kept) < min_segments:
         raise RuntimeError(f"Only {len(kept)} stories survived review (minimum {min_segments}); "
                            "refusing to publish a thin episode")
-
     segs = [s for _, s in kept]
-    title, outro = build_frame(segs, call=call, models=models, speakers=speakers, lang=lang, log=log)
-    script = [t for s in segs for t in s["script"]] + outro
+    through = (plan or {}).get("through_line", "")
+    title, outro, bridges = build_frame(segs, call=call, models=models, speakers=speakers,
+                                        lang=lang, log=log, through_line=through)
+    script: list[dict] = []
+    for k, seg in enumerate(segs):
+        if k in bridges:
+            script.append(bridges[k])
+        script += seg["script"]
+    script += outro
     script, trimmed = script_quality.trim_agreement_openers(script)
     if trimmed:
         log(f"  trimmed the leading agreement word from {trimmed} turn(s) (limit: two in the episode)")
-    script, replaced = speech_tools.translate_hebrew_terms(script, lang)
+    script, _ = speech_tools.translate_hebrew_terms(script, lang)
     final = script_quality.script_problems(script) + script_quality.script_style_problems(script, lang)
     for p in final:
         print(f"::warning::episode check: {p}", flush=True)
-
     return {
         "episode_title": title,
         "digest_summary": [{"title": s["headline"], "key_takeaway": s["takeaway"]} for s in segs],
@@ -666,7 +878,52 @@ def build_episode(articles: list[dict], *, call, save, models: dict, speakers: t
         "segments": done,
         "kept": [i for i, _ in kept],
         "dropped": [{"index": i, "reason": s.get("reason")} for i, s in dropped],
-        # What write_intro() reads, in the shape the old prep step produced.
+        "bridges_used": len(bridges),
+        "through_line": through,
+        "writers": [s.get("model") for s in segs],
+        # What write_intro() reads.
         "prep": {"articles": [{"key_points": s["key_points"]} for s in segs],
-                 "questions": [], "through_line": ""},
+                 "questions": [], "through_line": through},
     }
+
+
+# ---------------------------------------------------------------- all at once (previews, tests)
+
+def write_pending(todo: list[int], articles: list[dict], writer: Writer, done: dict, save, log) -> None:
+    """Write the stories in `todo`, up to WORKERS at a time; each finished story is
+    saved at once. A story that cannot be written raises after the others finish."""
+    failure: Exception | None = None
+    with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        futures = {pool.submit(writer.write, articles[i], i): i for i in todo}
+        for fut in concurrent.futures.as_completed(futures):
+            i = futures[fut]
+            try:
+                done[str(i)] = fut.result()
+            except Exception as e:                              # noqa: BLE001
+                log(f"::warning::story {i + 1}/{len(articles)} failed: {type(e).__name__}: {e}")
+                failure = failure or e
+                continue
+            save(done)
+    if failure:
+        raise failure
+
+
+def build_episode(articles: list[dict], *, call, save, models: dict, speakers: tuple[str, str],
+                  lang: str, memory_context: str, resume: dict | None, log,
+                  min_segments: int = MIN_SEGMENTS, plan: dict | None = None,
+                  feedback: str = "") -> dict:
+    """The whole script in one go: write, review, assemble. The weekly pipeline runs
+    these steps on different days (stages.py); previews and tests run them together."""
+    plan = plan or {}
+    writer = Writer(call=call, models=models, speakers=speakers, lang=lang, total=len(articles),
+                    memory_context=memory_context, theme=plan.get("through_line", ""),
+                    angles=plan.get("angles"), feedback=feedback, log=log)
+    done = {k: v for k, v in (resume or {}).items()
+            if v.get("status") in ("written", "needs_rewrite", "rewritten", "ok", "dropped")}
+    todo = [i for i in range(len(articles)) if str(i) not in done]
+    if done:
+        log(f"  resuming: {len(done)} of {len(articles)} stories already written")
+    write_pending(todo, articles, writer, done, save, log)
+    review_segments(done, articles, writer, save, last_chance=True)
+    return assemble_episode(done, articles, call=call, models=models, speakers=speakers,
+                            lang=lang, plan=plan, log=log, min_segments=min_segments)

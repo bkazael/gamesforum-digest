@@ -1,32 +1,23 @@
 name: Gamesforum weekly digest
 
+# The episode is built over several days (see stages.py): a short run every day from
+# Friday to Wednesday does what is due that day and stops. 09:17 UTC is 01:17 Pacific,
+# after the free-tier quota resets at 08:00 UTC; 15:17 UTC is a second try on the days
+# that can publish. GitHub may start a scheduled run late or skip it: nothing here
+# depends on a particular run happening, the next one picks the work up.
 on:
   schedule:
-    # Monday 06:00 Israel time (03:00 UTC summer / 04:00 UTC winter)
-    - cron: "0 3 * * 1"
-    # Two automatic retries, because the two failures in September were
-    # both transient Gemini slowness rather than anything in this repo,
-    # and both needed a human to notice and re-run. These make that
-    # self-healing: main() exits immediately if the episode already
-    # published, and checkpoint.py means a retry after a partial run only
-    # synthesizes the chunks that are still missing -- so a retry costs
-    # minutes and almost no quota. Spaced widely enough that a genuinely
-    # slow API has time to recover between attempts.
-    - cron: "0 6 * * 1"
-    - cron: "0 10 * * 1"
-    # Catch-up firings for a Monday lost to a Google outage (2026-11-10:
-    # every Monday firing met hours of 503s). main() exits at once when the
-    # week already has an episode (recent_episode()), so on a normal week
-    # these cost a minute of runner time and no model calls.
-    # After 08:00 UTC on purpose: the free-tier daily quota resets at
-    # midnight Pacific, and an earlier catch-up would meet the quota the
-    # failed Monday runs already spent.
-    - cron: "17 9 * * 2,3"
-    - cron: "17 15 * * 2,3"
-  workflow_dispatch: {}   # Trigger manually from Actions tab
+    - cron: "17 9 * * 5,6,0,1,2,3"
+    - cron: "17 15 * * 1,2,3"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run every stage now, ignoring the calendar (spends model quota)"
+        type: boolean
+        default: false
 
 permissions:
-  contents: write         # Needed to commit the new episode
+  contents: write         # Needed to commit the work in progress and the episode
 
 concurrency:
   group: digest
@@ -36,165 +27,97 @@ jobs:
   build:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    # Was 20. The 2026-09-14 run got killed by this exact timeout at
-    # 20m13s -- three TTS chunks legitimately took 3-7 minutes *each*
-    # during a slow/flaky spell for Gemini (one chunk also hit a real
-    # HTTP 500 mid-run), on top of ~3 extra minutes of 503 retries during
-    # scoring. None of that was a bug; the API was just slow that day, and
-    # 20 minutes had no real margin for it. The job was 21 seconds into
-    # the final (smallest) TTS chunk when it was cancelled -- both
-    # "Commit episode" and "Check source health" got skipped entirely, so
-    # neither the episode nor even an alert about it went out that week.
-    timeout-minutes: 55   # was 35; see RUN_DEADLINE_SEC in gamesforum_pipeline.py
+    timeout-minutes: 55   # RUN_DEADLINE_SEC (45 min) < step (50) < job (55)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install ffmpeg
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
 
-      - name: Episode date
+      - name: Episode week
         id: ep
-        run: |
-          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-          echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
 
-      # Every run gets a clean runner, so checkpoint.py's .checkpoint/ dir
-      # would vanish between attempts without this -- and the whole point
-      # of it is to survive a failed attempt. restore-keys does prefix
-      # matching, so today's second attempt picks up today's first attempt
-      # (cache keys are immutable, hence run_id in the key and a prefix to
-      # find it again). Keyed by ISO week, not date+code hash: a code fix
-      # pushed mid-day, or a Tue/Wed catch-up run, must still find the
-      # week's unfinished episode (2026-11-10 lost a paid selection to a
-      # code push). checkpoint.adopt_recent() moves it to today's date.
-      - name: Restore episode checkpoint
-        continue-on-error: true   # no checkpoint just means "start fresh"
+      # Only the synthesized speech lives in the cache (tens of MB, needed on the
+      # publish day to survive a failed mix). The text work is committed under work/.
+      - name: Restore speech cache
+        continue-on-error: true
         uses: actions/cache/restore@v4
         with:
           path: .checkpoint
-          key: checkpoint-v3-${{ steps.ep.outputs.week }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: checkpoint-v3-${{ steps.ep.outputs.week }}-
+          key: checkpoint-v4-${{ steps.ep.outputs.week }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: checkpoint-v4-${{ steps.ep.outputs.week }}-
 
-      # A step-level timeout smaller than the job's own (35) matters
-      # specifically because a JOB-level timeout cancels every remaining
-      # step at once -- including "Commit episode" and "Check source
-      # health" -- with no chance for either to run. This one failing (by
-      # timeout or a real crash) instead leaves ~5 minutes of job budget
-      # for "Report pipeline failure" below to still run and turn the job
-      # red on purpose, which is what makes GitHub send its default
-      # failure-notification email. See CHANGELOG, 2026-09-14: that gap is
-      # exactly what left a real run silent with no episode and no alert.
+      # A failure turns this step red only on the last chance day (Wednesday); on the
+      # other days it is a warning, because the next run retries. See stages.run().
       - name: Run pipeline
         id: run_pipeline
-        timeout-minutes: 50   # was 30
+        timeout-minutes: 50
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
+          SHOW_NAME: ${{ vars.SHOW_NAME }}
           DIGEST_LANG: he
-          # Override with the repo variable TTS_MODEL; a key from a new project
-          # may not reach the default (see swap_retired_model in the pipeline).
-          TTS_MODEL: ${{ vars.TTS_MODEL || 'gemini-2.5-flash-preview-tts' }}
-          # Optional: the model that writes the stories and the intro.
-          # Set the repo variable
-          # GEMINI_CREATIVE_MODEL (Settings -> Secrets and variables -> Actions
-          # -> Variables) to try a stronger one; unset or empty means the
-          # default, i.e. nothing changes.
+          TTS_MODEL: ${{ vars.TTS_MODEL }}
           GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
-          # Relevance scoring is high-volume classification; Flash-Lite is
-          # the default in code. Override if model/project quota requires it.
           GEMINI_SCORING_MODEL: ${{ vars.GEMINI_SCORING_MODEL }}
-          # Per-story fact review, title and outro (default gemini-3.5-flash in
-          # code): a third model so each stage has its own daily quota.
           GEMINI_REVIEW_MODEL: ${{ vars.GEMINI_REVIEW_MODEL }}
-          # Used only by enabled kind=email sources. Gamigion is configured
-          # but disabled in profile.toml until these secrets are added and
-          # the source is explicitly enabled there.
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          PIPELINE_FORCE: ${{ inputs.force && '1' || '' }}
         run: python gamesforum_pipeline.py
 
-      # `if: always()` is the whole trick: actions/cache's default
-      # save-on-success would throw away the checkpoint in exactly the
-      # case it exists for -- a run that died partway with finished work
-      # worth keeping. A clean run deletes .checkpoint/ itself
-      # (checkpoint.clear), so success caches an empty dir and the next
-      # episode starts fresh regardless.
-      # continue-on-error matters more than it looks: this step sits
-      # between the pipeline and "Commit episode", which has no `if:` and
-      # so runs only when everything before it succeeded. Without this, a
-      # transient cache-service hiccup would skip publishing an episode
-      # that was already fully built. A checkpoint is an optimization; it
-      # must never stand between a finished episode and the feed.
-      - name: Save episode checkpoint
+      - name: Save speech cache
         if: always()
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: .checkpoint
-          key: checkpoint-v3-${{ steps.ep.outputs.week }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: checkpoint-v4-${{ steps.ep.outputs.week }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Upload diagnostics
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pipeline-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             reports/
             ledger/
+            work/
             source_alerts.json
           retention-days: 14
 
-      - name: Commit episode
-        id: commit_episode
+      # Every run commits what it did, failed or not: the selection, the stories
+      # written so far, the ledger and the reports. A failed run is then visible in
+      # the repository, and the next run starts from it.
+      - name: Commit the week's work
+        if: always()
         run: |
           git config user.name  "gamesforum-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add episodes digests ledger reports feed.xml state.json memory.json
+          git add work episodes digests ledger reports feed.xml state.json memory.json seen.json
           if git diff --cached --quiet; then
-            echo "nothing new this week"
+            echo "nothing new"
           else
-            git commit -m "digest: $(date -u +%Y-%m-%d)"
-            git push
+            git commit -m "digest: $(date -u +%Y-%m-%d) $(date -u +%a)"
+            for attempt in 1 2 3; do
+              git pull --rebase --autostash origin main && git push && break
+              sleep $((attempt * 5))
+            done
           fi
 
-      # Runs only after a successful publish (default `if:` behavior --
-      # no explicit condition needed since a failed "Run pipeline" or
-      # "Commit episode" already skips this the normal way). source_alerts.json
-      # (written during the pipeline run above, from this run's data only
-      # -- see source_health.py) is scratch space for this one job; it is
-      # never committed and carries no history. The episode is already
-      # published by the step before this one no matter what happens here.
-      # This step failing turns the whole run red, which is what makes
-      # GitHub send its own default failure-notification email -- one line
-      # per source that came back empty this run, in plain language,
-      # without ever blocking that week's episode on it.
-      - name: Check source health
+      # Source problems are a warning in the run summary, not a red run: the episode
+      # may well have been built, and the weekly check below is the one that alerts.
+      - name: Source health
+        if: always()
         run: |
           python3 -c "
-          import source_health, sys
-          alerts = source_health.pending_alerts()
-          for line in alerts:
-              print(f'::error::{line}')
-          sys.exit(1 if alerts else 0)
+          import source_health
+          for line in source_health.pending_alerts():
+              print(f'::warning::{line}')
           "
-
-      # Runs ONLY when "Run pipeline" or "Commit episode" itself failed or
-      # timed out -- i.e. no episode was published at all this week.
-      # Checking those two steps' own outcome (not bare `if: failure()`,
-      # which is true whenever ANY prior step failed) matters because
-      # "Check source health" above is ALSO expected to fail sometimes on
-      # a perfectly successful publish -- that's its whole job. A 2026-09-15
-      # run hit exactly that: pipeline+commit both succeeded, "Check source
-      # health" correctly failed over Gamigion's feed, and this step's old
-      # bare `if: failure()` fired anyway and printed the wrong message
-      # ("no episode was published") on a week that in fact published fine.
-      - name: Report pipeline failure
-        if: failure() && (steps.run_pipeline.outcome == 'failure' || steps.commit_episode.outcome == 'failure')
-        run: |
-          echo "::error::This week's digest pipeline failed or timed out -- no episode was published. Check the 'Run pipeline' step's log for where it stopped."
-          exit 1

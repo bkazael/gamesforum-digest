@@ -24,8 +24,9 @@ ARTICLES = [{"url": "https://example.test/a", "title": "A", "text": "t", "source
 DATA = {"episode_title": "Ep", "digest_summary": [], "script": [{"speaker": "Dana", "text": "hi"}]}
 
 with tempfile.TemporaryDirectory() as tmp:
-    real_dir = C.CHECKPOINT_DIR
+    real_dir, real_work = C.CHECKPOINT_DIR, C.WORK_DIR
     C.CHECKPOINT_DIR = pathlib.Path(tmp) / ".checkpoint"
+    C.WORK_DIR = pathlib.Path(tmp) / "work"
     try:
         # 1. Nothing saved yet -> nothing to resume from. This is the
         # normal weekly case and must never look like a resume.
@@ -67,7 +68,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
         # 6. A corrupt checkpoint must degrade to "no checkpoint" (redo the
         # work), never raise into the run that's trying to resume.
-        (C.CHECKPOINT_DIR / "2026-09-24-content.json").write_text("not json")
+        (C.WORK_DIR / "2026-09-24-content.json").write_text("not json")
         check("a corrupt content checkpoint reads as None, not a crash",
               C.load_content("2026-09-24") is None)
 
@@ -82,10 +83,10 @@ with tempfile.TemporaryDirectory() as tmp:
         check("clear() drops that date's content", C.load_content("2026-09-22") is None)
         check("clear() drops that date's chunks", C.load_chunk("2026-09-22", 1) is None)
         check("clear() leaves other dates alone",
-              (C.CHECKPOINT_DIR / "2026-09-24-content.json").exists()
+              (C.WORK_DIR / "2026-09-24-content.json").exists()
               or not C.CHECKPOINT_DIR.exists())
     finally:
-        C.CHECKPOINT_DIR = real_dir
+        C.CHECKPOINT_DIR, C.WORK_DIR = real_dir, real_work
 
 # 9. REAL articles, not fixtures. Every article select() returns carries
 # `published` as a datetime.date (sources.py parses it), and json.dumps
@@ -97,8 +98,9 @@ with tempfile.TemporaryDirectory() as tmp:
 import datetime as dt
 
 with tempfile.TemporaryDirectory() as tmp:
-    real_dir = C.CHECKPOINT_DIR
+    real_dir, real_work = C.CHECKPOINT_DIR, C.WORK_DIR
     C.CHECKPOINT_DIR = pathlib.Path(tmp) / ".checkpoint"
+    C.WORK_DIR = pathlib.Path(tmp) / "work"
     try:
         real_articles = [
             {"url": "https://example.test/b", "title": "B", "text": "t", "source": "PG",
@@ -111,7 +113,7 @@ with tempfile.TemporaryDirectory() as tmp:
         ]
         C.save_content("2026-10-04", real_articles, DATA)
         check("a checkpoint with real date-bearing articles actually gets written",
-              (C.CHECKPOINT_DIR / "2026-10-04-content.json").exists())
+              (C.WORK_DIR / "2026-10-04-content.json").exists())
         back = C.load_content("2026-10-04")
         check("...and loads back", back is not None)
         if back:
@@ -126,25 +128,27 @@ with tempfile.TemporaryDirectory() as tmp:
             check("a set (not JSON-native) is saved as a sorted list rather than failing the save",
                   arts[2]["tags"] == ["a", "b"])
     finally:
-        C.CHECKPOINT_DIR = real_dir
+        C.CHECKPOINT_DIR, C.WORK_DIR = real_dir, real_work
 
-# ---------------------------------------------------------------- catch-up runs adopt the week's unfinished episode
+# ---------------------------------------------------------------- the week's text work lives in work/, audio in .checkpoint/
 import tempfile as _tf
 with _tf.TemporaryDirectory() as _tmp:
-    _saved = C.CHECKPOINT_DIR
-    C.CHECKPOINT_DIR = pathlib.Path(_tmp)
+    _saved = (C.CHECKPOINT_DIR, C.WORK_DIR)
+    C.CHECKPOINT_DIR, C.WORK_DIR = pathlib.Path(_tmp) / ".checkpoint", pathlib.Path(_tmp) / "work"
     try:
-        C.save_content("2026-11-09", [{"title": "a"}], {"segments": {"0": {"status": "ok"}}})
-        check("a Tuesday run adopts Monday's unfinished episode",
-              C.adopt_recent("2026-11-10") == "2026-11-09"
-              and C.load_content("2026-11-10") is not None
-              and C.load_content("2026-11-09") is None)
-        check("nothing is adopted when today already has its own checkpoint",
-              C.adopt_recent("2026-11-10") is None)
-        C.save_content("2026-11-02", [{"title": "old"}], {"segments": {}})
-        check("last week's leftovers are never adopted", C.adopt_recent("2026-11-06") is None)
+        C.save_content("2026-11-16", [{"title": "a"}], {"segments": {"0": {"status": "ok"}}})
+        C.save_chunk("2026-11-16", 1, b"pcm")
+        check("text work goes to work/, audio chunks to .checkpoint/",
+              (C.WORK_DIR / "2026-11-16-content.json").exists()
+              and not (C.CHECKPOINT_DIR / "2026-11-16-content.json").exists()
+              and (C.CHECKPOINT_DIR / "2026-11-16-chunk-01.pcm").exists())
+        C.clear("2026-11-16")
+        check("clear() removes both after a published episode",
+              not (C.WORK_DIR / "2026-11-16-content.json").exists() and C.load_chunk("2026-11-16", 1) is None)
+        check("adopt_recent is gone: a catch-up run reads the same work/ file, no renaming",
+              not hasattr(C, "adopt_recent"))
     finally:
-        C.CHECKPOINT_DIR = _saved
+        C.CHECKPOINT_DIR, C.WORK_DIR = _saved
 
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

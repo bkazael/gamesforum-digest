@@ -1,0 +1,277 @@
+{
+  "articles": [
+    {
+      "url": "https://example.test/eu-kids",
+      "title": "Daily log-in bonuses under threat in EU Kids Act",
+      "source": "PG",
+      "text": "EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. EU Kids Act text. ",
+      "_airtime": 0.4,
+      "published": "2026-10-02"
+    },
+    {
+      "url": "https://example.test/youtube",
+      "title": "YouTube rolls out Playables to 50 markets",
+      "source": "MG",
+      "text": "Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. Playables text. ",
+      "_airtime": 0.25,
+      "published": "2026-10-02"
+    },
+    {
+      "url": "https://example.test/tyrads",
+      "title": "TyrAds and Nordeus partner on rewarded engagement",
+      "source": "GF",
+      "text": "Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. Partnership text. ",
+      "_airtime": 0.35,
+      "published": "2026-10-02"
+    }
+  ],
+  "data": {
+    "segments": {
+      "0": {
+        "publishable": true,
+        "stance": "NEUTRAL_REPORTING",
+        "headline": "כותרת",
+        "key_points": [
+          "נקודה אחת",
+          "נקודה שנייה"
+        ],
+        "caution": "",
+        "takeaway": "לבדוק משהו.",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 0 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 1 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 2 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 3 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 4 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 5 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 6 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 7 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 8 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 9 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 10 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 11 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 12 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 13 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 14 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 15 בשיחה על הכתבה."
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "problems": [],
+        "status": "written"
+      },
+      "2": {
+        "publishable": true,
+        "stance": "NEUTRAL_REPORTING",
+        "headline": "כותרת",
+        "key_points": [
+          "נקודה אחת",
+          "נקודה שנייה"
+        ],
+        "caution": "",
+        "takeaway": "לבדוק משהו.",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 0 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 1 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 2 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 3 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 4 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 5 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 6 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 7 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 8 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 9 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 10 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 11 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 12 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 13 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 14 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 15 בשיחה על הכתבה."
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "problems": [],
+        "status": "written"
+      },
+      "1": {
+        "publishable": true,
+        "stance": "NEUTRAL_REPORTING",
+        "headline": "כותרת",
+        "key_points": [
+          "נקודה אחת",
+          "נקודה שנייה"
+        ],
+        "caution": "",
+        "takeaway": "לבדוק משהו.",
+        "script": [
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 0 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 1 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 2 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 3 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 4 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 5 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 6 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 7 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 8 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 9 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 10 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 11 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 12 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 13 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Dana",
+            "text": "סיפור מספר 14 בשיחה על הכתבה."
+          },
+          {
+            "speaker": "Yoni",
+            "text": "סיפור מספר 15 בשיחה על הכתבה."
+          }
+        ],
+        "model": "gemini-3.8-flash",
+        "problems": [],
+        "status": "written"
+      }
+    },
+    "plan": {
+      "through_line": "",
+      "angles": {}
+    },
+    "source_alerts": []
+  }
+}
