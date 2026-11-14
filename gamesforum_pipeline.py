@@ -438,6 +438,29 @@ class TTSTruncatedError(RuntimeError):
 # alone that way and died on chunk 3. _check_deadline() at the top of each
 # attempt is the real bound now; this just stops the loop from being
 # absurd on its own terms.
+_tts_state = {"fallback_used": False}
+
+
+def tts_model() -> str:
+    """The speech model in use: the configured one, or the fallback once the first
+    could not be reached (retired with no named replacement, or its daily quota gone)."""
+    return TTS_FALLBACK_MODEL if _tts_state["fallback_used"] else live_model(TTS_MODEL)
+
+
+def _switch_tts_model(code: int, detail: str) -> bool:
+    """Move to TTS_FALLBACK_MODEL for the rest of the run. True if switched."""
+    if (_tts_state["fallback_used"] or not TTS_FALLBACK_MODEL
+            or TTS_FALLBACK_MODEL == live_model(TTS_MODEL)):
+        return False
+    daily = code == 429 and re.search(r"per.?day|daily|requestsperday|free.?tier.?requests", detail, re.I)
+    if code == 404 or daily:
+        _tts_state["fallback_used"] = True
+        print(f"::warning::speech model {live_model(TTS_MODEL)} cannot be used (HTTP {code}); using "
+              f"{TTS_FALLBACK_MODEL} for the rest of this run. Its voices may sound different.", flush=True)
+        return True
+    return False
+
+
 def gemini_tts_chunk(script_chunk_text: str, tries: int = 4) -> bytes:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is required for TTS.")
@@ -477,11 +500,12 @@ TRANSCRIPT:
         attempt += 1
         _check_deadline()
         url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-               f"{live_model(TTS_MODEL)}:generateContent")
+               f"{tts_model()}:generateContent")
         req = urllib.request.Request(
             url, data=body,
             headers={"Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY}
         )
+        llm.count_call(tts_model())
         try:
             with urllib.request.urlopen(req, timeout=_remaining_timeout(TTS_TIMEOUT)) as r:
                 data = json.loads(r.read())
@@ -517,6 +541,9 @@ TRANSCRIPT:
                 detail = ""
             log(f"    TTS HTTP {e.code} (attempt {attempt + 1}/{tries}) {detail[:300]}")
             if swap_retired_model(TTS_MODEL, e.code, detail, "TTS_MODEL"):
+                tries += 1
+                continue
+            if _switch_tts_model(e.code, detail):
                 tries += 1
                 continue
             explain_billing_error(e.code)

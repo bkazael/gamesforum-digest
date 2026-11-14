@@ -75,5 +75,65 @@ check("one bad run alone does not alert", SH.yield_alerts(hist[-1:], ["A", "B"])
 check("a source with nothing listed is the fetch alert's business, not the yield alert's",
       SH.yield_alerts([{"sources": {"B": {"listed": 0, "scored": 0}}}] * 2, ["B"]) == [])
 
+# ---------------------------------------------------------------- end to end: an undated source, two runs
+# The 2026-10-19 to 2026-11-11 failure, replayed: a source whose pages carry no date and whose listing
+# mixes old and new links. Run 1 must not publish the old links as news; run 2 must pick up the one
+# link that appeared since.
+import pathlib
+import tempfile
+
+import llm
+import memory
+import source_health
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmp = pathlib.Path(tmp)
+    saved = (D.STATE_FILE, D.SEEN_FILE, D.YIELD_FILE, D.LEDGER, D.collect, D.fetch_article, llm.gemini_json,
+             memory.load_recent_topics, source_health.ALERTS_FILE)
+    D.STATE_FILE, D.SEEN_FILE, D.YIELD_FILE, D.LEDGER = (tmp / "state.json", tmp / "seen.json",
+                                                         tmp / "reports" / "source_yield.json", tmp / "ledger")
+    source_health.ALERTS_FILE = tmp / "alerts.json"
+    memory.load_recent_topics = lambda: []
+    listing = {"links": ["a", "b"]}
+
+    def fake_collect(sources, max_age_days):
+        items = [{"url": f"https://wire.test/news/{n}-long-slug-here", "title": f"{n} long slug here",
+                  "source": "Wire", "published": None, "summary": ""} for n in listing["links"]]
+        return items, set(), {"Wire": len(items)}
+
+    D.collect = fake_collect
+    D.fetch_article = lambda url: {"url": url, "title": url.rsplit("/", 1)[-1], "text": "word " * 300,
+                                   "published": None}
+    llm.gemini_json = lambda prompt, schema=None, **kw: {"articles": [
+        {"id": i, "reasoning": "r", "axis": "MARKET", "score": 9, "why": "w", "topic": "t"} for i in range(20)]}
+    try:
+        first = D.select()
+        check("run 1: the links already in the listing are not news (nothing is selected)", first == [],
+              str([a["title"] for a in first]))
+        check("run 1: they were recorded as seen", len(D.load_seen().get("Wire", {})) == 2)
+        listing["links"] = ["a", "b", "c"]
+        second = D.select()
+        check("run 2: the one new link is selected, the two old ones are not",
+              [a["title"] for a in second] == ["c-long-slug-here"], str([a["title"] for a in second]))
+        history = __import__("json").loads(D.YIELD_FILE.read_text())
+        check("the day's yield is recorded per source (a second run the same day replaces the first)",
+              len(history) == 1 and history[0]["sources"]["Wire"]["selected"] == 1, str(history))
+    finally:
+        (D.STATE_FILE, D.SEEN_FILE, D.YIELD_FILE, D.LEDGER, D.collect, D.fetch_article, llm.gemini_json,
+         memory.load_recent_topics, source_health.ALERTS_FILE) = saved
+
+# ---------------------------------------------------------------- probe_source: a ready block
+import probe_source
+blk = probe_source.suggest_block("https://www.example.com/feed", "rss")
+check("the probe prints a ready rss [[sources]] block", blk.startswith("[[sources]]") and 'kind = "rss"' in blk
+      and 'name = "example.com"' in blk and 'urls = ["https://www.example.com/feed"]' in blk, blk)
+blk = probe_source.suggest_block("https://site.test/news-media/news", "html", "Site")
+check("...and an html block with a link-pattern starting point",
+      'kind = "html"' in blk and "link_pattern" in blk and "news" in blk, blk)
+import tomllib
+check("both blocks are valid TOML",
+      all(tomllib.loads(probe_source.suggest_block(u, k)) for u, k in
+          (("https://a.test/feed", "rss"), ("https://a.test/news", "html"))))
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

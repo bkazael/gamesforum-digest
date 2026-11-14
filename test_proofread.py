@@ -92,5 +92,17 @@ check("a failed proofreading call never fails the run; the free fixes still appl
       report["status"] == "unavailable" and len(out) == len(SCRIPT) and "ل" not in out[2]["text"]
       and any("::warning::" in w for w in warnings))
 
+# ---------------------------------------------------------------- the pronunciation list
+def call_names(prompt, schema, *, model, tries, timeout):
+    return {"edits": [], "pronunciation_risks": ["Tamatem", "Rovio", "rovio", "Zynga", " ", "AppLovin"]}
+
+
+out, report = PR.proofread_episode(SCRIPT, call=call_names, model="m", lang="he",
+                                   glossary={"Tamatem": "טאמאטם"})
+check("risky names are logged without duplicates, blanks, or names the glossary already covers",
+      report["pronunciation_risks"] == ["Rovio", "Zynga", "AppLovin"], str(report["pronunciation_risks"]))
+check("the proofreader is told this list is only for the owner and must not change the script",
+      "only a list for the owner" in PR.proofread_prompt(SCRIPT, "he"))
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

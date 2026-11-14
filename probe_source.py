@@ -19,6 +19,7 @@ import json
 import os
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -46,6 +47,20 @@ def get(url: str) -> tuple[int | str, str, str]:
         return e.code, e.headers.get("Content-Type", ""), e.read().decode("utf-8", "replace")[:300]
     except Exception as e:                                  # noqa: BLE001
         return type(e).__name__, "", str(e)[:300]
+
+
+def suggest_block(url: str, kind: str, name: str | None = None) -> str:
+    """A ready [[sources]] block for profile.toml: paste it, then run the weekly pipeline's
+    preview. `kind` is "rss" (a feed) or "html" (a listing page; the link pattern is a
+    starting point to adjust)."""
+    host = re.sub(r"^www\.", "", urllib.parse.urlparse(url).netloc)
+    label = name or host
+    lines = ["[[sources]]", f'name = "{label}"', f'kind = "{kind}"', f'urls = ["{url}"]']
+    if kind == "html":
+        path = urllib.parse.urlparse(url).path.rstrip("/") or ""
+        lines.append(f"link_pattern = '{re.escape(path) if path else ''}/[a-z0-9][a-z0-9\\-.]{{8,}}'")
+    lines += ["weight = 1.0", "max_per_episode = 2"]
+    return "\n".join(lines)
 
 
 def words(html: str) -> int:
@@ -83,6 +98,8 @@ def main() -> int:
         elif "xml" in ctype or "rss" in ctype:
             items = re.findall(r"<item>.*?</item>", body, re.S)
             print(f"   RSS items: {len(items)}")
+            if items:
+                print("   suggested block for profile.toml:\n      " + suggest_block(url, "rss").replace("\n", "\n      "))
             for item in items[:3]:
                 link = re.search(r"<link>(.*?)</link>", item, re.S)
                 title = re.search(r"<title>(.*?)</title>", item, re.S)
@@ -104,6 +121,9 @@ def main() -> int:
             title = re.search(r"<title>(.*?)</title>", body, re.S | re.I)
             if title:
                 print(f"   <title>: {title.group(1).strip()[:120]}")
+            if status == 200 and "html" in ctype:
+                print("   no feed: if articles are listed here, a block like this may work (adjust link_pattern):\n      "
+                      + suggest_block(url, "html").replace("\n", "\n      "))
     seen = set()
     for link in post_links:
         if link in seen or len(seen) >= 3:
@@ -121,6 +141,7 @@ def main() -> int:
         if art:
             text = art.get("text") or ""
             print(f"   fetch_article: {len(text.split()):,} words | title {art.get('title')!r}")
+            print(f"   publication date: {art.get('published') or 'NONE FOUND on the page (the pipeline then counts the article from the day its link first appeared)'}")
             print(f"   starts: {text[:300]!r}")
             print(f"   ends:   {text[-200:]!r}")
         else:

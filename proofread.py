@@ -45,6 +45,9 @@ PROOF_SCHEMA = {
                 "required": ["turn", "category", "action", "corrected", "reason"],
             },
         },
+        # Names a text-to-speech voice is likely to misread inside Hebrew speech.
+        # Only logged, so the owner can add the wrong ones to [speech.replacements].
+        "pronunciation_risks": {"type": "ARRAY", "items": {"type": "STRING"}},
     },
     "required": ["edits"],
 }
@@ -85,6 +88,10 @@ For REPLACE give the WHOLE corrected turn in "corrected": the same sentence with
 error fixed, every number and name kept exactly. For DELETE (only OFF_TOPIC or REPEAT) leave
 "corrected" empty. Turn numbers are the numbers below. Return an empty list if the script is
 clean; most turns should not be touched.
+
+Separately, in "pronunciation_risks" list up to 15 company, game or product names (exactly as
+written in the script) that a text-to-speech voice reading Hebrew is likely to mispronounce.
+This is only a list for the owner; do not change those names in the script.
 
 SCRIPT:
 {turns}
@@ -171,8 +178,19 @@ def deterministic_cleanup(script: list[dict], lang: str) -> tuple[list[dict], in
     return out, changed
 
 
+def pronunciation_risks(raw: dict, known: set[str]) -> list[str]:
+    """The names the proofreader expects the voice to misread, minus those already in
+    the glossary ([speech.replacements]), deduplicated, at most 15."""
+    out: list[str] = []
+    for name in raw.get("pronunciation_risks") or []:
+        name = " ".join(str(name).split())[:40]
+        if name and name.lower() not in known and name.lower() not in {o.lower() for o in out}:
+            out.append(name)
+    return out[:15]
+
+
 def proofread_episode(script: list[dict], *, call, model: str, lang: str,
-                      log=lambda m: None) -> tuple[list[dict], dict]:
+                      log=lambda m: None, glossary: dict | None = None) -> tuple[list[dict], dict]:
     """Proofread the whole episode. Never raises: on a failed call the script is
     returned after the free cleanup only, and the report says so."""
     script, cleaned = deterministic_cleanup(script, lang)
@@ -188,6 +206,11 @@ def proofread_episode(script: list[dict], *, call, model: str, lang: str,
         return script, report
     script, record = apply_edits(script, edits, lang, log)
     script, _ = deterministic_cleanup(script, lang)
+    known = {str(k).lower() for k in (glossary or {})}
+    report["pronunciation_risks"] = pronunciation_risks(raw, known)
+    if report["pronunciation_risks"]:
+        log("  names the voice may misread (add the wrong ones to [speech.replacements]): "
+            + ", ".join(report["pronunciation_risks"]))
     report.update(status="done", edits=record,
                   applied=sum(1 for r in record if r["applied"]),
                   refused=sum(1 for r in record if not r["applied"]))

@@ -224,7 +224,8 @@ class Run:
             self.did.append("intro")
         if data.get("proofread_done") is False:
             data["script"], data["proofread"] = proofread.proofread_episode(
-                data["script"], call=self.call, model=llm.GEMINI_CREATIVE_MODEL, lang=P.LANG, log=log)
+                data["script"], call=self.call, model=llm.GEMINI_CREATIVE_MODEL, lang=P.LANG, log=log,
+                glossary=runtime.load_profile().get("speech", {}).get("replacements", {}))
             data["proofread_done"] = True
             self.save(articles, data)
             self.did.append(f"proofread ({data['proofread'].get('applied', 0)} fixes)")

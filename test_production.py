@@ -344,6 +344,54 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(llm.used_today("primary"), 3)
             llm.configure(None)
 
+    def _tts_ok(self, pcm=b"\0\0" * 100):
+        import base64
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = json.dumps({"candidates": [{"finishReason": "STOP", "content": {"parts": [
+            {"inlineData": {"mimeType": "audio/L16;rate=24000",
+                            "data": base64.b64encode(pcm).decode()}}]}}]}).encode()
+        return response
+
+    def test_speech_falls_back_to_the_second_model_when_the_first_is_gone(self):
+        urls = []
+
+        def fake(req, timeout=None):
+            urls.append(req.full_url)
+            if "primary-tts" in req.full_url:
+                raise urllib.error.HTTPError(req.full_url, 404, "gone", {}, io.BytesIO(b"model not found"))
+            return self._tts_ok()
+
+        with patch.object(llm, "GEMINI_API_KEY", "k"), patch.object(p, "GEMINI_API_KEY", "k"), \
+                patch.object(p, "TTS_MODEL", "primary-tts"), patch.object(llm, "TTS_MODEL", "primary-tts"), \
+                patch.object(p, "TTS_FALLBACK_MODEL", "fallback-tts"), \
+                patch.dict(p._tts_state, {"fallback_used": False}), patch.dict(llm._MODEL_SWAPS, clear=True), \
+                patch.object(p, "_retry_sleep"), patch("urllib.request.urlopen", side_effect=fake):
+            self.assertEqual(p.gemini_tts_chunk("Dana: hi"), b"\0\0" * 100)
+            self.assertIn("fallback-tts", urls[-1])
+            p.gemini_tts_chunk("Dana: again")
+            self.assertEqual(sum("primary-tts" in u for u in urls), 1)     # not retried for the rest of the run
+
+    def test_speech_fallback_ignores_other_errors(self):
+        with patch.object(p, "TTS_FALLBACK_MODEL", "fallback-tts"), patch.dict(p._tts_state, {"fallback_used": False}):
+            self.assertFalse(p._switch_tts_model(503, "overloaded"))
+            self.assertFalse(p._switch_tts_model(429, "per-minute rate limit"))
+            self.assertTrue(p._switch_tts_model(429, "free tier requests per day exceeded"))
+
+    def test_show_notes_put_the_hebrew_headline_over_each_source(self):
+        articles = [{"title": "Rovio layoffs", "url": "https://e.test/a?x=1&y=2", "source": "G"},
+                    {"title": "Take-Two Q2", "url": "https://e.test/b", "source": "MG",
+                     "_also": [{"title": "Same story", "url": "https://e.test/c", "source": "PG"}]}]
+        data = {"digest_summary": [{"title": "t", "key_takeaway": "משהו לבדוק"}], "kept": [0, 1],
+                "segments": {"0": {"headline": "פיטורים ברוביו"}, "1": {"headline": "טייק-טו ברבעון"}}}
+        notes = p.show_notes(articles, data)
+        self.assertIn("<strong>פיטורים ברוביו</strong>", notes)
+        self.assertIn("Rovio layoffs", notes)
+        self.assertIn("x=1&amp;y=2", notes)
+        self.assertIn("Same story", notes)
+        self.assertLess(notes.index("פיטורים"), notes.index("Rovio layoffs"))
+
     def test_quota_day_follows_pacific_midnight(self):
         before = dt.datetime(2026, 11, 14, 7, 59, tzinfo=dt.timezone.utc)
         after = dt.datetime(2026, 11, 14, 8, 1, tzinfo=dt.timezone.utc)
