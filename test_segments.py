@@ -101,12 +101,22 @@ check("the prompt decides key points, then the hook and the debate, and only the
       p0.index("key_points:") < p0.index("hook:") < p0.index("debate:") < p0.index("script:")
       and "Every key point is covered" in p0)
 check("the script is built as hook, what happened, discussion, landing; with a typical size and no word target",
-      "THE DISCUSSION, at least a third of the turns" in p0 and "typical" in p0 and "word target" not in p0)
+      "THE DISCUSSION, at least 40% of the turns" in p0 and "typical" in p0 and "word target" not in p0)
 check("the writer is told the thinking is the segment, to choose the numbers, and not to interview",
       "That thinking is the\n  segment" in p0 and "never more than two numbers in one turn" in p0
       and "No question-answer ping-pong" in p0 and "fewer than half" in p0)
 check("a host's own illustration is marked as opinion and never carries digits",
       "never contains a figure written in digits" in p0)
+check("the processing step comes before the script: insights the article does not state, then the debate",
+      p0.index("hook:") < p0.index("insights: THE PROCESSING") < p0.index("debate:") < p0.index("script:")
+      and "A restated fact is not an insight" in p0 and "reach EVERY insight" in p0)
+thin = S.segment_problems({"script": turns(20, "41."), "key_points": ["41"], "insights": ["אחת."]}, "LEAD", SP, "he")
+check("a deep story with fewer than two insights is sent back", any("fewer than two insights" in p for p in thin))
+check("...a quick hit is not", not any("insights" in p for p in S.segment_problems(
+    {"script": turns(5, "41."), "key_points": ["41"], "insights": []}, "BRIEF", SP, "he")))
+check("the fact reviewer is told that analysis framed as the hosts' view is wanted",
+      "SUPPOSED to analyse" in S.review_prompt([{"story": 1, "article": {"title": "t", "text": "x"},
+                                                 "script": turns(2), "suspects": []}], SP))
 check("a quick hit is told it is one: a few turns, one number, one reaction",
       "THIS IS A QUICK HIT" in prompt(index=5, total=8, role="BRIEF") and "THIS IS A QUICK HIT" not in p0)
 
@@ -167,7 +177,7 @@ def stub(*, script=None, key_points=None, issues_seq=None, publishable=True, log
             seq = scripts_seq or [script if script is not None else turns(20, "41 מיליון.")]
             return {"publishable": publishable, "stance": "NEUTRAL_REPORTING", "headline": "הסברנו",
                     "key_points": key_points if key_points is not None else ["Hasbro earned 41 million"],
-                    "caution": "", "takeaway": "לבדוק.", "script": seq[min(state["story"], len(seq)) - 1]}
+                    "insights": ["תובנה ראשונה.", "תובנה שנייה."], "hook": "למה זה חשוב.", "debate": "על מה מתווכחים.", "caution": "", "takeaway": "לבדוק.", "script": seq[min(state["story"], len(seq)) - 1]}
         if "issues" in props:
             if fail_review:
                 raise RuntimeError("503 simulated")

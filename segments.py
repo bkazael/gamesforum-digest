@@ -59,11 +59,13 @@ SEGMENT_SCHEMA = {
         # Decided before the script is written, so the conversation is built around a
         # reason to care and a real exchange of views instead of a list of facts.
         "hook": {"type": "STRING"},
+        # The processing: what the hosts work out that the article does not say.
+        "insights": {"type": "ARRAY", "items": {"type": "STRING"}},
         "debate": {"type": "STRING"},
         "script": {"type": "ARRAY", "items": TURN_SCHEMA},
     },
     "required": ["publishable", "stance", "headline", "key_points", "caution",
-                 "takeaway", "hook", "debate", "script"],
+                 "takeaway", "hook", "insights", "debate", "script"],
 }
 
 REVIEW_SCHEMA = {
@@ -323,7 +325,8 @@ def segment_prompt(article: dict, index: int, total: int, role: str, memory_cont
     if role == "BRIEF":
         quick = ("\nTHIS IS A QUICK HIT: 4-6 turns in all. One or two sentences on what happened, "
                  "the single number that matters, one sharp reaction or disagreement, done. The "
-                 "hook is the first sentence. No discussion section. List only 1-2 key points.\n")
+                 "hook is the first sentence. No discussion section. List only 1-2 key points and one "
+                 "insight, and say that insight as the reaction.\n")
     partial = ""
     if article.get("partial"):
         partial = ("\nPARTIAL: only the newsletter preview of this article was available. "
@@ -350,14 +353,29 @@ DO THESE IN ORDER
    what the article says. Every figure written as digits. Leave secondary figures out.
 5. hook: one Hebrew sentence: why should the owner of a casual / hybrid-casual / real-money
    skill games company care about this story? Name the stake (money, risk, an opening, a
-   competitor's move). debate: one or two Hebrew sentences: the question the hosts will dig
-   into or disagree on, and where each of them stands.
-6. script: the conversation, built in this order: (a) the hook, in the first one or two
+   competitor's move).
+6. insights: THE PROCESSING. 3-4 Hebrew sentences (1 for a quick hit), each something the
+   hosts WORK OUT from the article that the article itself does not say. Think like an
+   experienced operator reading it:
+   - the mechanism: WHY did this happen, what is really driving it?
+   - second-order effects: if this is true, what happens next, and to whom?
+   - who gains and who pays, including players, small studios, platforms, ad networks;
+   - what it means for a casual / hybrid-casual / skill-cash studio specifically: which
+     metric, budget line or roadmap decision it touches;
+   - what does not add up: a number that looks too good, a missing comparison, an
+     interest the source has in telling it this way;
+   - a link to an ongoing storyline from earlier episodes, if one is given above and it is real.
+   These are reasoning, not new facts: no figure, company or event that is not in the
+   article. A restated fact is not an insight.
+7. debate: one or two Hebrew sentences: the question the hosts will dig into or disagree
+   on, and where each of them stands. It should grow out of the insights.
+8. script: the conversation, built in this order: (a) the hook, in the first one or two
    turns; (b) what happened, briefly, with the key points' numbers said out loud as digits;
-   (c) THE DISCUSSION, at least a third of the turns: the debate above, what it means for a
-   studio like the listener's, whether the claims hold up, what the hosts would do; (d) a
-   landing in the hosts' own words. Every key point is covered. Length follows the material
-   (typical for this role: about {lo}-{hi} turns). Never pad, never recite.
+   (c) THE DISCUSSION, at least 40% of the turns: the hosts reach EVERY insight above by
+   talking it through (one raises it, the other tests it), have the debate, and say what
+   they would do; (d) a landing in the hosts' own words. Every key point is covered. Length
+   follows the material (typical for this role: about {lo}-{hi} turns). Never pad, never
+   recite: a fact is only said to be USED, by the very next turn or two.
 {quick}
 {_style_rules(a, b)}
 {lang_inst}
@@ -401,8 +419,12 @@ TYPO (never blocking): a misspelt or wrong word. Put the WHOLE turn again in "re
 with only that word corrected, nothing else changed.
 OTHER: anything else (wording, repetition). Never blocking.
 
-Opinions and analysis by the hosts are fine when they are framed as opinion. Return an
-empty list if every conversation is faithful.
+The hosts are SUPPOSED to analyse: inference, explanation of causes, prediction, doubt,
+comparison to their own experience and hypothetical examples are the point of the show
+and are never an issue when they are framed as the hosts' own view ("לדעתי", "אני מנחש",
+"אם הייתי"). Flag analysis only when it is stated as a fact reported by the article, or
+when it contains a figure, company or event that the article does not. Return an empty
+list if every conversation is faithful.
 
 {chr(10).join(blocks)}"""
 
@@ -527,6 +549,11 @@ def segment_problems(seg: dict, role: str, speakers: tuple[str, str], lang: str)
                  and len(script) < len(seg["key_points"]) * 2)
     if role != "BRIEF":
         problems += delivery_problems(script, speakers)
+        if len(seg.get("insights") or []) < 2:
+            problems.append("fewer than two insights: say what the hosts work out beyond the "
+                            "article (why it happened, what follows, who gains, what does not "
+                            "add up, what it means for a studio like the listener's) and build "
+                            "the discussion on it")
     if uncovered:
         problems.append(f"{len(seg['key_points'])} key points need more than {len(script)} turns")
     problems += script_quality.script_style_problems(script, lang)
@@ -690,6 +717,7 @@ class Writer:
             "caution": str(raw.get("caution") or "").strip(),
             "takeaway": str(raw.get("takeaway") or "").strip(),
             "hook": str(raw.get("hook") or "").strip(),
+            "insights": [str(x).strip() for x in raw.get("insights") or [] if str(x).strip()][:5],
             "debate": str(raw.get("debate") or "").strip(),
             "script": script,
             "model": raw.get("_model"),

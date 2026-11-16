@@ -79,7 +79,7 @@ def fake_model(prompt, schema=None, **kw):
             raise llm.GeminiQuotaExhausted("daily quota simulated")
         calls.append("story")
         return {"publishable": True, "stance": "NEUTRAL_REPORTING", "headline": "כותרת",
-                "key_points": ["נקודה אחת", "נקודה שנייה"], "caution": "", "takeaway": "לבדוק משהו.",
+                "key_points": ["נקודה אחת", "נקודה שנייה"], "insights": ["תובנה ראשונה.", "תובנה שנייה."], "hook": "למה זה חשוב.", "debate": "על מה מתווכחים.", "caution": "", "takeaway": "לבדוק משהו.",
                 "script": story()}
     if "issues" in props:
         calls.append("review")

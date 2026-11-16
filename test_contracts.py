@@ -225,7 +225,7 @@ def model_stub(script=None, key_points=None, issues=None, log=None):
         if "key_points" in props:
             return {"publishable": True, "stance": "NEUTRAL_REPORTING", "headline": "כותרת",
                     "key_points": key_points if key_points is not None else ["נקודה אחת", "נקודה שנייה"],
-                    "caution": "", "takeaway": "משהו לבדוק.",
+                    "insights": ["תובנה ראשונה.", "תובנה שנייה."], "hook": "למה זה חשוב.", "debate": "על מה מתווכחים.", "caution": "", "takeaway": "משהו לבדוק.",
                     "script": script if script is not None else turns(16)}
         if "issues" in props:
             return {"issues": issues or []}

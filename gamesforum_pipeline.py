@@ -862,7 +862,7 @@ def finalize_episode(data: dict, key: str) -> dict:
         **data["editorial_review"],
         "segments": {k: {kk: v.get(kk) for kk in
                          ("status", "reason", "stance", "headline", "key_points", "caution",
-                          "review", "edits", "model")}
+                          "hook", "insights", "debate", "review", "edits", "model")}
                      for k, v in sorted(stories.items(), key=lambda kv: int(kv[0]))},
     }, ensure_ascii=False, indent=2))
     return data
