@@ -387,6 +387,14 @@ plan = S.build_plan(partial_articles, call=plan_call({"order": [1, 2, 3, 4], "th
                     models=MODELS, lang="he", log=quiet)
 check("a partial (email-preview) story never leads and is told last, whatever its score",
       plan["order"][0] == 3 and plan["order"][-1] == 1, str(plan["order"]))
+mixed = [dict(a) for a in PLAN_ARTICLES]
+mixed[1]["text"] = "word " * 400; mixed[0]["text"] = "word " * 400; mixed[3]["text"] = "word " * 400
+plan = S.build_plan(mixed, call=plan_call({"order": [2, 3, 1, 4], "through_line": "x", "angles": []}),
+                    models=MODELS, lang="he", log=quiet)
+check("a short article (a quick hit by nature) is told after the stories told in depth",
+      plan["order"] == [1, 0, 3, 2], str(plan["order"]))
+check("the writer is told not to open every story with the same listener formula",
+      "Do NOT open with a formula addressed to" in p0)
 check("with fewer than three stories there is nothing to plan and no call is made",
       S.build_plan(PLAN_ARTICLES[:2], call=boom, models=MODELS, lang="he", log=quiet)["order"] == [0, 1])
 

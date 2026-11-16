@@ -240,7 +240,10 @@ WHAT MAKES IT WORTH LISTENING TO
   people working out what it MEANS: who wins and who loses, whether the claim holds up, what
   it changes for a studio like his, what they would do on Monday. That thinking is the
   segment; the facts are its raw material.
-- Start from the hook, not from "company X reported Y".
+- Start from the hook, not from "company X reported Y". The hook is said in the story's own
+  terms (the stake, the surprise, the contradiction). Do NOT open with a formula addressed to
+  the listener ("אם אתם מנהלים משחק...", "אם המשחק שלכם...", "אם תהיתם..."): every story in
+  the episode would open the same way.
 - Choose the numbers. Say only the few that carry the story, each WITH what it compares to,
   and never more than two numbers in one turn. A turn that lists figures is a spreadsheet,
   not a conversation; leave the rest out.
@@ -265,7 +268,7 @@ WHAT MAKES IT WORTH LISTENING TO
   ATTRIBUTED, never endorsed ("לפי החברה", "לפי המספרים שלהם"), and the hosts are free to
   doubt it out loud. Say plainly what the article does not show.
 - Shape of a good exchange (invented subject; do not reuse its facts or wording):
-    {a}: אם אתה מריץ משחק קז'ואל על מודעות, הסיפור הזה נוגע לכיס שלך. הרשת X העלתה את העמלה, וה-CPM בקטגוריה קפץ ב-18 אחוז ברבעון אחד.
+    {a}: רבעון אחד הספיק כדי למחוק את המרווח של חצי מהקטגוריה: הרשת X העלתה את העמלה, וה-CPM במשחקי קז'ואל קפץ ב-18 אחוז.
     {b}: שמונה-עשרה אחוז נשמע רע, אבל אני לא בטוח שזה הסיפור. מי שה-ROAS שלו עלה באותה תקופה בכלל לא מרגיש את זה.
     {a}: אז זהו, שה-ROAS כמעט לא זז. המרווח פשוט הצטמצם.
     {b}: בממוצע. אני מוכן להתערב שמי שמריץ עשרים קריאייטיבים בשבוע נפגע הרבה פחות ממי שמריץ אחד.
@@ -324,8 +327,8 @@ def segment_prompt(article: dict, index: int, total: int, role: str, memory_cont
     quick = ""
     if role == "BRIEF":
         quick = ("\nTHIS IS A QUICK HIT: 4-6 turns in all. One or two sentences on what happened, "
-                 "the single number that matters, one sharp reaction or disagreement, done. The "
-                 "hook is the first sentence. No discussion section. List only 1-2 key points and one "
+                 "the single number that matters, one sharp reaction or disagreement, done. Open "
+                 "with the news itself, plainly. No discussion section. List only 1-2 key points and one "
                  "insight, and say that insight as the reaction.\n")
     partial = ""
     if article.get("partial"):
@@ -669,6 +672,11 @@ def build_plan(articles: list[dict], *, call, models: dict, lang: str, log) -> d
         order.insert(0, best)
     # An email preview of a longer post (partial) never leads and is told last.
     order = [i for i in order if not articles[i].get("partial")] + [i for i in order if articles[i].get("partial")]
+    # A short article cannot carry a discussion and is told as a quick hit (role_for), so
+    # it goes after the stories told in depth, whatever its score (2026-11-16 preview: a
+    # 150-word 9.0 story sat second and split the episode with a "briefly" line).
+    short = [i for i in order if len((articles[i].get("text") or "").split()) < BRIEF_ARTICLE_WORDS]
+    order = [i for i in order if i not in short] + short
     through = " ".join(str(raw.get("through_line") or "").split())
     if _DIGIT.search(through) or len(through.split()) > 40:
         through = ""
@@ -954,11 +962,13 @@ def assemble_episode(done: dict, articles: list[dict], *, call, models: dict,
     brief = [role_for(i, articles[i]) == "BRIEF" for i, _ in kept]
     bridges = {k: t for k, t in bridges.items() if not brief[k] and not brief[k - 1]}
     script: list[dict] = []
+    announced = False
     for k, seg in enumerate(segs):
         if k in bridges:
             script.append(bridges[k])
-        elif brief[k] and k > 0 and not brief[k - 1]:
+        elif brief[k] and k > 0 and not announced:
             script.append(quick_hits_line(speakers, lang))
+            announced = True
         script += seg["script"]
     script += outro
     script, trimmed = script_quality.trim_agreement_openers(script)
