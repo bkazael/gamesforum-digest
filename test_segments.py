@@ -120,6 +120,10 @@ check("an analyst who only asks questions is flagged as an interview",
       any("reads as an interview" in p for p in S.delivery_problems(interview, SP)))
 talk = [{"speaker": A if i % 2 == 0 else B, "text": "אני חושב שזה לא הסיפור." if i % 2 else "קרה משהו עם 41."}
         for i in range(12)]
+openq = [{"speaker": A if i % 2 == 0 else B, "text": "מה קרה?" if i < 5 else "אני חושב שזה לא הסיפור."}
+         for i in range(10)]
+check("a story that opens with three or more questions in its first six turns is flagged",
+      any("first six turns" in p for p in S.delivery_problems(openq, SP)))
 check("a real exchange of statements is not", S.delivery_problems(talk, SP) == [])
 dump = [{"speaker": A if i % 2 == 0 else B, "text": "עלה ב-12 אחוז ל-340 מיליון, מול 290 ו-18 אחוז." if i % 2 == 0 else "מעניין."}
         for i in range(10)]

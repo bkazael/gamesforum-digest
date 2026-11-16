@@ -112,5 +112,8 @@ check("a failed call never raises and points nothing",
       N.vocalize(script, call=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("503")), model="m") == [])
 check("no list means the plain script is voiced", N.apply(script, None) == script)
 
+check("the vowel-mark call is told to list few words and to leave out ordinary ones",
+      "When in doubt,\nleave the word out" in N.nikud_prompt(script) and N.MAX_WORDS <= 30)
+
 print("\n" + ("ALL PASS" if not FAILS else f"FAILED: {FAILS}"))
 sys.exit(1 if FAILS else 0)

@@ -29,7 +29,7 @@ NIKUD_SCHEMA = {
 }
 _MARKS = re.compile(r"[֑-ׇֽֿׁׂׅׄ]")
 _HEB_LETTER = r"א-ת"
-MAX_WORDS = 80
+MAX_WORDS = 25
 
 
 def strip_marks(text: str) -> str:
@@ -39,18 +39,21 @@ def strip_marks(text: str) -> str:
 def nikud_prompt(script: list[dict]) -> str:
     turns = "\n".join(f"{i}. {t['speaker']}: {t['text']}" for i, t in enumerate(script, 1))
     return f"""Below is the script of a Hebrew podcast that a text-to-speech voice will read aloud.
-The voice reads unpointed Hebrew and guesses the vowels. List the words it is LIKELY TO MISREAD,
-each with its fully pointed (menukad) form as it must be pronounced IN THIS SENTENCE:
+The voice reads unpointed Hebrew and guesses the vowels. List ONLY the words it is likely to
+get wrong, each with its fully pointed (menukad) form as it must be pronounced IN THIS SENTENCE.
 
-- words with more than one reading (ספר, חברה, עלה, מספר, הרכב, מנוי, שער, דבר, משחק/מְשַׂחֵק,
-  verbs whose tense or binyan is ambiguous, construct forms, passive vs active participles);
-- Hebrew transliterations of foreign words and names written in Hebrew letters;
-- uncommon or technical Hebrew words.
+Include a word only if one of these is true:
+- it has two or more real readings and the sentence decides (ספר, חברה, עלה, מספר, הרכב, מנוי,
+  שער, דבר, a verb whose tense or binyan is ambiguous);
+- it is a Hebrew-letter transliteration of a foreign name or term (פאננן, באנדלים, קז'ואל);
+- it is a rare or technical Hebrew word an average reader would stumble on.
 
-Do not list words any reader would pronounce correctly, and do not list words in Latin
-letters. "word" is the word exactly as it appears in that turn, including attached prefixes
-(ב, ה, ו, ל, מ, ש, כ). "vocalized" is the same letters with vowel marks, nothing added or
-removed. At most {MAX_WORDS} words in all; choose the ones that matter most.
+Do NOT include: common words with one natural reading (לקטינים, הנציבות, כברירת, שמדורג),
+ordinary verbs and nouns with prefixes attached, or words in Latin letters. When in doubt,
+leave the word out: a wrong or needless mark makes the voice worse. At most {MAX_WORDS} words
+in all, the ones that matter most. "word" is the word exactly as it appears in that turn,
+including attached prefixes. "vocalized" is the same letters with vowel marks, nothing added
+or removed.
 
 SCRIPT:
 {turns}

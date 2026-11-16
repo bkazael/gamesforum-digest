@@ -240,6 +240,8 @@ WHAT MAKES IT WORTH LISTENING TO
   people working out what it MEANS: who wins and who loses, whether the claim holds up, what
   it changes for a studio like his, what they would do on Monday. That thinking is the
   segment; the facts are its raw material.
+- The first six turns contain at most two questions. Open with the hook as a statement,
+  let the other host react with a view or a doubt, and only then ask.
 - Start from the hook, not from "company X reported Y". The hook is said in the story's own
   terms (the stake, the surprise, the contradiction). Do NOT open with a formula addressed to
   the listener ("אם אתם מנהלים משחק...", "אם המשחק שלכם...", "אם תהיתם..."): every story in
@@ -529,6 +531,11 @@ def delivery_problems(script: list[dict], speakers: tuple[str, str]) -> list[str
         problems.append(f"it reads as an interview: {asks} of {speakers[1]}'s {len(analyst)} turns are "
                         f"questions. {speakers[1]} must mostly state views, doubts and comparisons; "
                         "fewer than half of his turns may be questions")
+    opening = script[:6]
+    qs = sum(1 for t in opening if t["text"].rstrip().endswith("?"))
+    if len(opening) >= 6 and qs >= 3:
+        problems.append(f"the first six turns contain {qs} questions: open with the hook as a statement, "
+                        "then give a view or a doubt; at most two questions before the discussion starts")
     heavy = sum(1 for t in script if len(_NUM_RE.findall(t["text"])) >= 4)
     if len(script) >= 6 and heavy / len(script) > 0.2:
         problems.append(f"{heavy} turns each recite four or more figures: keep only the numbers that "
