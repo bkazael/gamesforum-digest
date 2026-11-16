@@ -1,0 +1,226 @@
+{
+  "status": "complete",
+  "date": "2026-11-16",
+  "target": "2026-11-16",
+  "words": 2534,
+  "duration_seconds": 1370,
+  "words_per_minute": 111.5,
+  "models": {
+    "scoring": "gemini-3.5-flash-lite",
+    "creative": "gemini-3.8-flash",
+    "review": "gemini-3.5-flash",
+    "tts": "gemini-2.5-flash-preview-tts"
+  },
+  "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "thinking_tokens": 0,
+    "tts_chunks": 5
+  },
+  "calls": {
+    "quota_day": "2026-11-16",
+    "today": {
+      "gemini-2.5-flash-preview-tts": 5
+    },
+    "this_run": {
+      "gemini-2.5-flash-preview-tts": 5
+    },
+    "daily_budget": 16
+  },
+  "week": [
+    {
+      "date": "2026-11-14",
+      "did": [
+        "selected 8 stories",
+        "wrote 4 stories"
+      ],
+      "status": "ok",
+      "calls": {
+        "quota_day": "2026-11-13",
+        "today": {
+          "gemini-3.5-flash-lite": 6,
+          "gemini-3.5-flash": 3,
+          "gemini-3.8-flash": 9
+        },
+        "this_run": {
+          "gemini-3.5-flash-lite": 6,
+          "gemini-3.5-flash": 3,
+          "gemini-3.8-flash": 9
+        },
+        "daily_budget": 16
+      }
+    },
+    {
+      "date": "2026-11-14",
+      "did": [
+        "wrote 2 stories"
+      ],
+      "status": "ok",
+      "calls": {
+        "quota_day": "2026-11-14",
+        "today": {
+          "gemini-3.8-flash": 6,
+          "gemini-3.5-flash": 4
+        },
+        "this_run": {
+          "gemini-3.8-flash": 6,
+          "gemini-3.5-flash": 4
+        },
+        "daily_budget": 16
+      }
+    },
+    {
+      "date": "2026-11-15",
+      "did": [
+        "wrote 2 stories",
+        "assembled 8 stories, 7 bridges",
+        "intro",
+        "proofread (3 fixes)"
+      ],
+      "status": "ok",
+      "calls": {
+        "quota_day": "2026-11-15",
+        "today": {
+          "gemini-3.8-flash": 5,
+          "gemini-3.5-flash": 2
+        },
+        "this_run": {
+          "gemini-3.8-flash": 5,
+          "gemini-3.5-flash": 2
+        },
+        "daily_budget": 16
+      }
+    }
+  ],
+  "elapsed_seconds": 517.1,
+  "profile_fingerprint": "e6ae5a647e202fa339dd288d50490722eb77ec116045d15f7699dc9f205b08d6",
+  "editorial": {
+    "passed": true,
+    "published_with_warnings": false,
+    "stories": 8,
+    "dropped": [],
+    "model": "gemini-3.5-flash",
+    "notes": [],
+    "proofread": {
+      "deterministic_fixes": 0,
+      "edits": [
+        {
+          "turn": 33,
+          "category": "SPELLING",
+          "action": "REPLACE",
+          "reason": "שגיאת כתיב: נכתב 'הערכות' (evaluations) במקום 'היערכות' (preparation/readiness).",
+          "applied": true,
+          "before": "השאלה היא האם אולפנים יוכלו לחכות לנוסח הסופי, או ששינוי מבנה המטבעות כבר מחייב הערכות בקוד מעכשיו.",
+          "after": "השאלה היא האם אולפנים יוכלו לחכות לנוסח הסופי, או ששינוי מבנה המטבעות כבר מחייב היערכות בקוד מעכשיו."
+        },
+        {
+          "turn": 70,
+          "category": "WRONG_WORD",
+          "action": "REPLACE",
+          "reason": "המילה 'מרשם' היא תרגום שגוי להקשר של פרסום דיגיטלי; המונח הנכון עבור impression הוא 'חשיפה'.",
+          "applied": true,
+          "before": "הכותב מסביר כי ad callback של AppLovin מספק הכנסה מדויקת לכל מרשם לפי creative ID, מה שמאפשר לסכום את הכנסות המפרסם ב-7 הימים האחרונים.",
+          "after": "הכותב מסביר כי ad callback של AppLovin מספק הכנסה מדויקת לכל חשיפה לפי creative ID, מה שמאפשר לסכום את הכנסות המפרסם ב-7 הימים האחרונים."
+        },
+        {
+          "turn": 73,
+          "category": "GRAMMAR",
+          "action": "REPLACE",
+          "reason": "חסרה ה' הידיעה במילה 'פתוחה' כדי להתאים לשם העצם המיודע (השאלה הפתוחה היא).",
+          "applied": true,
+          "before": "השאלה פתוחה היא כמה מפתח קז'ואל מוכן לספוג ב-churn של שחקנים לטווח ארוך תמורת eCPM גבוה בטווח הקצר.",
+          "after": "השאלה הפתוחה היא כמה מפתח קז'ואל מוכן לספוג ב-churn של שחקנים לטווח ארוך תמורת eCPM גבוה בטווח הקצר."
+        }
+      ],
+      "pronunciation_risks": [
+        "Supercell",
+        "GOODROID",
+        "Gamigion",
+        "Ukie",
+        "Aptoide",
+        "Skich",
+        "Onside",
+        "Segmenta-ai",
+        "Easybrain",
+        "Moonton",
+        "ByteDance",
+        "Nexters",
+        "A Thinking Ape",
+        "Outfit7",
+        "MacPaw"
+      ],
+      "status": "done",
+      "applied": 3,
+      "refused": 0
+    },
+    "through_line": "השבוע אנחנו רואים כיצד שינויים רגולטוריים, מדיניות פלטפורמות ודיוק במנגנוני מונטיזציה מגדירים מחדש את סיכויי ההישרדות והצמיחה של משחקי מובייל.",
+    "bridges_used": 7,
+    "writers": [
+      "gemini-3.8-flash",
+      "gemini-3.8-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.8-flash",
+      "gemini-3.8-flash"
+    ]
+  },
+  "artifacts": {
+    "episodes/2026-11-16.mp3": "4fef7356107fb6f0e2ac470c6fabe577548dd1d776c95ebc9197e0ab80c8d0b8",
+    "episodes/2026-11-16.json": "9c67a47ce0694a6d9dda9e59909f72e4bcf3cb4a00153c163854ca04f23ae2c8",
+    "digests/2026-11-16.md": "3ee8d2b04b0215da6e916637a95c4503b895ffcc9f234fdaf5b8d4096988d7b9",
+    "digests/2026-11-16-script.md": "97c62faf51743afb5dfc3af8c089b02a461929aedd696968f82ac5b0333e074c",
+    "feed.xml": "99e0e5e8c37d1e6933bb007f720574b5abaac318b77d421d4a9a1a8cc049e452"
+  },
+  "sources": [
+    {
+      "title": "Supercell and King bosses warn EU’s Digital Fairness Act could hurt players and studios",
+      "url": "https://mobilegamer.biz/supercell-and-king-bosses-warn-eus-digital-fairness-act-would-hurt-players-and-mobile-studios",
+      "published": "2026-11-12",
+      "score": 9.0
+    },
+    {
+      "title": "Apple's new iOS terms in the EU are live: What alternative app stores now mean for game studios",
+      "url": "https://www.pocketgamer.biz/apples-new-ios-terms-in-the-eu-are-live-what-alternative-app-stores-now-mean-for-game-studios",
+      "published": "2026-11-09",
+      "score": 8.0
+    },
+    {
+      "title": "Get Kicked Off the App Store, and Almost Never Coming Back?!",
+      "url": "https://www.gamigion.com/get-kicked-off-the-app-store-and-almost-never-coming-back",
+      "published": "2026-11-13",
+      "score": 8.0
+    },
+    {
+      "title": "To Block or Not to Block, Part 2: The Advertiser I Should NOT Have Blocked",
+      "url": "https://www.gamigion.com/to-block-or-not-to-block-part-2-the-advertiser-i-should-not-have-blocked",
+      "published": "2026-11-12",
+      "score": 9.0
+    },
+    {
+      "title": "Why Two Near-Identical Bus Match Games Ended Up With a 13x IAP Revenue Gap",
+      "url": "https://www.gamigion.com/why-two-near-identical-bus-match-games-ended-up-with-a-13x-iap-revenue-gap",
+      "published": "2026-11-13",
+      "score": 9.0
+    },
+    {
+      "title": "Playtika rules out sale and will continue as independent company",
+      "url": "https://www.pocketgamer.biz/playtika-rules-out-sale-and-will-continue-as-independent-company",
+      "published": "2026-11-09",
+      "score": 8.0
+    },
+    {
+      "title": "Data digest: Learnings tops ad charts, Savvy’s $6bn Moonton deal, Deca’s $4.5m buy, more",
+      "url": "https://mobilegamer.biz/data-digest-learnings-tops-ad-charts-savvys-6bn-moonton-deal-decas-4-5m-buy-more",
+      "published": "2026-11-11",
+      "score": 8.0
+    },
+    {
+      "title": "AI is changing discoverability: How Talking Tom boosted AI referral traffic by 357%",
+      "url": "https://www.pocketgamer.biz/ai-is-changing-discoverability-how-talking-tom-boosted-ai-referral-traffic-by-357",
+      "published": "2026-11-12",
+      "score": 8.0
+    }
+  ]
+}

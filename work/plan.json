@@ -1,6 +1,6 @@
 {
  "target": "2026-11-16",
- "published": null,
+ "published": "2026-11-16",
  "holds": 0,
  "held": null,
  "last_error": null,
@@ -64,6 +64,23 @@
     "this_run": {
      "gemini-3.8-flash": 5,
      "gemini-3.5-flash": 2
+    },
+    "daily_budget": 16
+   }
+  },
+  {
+   "date": "2026-11-16",
+   "did": [
+    "published"
+   ],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-16",
+    "today": {
+     "gemini-2.5-flash-preview-tts": 5
+    },
+    "this_run": {
+     "gemini-2.5-flash-preview-tts": 5
     },
     "daily_budget": 16
    }

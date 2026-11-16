@@ -1,7 +1,6 @@
 {
-  "quota_day": "2026-11-15",
+  "quota_day": "2026-11-16",
   "calls": {
-    "gemini-3.8-flash": 5,
-    "gemini-3.5-flash": 2
+    "gemini-2.5-flash-preview-tts": 5
   }
 }
