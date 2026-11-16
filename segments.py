@@ -56,10 +56,14 @@ SEGMENT_SCHEMA = {
         "key_points": {"type": "ARRAY", "items": {"type": "STRING"}},
         "caution": {"type": "STRING"},
         "takeaway": {"type": "STRING"},
+        # Decided before the script is written, so the conversation is built around a
+        # reason to care and a real exchange of views instead of a list of facts.
+        "hook": {"type": "STRING"},
+        "debate": {"type": "STRING"},
         "script": {"type": "ARRAY", "items": TURN_SCHEMA},
     },
     "required": ["publishable", "stance", "headline", "key_points", "caution",
-                 "takeaway", "script"],
+                 "takeaway", "hook", "debate", "script"],
 }
 
 REVIEW_SCHEMA = {
@@ -132,15 +136,20 @@ def schemas(speakers: tuple[str, str]) -> dict:
 # (a "thin" segment is expanded once), not targets: the key-point check is what
 # decides whether a story is covered.
 ROLES = {
-    "LEAD": {"turns": (24, 40), "floor": 14,
-             "text": "the LEAD story of the episode and the longest treatment"},
-    "MAJOR": {"turns": (16, 28), "floor": 10,
-              "text": "a major story with a full treatment"},
+    "LEAD": {"turns": (22, 34), "floor": 14,
+             "text": "the LEAD story of the episode, told in depth"},
+    "MAJOR": {"turns": (16, 26), "floor": 10,
+              "text": "a major story, told in depth"},
     "STANDARD": {"turns": (12, 20), "floor": 8,
-                 "text": "a standard story: what happened, the numbers, why, what follows"},
-    "BRIEF": {"turns": (6, 10), "floor": 4,
-              "text": "a short item: a concrete update and one implication"},
+                 "text": "a story told in depth: why it matters, what happened, what the hosts make of it"},
+    "BRIEF": {"turns": (4, 6), "floor": 3,
+              "text": "a QUICK HIT near the end of the episode: what happened in one or two "
+                      "sentences, the one number that matters, and one sharp reaction"},
 }
+# How many stories get a full discussion; the rest are quick hits. An episode of eight
+# equal stories has no shape (2026-11-16: 23 minutes at one pace). Set from
+# [thresholds] deep_stories in profile.toml by stages.py.
+DEEP_STORIES = 4
 BRIEF_ARTICLE_WORDS = 250
 MIN_SEGMENTS = 3
 WORKERS = 3
@@ -150,7 +159,7 @@ SMALL_TRIES = 3
 
 
 def role_for(index: int, article: dict) -> str:
-    if len((article.get("text") or "").split()) < BRIEF_ARTICLE_WORDS:
+    if index >= DEEP_STORIES or len((article.get("text") or "").split()) < BRIEF_ARTICLE_WORDS:
         return "BRIEF"
     return "LEAD" if index == 0 else ("MAJOR" if index == 1 else "STANDARD")
 
@@ -217,37 +226,49 @@ def _lang(lang: str) -> tuple[str, str, str]:
 
 
 def _style_rules(a: str, b: str) -> str:
-    return f"""CHARACTERS:
-- {a} (female anchor): leads with strategy, numbers and the market picture, and ANSWERS
-  {b}'s questions with specifics.
-- {b} (male analyst): analytical, questions assumptions, probes UA/LTV realities.
+    return f"""CHARACTERS (two colleagues who have both run mobile games, talking, not an interview)
+- {a} (female anchor): brings the story and the market picture. Has opinions of her own and
+  defends them.
+- {b} (male analyst): the sceptic with operator experience. He does NOT interview {a}: most
+  of his turns are statements. He doubts, compares to things he has seen, says what he would
+  do, pushes back, and sometimes knows part of the story himself and tells it.
 
-HOW THEY TALK
-- Calm and precise, two colleagues, not radio hosts. No hype words (avoid עצום, מטורף,
-  מהפכה, מהפכני, דרמטי, וואו, מדהים, "game changer"); at most one strong adjective, and only
-  when the number justifies it. No exclamations of surprise.
-- Most turns are 15-55 words, none over 80. Split an explanation into a back-and-forth
-  instead of two essays.
-- Say what happened and give the numbers WITH what they compare to. Then a real exchange:
-  one host raises a doubt or a question and the OTHER ANSWERS it with specifics in the next
-  turn -- a question is never left hanging. When the hosts agree, the second adds something
-  the first did not say. Where the article supports it they disagree or name a caveat.
-  Never fill a turn by agreeing with or paraphrasing the other host.
-- Questions are short, plain, one clause. Never a compound interview question.
-- Do not open turns with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן) -- respond by
-  adding to what was just said or questioning it.
-- Never close a story with advice ("operators should ...", "developers must ..."). What an
-  operator could check or test is said inside the conversation, as a plain observation or
-  a question; the story itself ends on an observation, a number or an open question.
+WHAT MAKES IT WORTH LISTENING TO
+- The listener can read the article himself. What he cannot get there is two experienced
+  people working out what it MEANS: who wins and who loses, whether the claim holds up, what
+  it changes for a studio like his, what they would do on Monday. That thinking is the
+  segment; the facts are its raw material.
+- Start from the hook, not from "company X reported Y".
+- Choose the numbers. Say only the few that carry the story, each WITH what it compares to,
+  and never more than two numbers in one turn. A turn that lists figures is a spreadsheet,
+  not a conversation; leave the rest out.
+- No question-answer ping-pong. Never more than two question-answer pairs in a row, and
+  fewer than half of {b}'s turns may be questions. A question is answered at once, with
+  specifics, and then someone REACTS to the answer.
+- The hosts disagree at least once, for real, and do not always settle it. When they agree,
+  the second adds something the first did not say.
+- Make it concrete: an example from a real kind of game (a match-3 with a season pass, a
+  skill-cash tournament app), a comparison the listener knows, a "picture this" moment.
+  Every such example is clearly the host's own illustration or opinion ("אני מנחש",
+  "לדעתי", "אם הייתי מנהל סטודיו כזה"), never presented as a fact from the article, and it
+  never contains a figure written in digits: digits are only for numbers from the article.
+- Vary the rhythm: some turns are one short reaction (3-10 words), most are 15-45 words,
+  none over 70. Dry humour is welcome when it comes naturally; forced jokes are not.
+- Calm, not flat. No hype words (avoid עצום, מטורף, מהפכה, מהפכני, דרמטי, וואו, מדהים,
+  "game changer") and no radio-host exclamations; interest comes from the thinking.
+- Do not open turns with an agreement word (בדיוק, לגמרי, בהחלט, נכון, אכן).
+- End on the hosts' own conclusion or an open question that matters, in their words. Not a
+  lecture ("operators should ...", "developers must ...").
 - A company's own announcement, an executive's byline, or a vendor promoting its product is
-  ATTRIBUTED, never endorsed ("according to the company", "by their own numbers"); never
-  repeat its slogan as an insight. Say plainly what the article does not show.
+  ATTRIBUTED, never endorsed ("לפי החברה", "לפי המספרים שלהם"), and the hosts are free to
+  doubt it out loud. Say plainly what the article does not show.
 - Shape of a good exchange (invented subject; do not reuse its facts or wording):
-    {a}: הרשת X העלתה את העמלה, וה-CPM בקטגוריה קפץ ב-18 אחוז ברבעון.
-    {b}: עלייה כזו כואבת רק אם ה-ROAS לא עלה איתה. יש נתון על זה?
-    {a}: יש. ה-ROAS במשחקי קז'ואל כמעט לא זז, אז המרווח הצטמצם.
-    {b}: זה ממוצע. אני מנחש שהפער גדול בין מי שמריץ קריאייטיב אחד לבין מי שמריץ עשרים.
-    {a}: הכתבה לא מפרטת, אז זו שאלה פתוחה. מה שברור הוא שהעלות השולית עלתה.
+    {a}: אם אתה מריץ משחק קז'ואל על מודעות, הסיפור הזה נוגע לכיס שלך. הרשת X העלתה את העמלה, וה-CPM בקטגוריה קפץ ב-18 אחוז ברבעון אחד.
+    {b}: שמונה-עשרה אחוז נשמע רע, אבל אני לא בטוח שזה הסיפור. מי שה-ROAS שלו עלה באותה תקופה בכלל לא מרגיש את זה.
+    {a}: אז זהו, שה-ROAS כמעט לא זז. המרווח פשוט הצטמצם.
+    {b}: בממוצע. אני מוכן להתערב שמי שמריץ עשרים קריאייטיבים בשבוע נפגע הרבה פחות ממי שמריץ אחד.
+    {a}: הכתבה לא מפרטת את זה, אז זה נשאר ניחוש שלך. אבל אני חושבת שאתה מפספס משהו: גם הגדולים משלמים יותר על אותו שחקן.
+    {b}: משלמים יותר, ועדיין מרוויחים. אם הייתי סטודיו קטן, הייתי בודק השבוע כמה מהתקציב שלי יושב על הרשת הזאת.
 - Never read a URL aloud; attribute by outlet name.
 - Never use the ASCII double-quote character (") in the spoken text. Write Hebrew acronyms
   with gershayim ״ (ארה״ב, מנכ״ל) and quote with single quotes '. Every turn ends with
@@ -298,6 +319,11 @@ def segment_prompt(article: dict, index: int, total: int, role: str, memory_cont
                   "ONLY if this article is genuinely about it, never force a callback, and do "
                   "not name a company from here unless this article is about it):\n"
                   + memory_context + "\n")
+    quick = ""
+    if role == "BRIEF":
+        quick = ("\nTHIS IS A QUICK HIT: 4-6 turns in all. One or two sentences on what happened, "
+                 "the single number that matters, one sharp reaction or disagreement, done. The "
+                 "hook is the first sentence. No discussion section. List only 1-2 key points.\n")
     partial = ""
     if article.get("partial"):
         partial = ("\nPARTIAL: only the newsletter preview of this article was available. "
@@ -318,18 +344,21 @@ DO THESE IN ORDER
 3. headline: a short Hebrew title for this story (under 10 words). takeaway: one Hebrew
    sentence, the concrete thing an operator should check, test or watch because of it.
    caution: what the article does NOT show or what must not be overstated.
-4. key_points: the 3-8 points a listener must come away with: figures WITH what they
-   compare to (period, base, whose data), named parties, status and timeline (proposal or
-   ruling? in force from when?), and the reason behind the result. Only what the article
-   says. Every figure written as digits.
-5. script: the conversation. COVERAGE STANDARD: the story is covered when a listener could
-   explain it to a colleague: what happened, the numbers, why it happened, what an operator
-   should do about it, and what the article does not show. Cover EVERY key point, each in
-   its own moment, its numbers said out loud as digits; do not squeeze several points into
-   one turn. Length follows the material: a rich article takes as long as it needs (typical
-   for this role: about {lo}-{hi} turns), a thin one fewer. Never pad or repeat, and never
-   drop a point to stay short.
-
+4. key_points: the 3-5 points that matter most to THIS listener: the figures that carry
+   the story WITH what they compare to (period, base, whose data), the named parties, the
+   status (proposal or ruling? in force from when?) and the reason behind the result. Only
+   what the article says. Every figure written as digits. Leave secondary figures out.
+5. hook: one Hebrew sentence: why should the owner of a casual / hybrid-casual / real-money
+   skill games company care about this story? Name the stake (money, risk, an opening, a
+   competitor's move). debate: one or two Hebrew sentences: the question the hosts will dig
+   into or disagree on, and where each of them stands.
+6. script: the conversation, built in this order: (a) the hook, in the first one or two
+   turns; (b) what happened, briefly, with the key points' numbers said out loud as digits;
+   (c) THE DISCUSSION, at least a third of the turns: the debate above, what it means for a
+   studio like the listener's, whether the claims hold up, what the hosts would do; (d) a
+   landing in the hosts' own words. Every key point is covered. Length follows the material
+   (typical for this role: about {lo}-{hi} turns). Never pad, never recite.
+{quick}
 {_style_rules(a, b)}
 {lang_inst}
 
@@ -397,12 +426,15 @@ def frame_prompt(segments: list[dict], speakers: tuple[str, str], lang: str,
    hype, no exclamations. Do not introduce the hosts. Use only what is in the stories.
 3. bridges: the stories were written separately, so the listener needs a thread between
    them. For each pair of neighbouring stories (after_story N = between story N and N+1)
-   write ONE spoken turn by {b}, 12-30 words, that links them honestly: a shared pattern, a
-   contrast, a consequence. Use ONLY facts in the KEY POINTS of those two stories; no number
-   and no company name that is not in them. It must make sense on its own, must not repeat
-   what was just said, and ends the previous story's mood while pointing at the next without
-   announcing it ("בוא נעבור" is not a link). If two neighbouring stories have nothing honest
-   in common, return an empty text for that bridge. Provide a bridge entry for every pair.
+   write ONE spoken turn by {b}, 8-22 words, the way a person changes the subject in a real
+   conversation: a contrast ("ואם שם הבעיה היא הרגולטור, כאן הבעיה היא החנות עצמה"), a
+   consequence, a wry remark, a shared pattern. Build every link DIFFERENTLY: never the same
+   sentence shape twice, and never an abstract summary of an industry trend. Use ONLY facts
+   in the KEY POINTS of those two stories; no number and no company name that is not in
+   them. It must not repeat what was just said and must not announce the next story ("בוא
+   נעבור" is not a link). If two neighbouring stories have nothing honest in common, return
+   an empty text for that bridge: no link is better than a forced one. Provide a bridge
+   entry for every pair.
 {theme}
 STORIES, in running order:
 {stories}
@@ -419,14 +451,17 @@ def plan_prompt(articles: list[dict], lang: str) -> str:
         gist = " ".join((art.get("text") or "").split()[:70])
         lines.append(f"{n}. [{art.get('source', '')}, score {art.get('_score', '?')}] "
                      f"{art['title']}\n   {gist}")
+    deep = DEEP_STORIES
     return f"""{top}You are the producer of a weekly mobile-games podcast for the owner of a
 casual / hybrid-casual / real-money-skill-games company. These stories were selected for
 this week's episode. Decide how to tell them as ONE episode rather than a list.
 
-1. order: all story numbers, in running order. The highest-scored story opens; after that
-   group stories that belong together (the same theme, the same kind of event) next to each
-   other, and put a lighter or more surprising story where the episode needs relief. Use
-   every number exactly once.
+1. order: all story numbers, in running order. The highest-scored story opens. The first
+   {deep} stories are told in depth, as a real discussion; the rest are quick hits of a few
+   lines at the end. So put first the stories with the most to DISCUSS for this listener (a
+   decision, a risk, a disagreement, a lesson), next to each other when they belong
+   together, and leave for the quick hits the ones that are just news. Use every number
+   exactly once.
 2. through_line: one short sentence in the output language naming what this week's stories
    have in common or what the week says about the industry. No numbers, no company names.
 3. angles: for each story, one short sentence in the output language on what to emphasise
@@ -459,6 +494,23 @@ def _clean_script(raw: list[dict], speakers: tuple[str, str]) -> tuple[list[dict
     return script, problems
 
 
+def delivery_problems(script: list[dict], speakers: tuple[str, str]) -> list[str]:
+    """The two measurable signs of a recital (2026-11-16: "good content, boring delivery"):
+    the analyst only asks questions, and turns that pile up figures."""
+    problems = []
+    analyst = [t for t in script if t["speaker"] == speakers[1]]
+    asks = sum(1 for t in analyst if t["text"].rstrip().endswith("?"))
+    if len(analyst) >= 4 and asks / len(analyst) > 0.5:
+        problems.append(f"it reads as an interview: {asks} of {speakers[1]}'s {len(analyst)} turns are "
+                        f"questions. {speakers[1]} must mostly state views, doubts and comparisons; "
+                        "fewer than half of his turns may be questions")
+    heavy = sum(1 for t in script if len(_NUM_RE.findall(t["text"])) >= 4)
+    if len(script) >= 6 and heavy / len(script) > 0.2:
+        problems.append(f"{heavy} turns each recite four or more figures: keep only the numbers that "
+                        "carry the story, at most two in a turn, and spend the turns on what they mean")
+    return problems
+
+
 def segment_problems(seg: dict, role: str, speakers: tuple[str, str], lang: str) -> list[str]:
     problems = []
     script = seg["script"]
@@ -471,7 +523,10 @@ def segment_problems(seg: dict, role: str, speakers: tuple[str, str], lang: str)
     if missing:
         problems.append("the key points' numbers are never said in the conversation: "
                         + ", ".join(missing))
-    uncovered = len(seg["key_points"]) > 0 and len(script) < len(seg["key_points"]) * 2
+    uncovered = (role != "BRIEF" and len(seg["key_points"]) > 0
+                 and len(script) < len(seg["key_points"]) * 2)
+    if role != "BRIEF":
+        problems += delivery_problems(script, speakers)
     if uncovered:
         problems.append(f"{len(seg['key_points'])} key points need more than {len(script)} turns")
     problems += script_quality.script_style_problems(script, lang)
@@ -634,6 +689,8 @@ class Writer:
             "key_points": [str(p).strip() for p in raw.get("key_points") or [] if str(p).strip()][:8],
             "caution": str(raw.get("caution") or "").strip(),
             "takeaway": str(raw.get("takeaway") or "").strip(),
+            "hook": str(raw.get("hook") or "").strip(),
+            "debate": str(raw.get("debate") or "").strip(),
             "script": script,
             "model": raw.get("_model"),
         }
@@ -780,6 +837,12 @@ def fallback_outro(speakers: tuple[str, str], lang: str) -> list[dict]:
     return [{"speaker": a, "text": "That is this week's episode. Thanks for listening, see you next week."}]
 
 
+def quick_hits_line(speakers: tuple[str, str], lang: str) -> dict:
+    text = ("לפני שנסיים, עוד כמה דברים מהשבוע, בקצרה." if lang == "he"
+            else "Before we wrap up, a few more things from the week, briefly.")
+    return {"speaker": speakers[1], "text": text}
+
+
 def validate_bridge(text: str, before: dict, after: dict, speaker: str, lang: str) -> dict | None:
     """The link turn between two stories, or None. Its numbers must come from those
     two stories, it must be short, spoken Hebrew, and one clean turn."""
@@ -788,7 +851,7 @@ def validate_bridge(text: str, before: dict, after: dict, speaker: str, lang: st
         return None
     turn = turns[0]
     words = turn["text"].split()
-    if not 5 <= len(words) <= 45:
+    if not 5 <= len(words) <= 32:
         return None
     pool = set()
     for seg in (before, after):
@@ -858,10 +921,16 @@ def assemble_episode(done: dict, articles: list[dict], *, call, models: dict,
     through = (plan or {}).get("through_line", "")
     title, outro, bridges = build_frame(segs, call=call, models=models, speakers=speakers,
                                         lang=lang, log=log, through_line=through)
+    # Links only between stories told in depth; the quick hits at the end get one fixed
+    # line before the first of them and then follow each other directly.
+    brief = [role_for(i, articles[i]) == "BRIEF" for i, _ in kept]
+    bridges = {k: t for k, t in bridges.items() if not brief[k] and not brief[k - 1]}
     script: list[dict] = []
     for k, seg in enumerate(segs):
         if k in bridges:
             script.append(bridges[k])
+        elif brief[k] and k > 0 and not brief[k - 1]:
+            script.append(quick_hits_line(speakers, lang))
         script += seg["script"]
     script += outro
     script, trimmed = script_quality.trim_agreement_openers(script)

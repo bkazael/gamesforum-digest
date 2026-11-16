@@ -53,7 +53,9 @@ Rules that make it robust:
 | `checkpoint.py` | `work/` (committed text work) and `.checkpoint/` (cached speech chunks) |
 | `script_quality.py`, `speech.py`, `audio_tools.py` | Deterministic text repair, term translation, chunking and PCM decoding |
 | `memory.py`, `source_health.py`, `runtime.py` | Episode memory, source alerts (fetch and yield), atomic writes, profile validation |
+| `voice_check.py`, `nikud.py` | After voicing: do both hosts' voices exist in the chunk (pitch spread, numpy)? Before voicing: vowel marks on ambiguous Hebrew words, for the voice only |
 | `check_week.py` | The Wednesday check |
+| `voice_sample.py` | A/B sample (with and without vowel marks) into `samples/` |
 | `preview.py`, `live_smoke.py`, `probe_source.py` | Isolated previews; a paid smoke test; the source probe that prints a ready block |
 
 ## Cohesion: how the pieces become one episode
@@ -72,6 +74,16 @@ but are tied together in four places:
    validators are tuned, so it was not merged into the frame call).
 
 `feedback.md` (the owner's notes) goes to every story prompt as taste.
+
+## Delivery: why a story is worth listening to
+
+The first episode built this way was accurate and dull: an interview in which one host asked and
+the other recited figures. Now each story decides a `hook` (why this listener should care) and a
+`debate` (what the hosts dig into or disagree on) before the script, and is built hook, what
+happened, discussion (at least a third), landing. Two free checks trigger the one rewrite:
+`delivery_problems` flags an analyst whose turns are mostly questions and turns that pile up four or
+more figures. The first `deep_stories` (4) stories are discussed in depth; the rest are quick hits
+of 4-6 turns after a fixed line, with links only between the deep ones.
 
 ## Model routing and budget
 

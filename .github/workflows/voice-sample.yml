@@ -1,0 +1,41 @@
+name: Voice sample (manual; vowel marks A/B)
+
+# Voices one short passage of the latest episode twice, without and with vowel marks on the
+# ambiguous words, and commits both to samples/ so they can be played from the site.
+# One text call and two speech calls.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  sample:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && pip install -q numpy
+      - name: Voice the sample
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PODCAST_BASE_URL: ${{ vars.PODCAST_BASE_URL }}
+          TTS_MODEL: ${{ vars.TTS_MODEL }}
+          GEMINI_CREATIVE_MODEL: ${{ vars.GEMINI_CREATIVE_MODEL }}
+        run: python voice_sample.py
+      - name: Commit the sample
+        run: |
+          git config user.name  "gamesforum-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add samples
+          git commit -m "voice sample: $(date -u +%Y-%m-%d)" || exit 0
+          git pull --rebase --autostash origin main && git push

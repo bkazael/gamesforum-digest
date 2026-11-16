@@ -43,7 +43,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install ffmpeg
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg && pip install -q numpy   # numpy: voice_check.py
 
       # No pip install: live_smoke.py and the modules it imports are
       # stdlib-only, same as the production pipeline.

@@ -86,8 +86,8 @@ check("the last story does not sign off either (the frame writes the outro)",
       "show outro is written separately" in last)
 check("no line of the prompt tells the writer a hand-over happened or is wanted",
       "hand-over" not in p0.replace("hand over to any other story", "") and "hand-over" not in prompt(index=1))
-check("the style rules no longer forbid advice while the coverage standard demands it",
-      "Never close a story with advice" in p0 and "Do not end with" not in p0)
+check("a story ends on the hosts' own conclusion, not a lecture",
+      "End on the hosts' own conclusion" in p0 and "Not a\n  lecture" in p0)
 themed = prompt(index=1, theme="שבוע של רגולציה", angle="מה זה אומר ל-RMG", feedback="- פחות מספרים")
 check("the episode theme, the story's angle and the listener's notes reach the writer",
       "EPISODE THEME" in themed and "שבוע של רגולציה" in themed and "THIS STORY'S ANGLE" in themed
@@ -97,10 +97,38 @@ check("without theme, angle or notes none of those sections appears",
       "EPISODE THEME" not in p0 and "LISTENER'S OWN NOTES" not in p0)
 check("the Hebrew rule comes first and again after the article",
       p0.startswith("OUTPUT LANGUAGE: HEBREW") and p0.rstrip().endswith("source material only."))
-check("the prompt asks for the key points first, then a conversation that covers every one",
-      p0.index("key_points:") < p0.index("script:") and "Cover EVERY key point" in p0)
-check("depth is a coverage standard with a typical size, and no word target",
-      "COVERAGE STANDARD" in p0 and "typical" in p0 and "1,400" not in p0 and "word target" not in p0)
+check("the prompt decides key points, then the hook and the debate, and only then writes the script",
+      p0.index("key_points:") < p0.index("hook:") < p0.index("debate:") < p0.index("script:")
+      and "Every key point is covered" in p0)
+check("the script is built as hook, what happened, discussion, landing; with a typical size and no word target",
+      "THE DISCUSSION, at least a third of the turns" in p0 and "typical" in p0 and "word target" not in p0)
+check("the writer is told the thinking is the segment, to choose the numbers, and not to interview",
+      "That thinking is the\n  segment" in p0 and "never more than two numbers in one turn" in p0
+      and "No question-answer ping-pong" in p0 and "fewer than half" in p0)
+check("a host's own illustration is marked as opinion and never carries digits",
+      "never contains a figure written in digits" in p0)
+check("a quick hit is told it is one: a few turns, one number, one reaction",
+      "THIS IS A QUICK HIT" in prompt(index=5, total=8, role="BRIEF") and "THIS IS A QUICK HIT" not in p0)
+
+# delivery: the two measurable signs of a recital (2026-11-16)
+interview = [{"speaker": A if i % 2 == 0 else B, "text": "מה קרה שם?" if i % 2 else "קרה משהו עם 41."}
+             for i in range(12)]
+check("an analyst who only asks questions is flagged as an interview",
+      any("reads as an interview" in p for p in S.delivery_problems(interview, SP)))
+talk = [{"speaker": A if i % 2 == 0 else B, "text": "אני חושב שזה לא הסיפור." if i % 2 else "קרה משהו עם 41."}
+        for i in range(12)]
+check("a real exchange of statements is not", S.delivery_problems(talk, SP) == [])
+dump = [{"speaker": A if i % 2 == 0 else B, "text": "עלה ב-12 אחוז ל-340 מיליון, מול 290 ו-18 אחוז." if i % 2 == 0 else "מעניין."}
+        for i in range(10)]
+check("turns that pile up four or more figures are flagged",
+      any("recite four or more figures" in p for p in S.delivery_problems(dump, SP)))
+real = [dict(speaker=l.split(": ", 1)[0], text=l.split(": ", 1)[1]) for l in
+        (pathlib.Path(__file__).parent / "digests" / "2026-11-16-script.md").read_text(encoding="utf-8").splitlines()
+        if ": " in l]
+check("the 2026-11-16 episode itself is caught by the interview check",
+      any("reads as an interview" in p for p in S.delivery_problems(real[5:34], SP)))
+check("stories beyond DEEP_STORIES are quick hits, whatever their length",
+      [S.role_for(i, long_article) for i in range(6)] == ["LEAD", "MAJOR", "STANDARD", "STANDARD", "BRIEF", "BRIEF"])
 check("a vendor or company source is attributed, never endorsed", "ATTRIBUTED, never endorsed" in p0)
 check("memory context is inserted only when there is some",
       "PREVIOUS EPISODES" in prompt(memory="- prior: x") and "PREVIOUS EPISODES" not in p0)

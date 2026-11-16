@@ -196,6 +196,9 @@ min_score = 6
 max_articles = 8
 core_articles = 6
 extra_slot_min_score = 8.0
+# כמה סיפורים מקבלים דיון מלא (למה זה חשוב, מה קרה, מה המנחים חושבים). השאר נאמרים
+# "בקצרה" בסוף הפרק, 4-6 שורות כל אחד. פרק של 8 סיפורים שווים נשמע שטוח (16.11).
+deep_stories = 4
 min_words = 120
 max_age_days = 7        # שבועי, קבוע. הניסיון החד-פעמי בסריקת חודש שלם (30 יום) הסתיים.
 
@@ -258,6 +261,9 @@ Pacing: leave a clear pause whenever the speaker changes, and a short beat after
 """
 
 [speech]
+# ניקוד למילים רב-משמעיות לפני ההקראה (nikud.py): הקול מנחש תנועות, ומילים כמו "ספר"
+# או "חברה" נקראות לא נכון. התסריט השמור נשאר בלי ניקוד. false מכבה.
+vocalize = true
 # Speech speed after synthesis (1.0 = as generated; 0.94 = 6% slower, same
 # pitch). Lowered because the hosts sounded rushed. Range 0.8-1.2.
 tempo = 0.94

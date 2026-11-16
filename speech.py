@@ -27,6 +27,21 @@ def prepare_turns(turns: list[dict], replacements: dict[str, str]) -> list[dict]
     return prepared
 
 
+def merge_same_speaker(turns: list[dict]) -> list[dict]:
+    """Join consecutive turns of the same speaker into one, for the voice only.
+
+    The two-voice speech model is told who says each line; two lines in a row by the same
+    host (a story's last turn followed by his link to the next story) are a likely trigger
+    for it losing track of which voice is which (2026-11-16)."""
+    out: list[dict] = []
+    for turn in turns:
+        if out and out[-1]["speaker"] == turn["speaker"]:
+            out[-1] = {**out[-1], "text": out[-1]["text"].rstrip() + " " + turn["text"].lstrip()}
+        else:
+            out.append(dict(turn))
+    return out
+
+
 def untranslated_hebrew_terms(turns: list[dict], lang: str) -> list[str]:
     """Catch common English acronyms that should not be read as Hebrew words."""
     if lang.lower().split("-")[0] != "he":

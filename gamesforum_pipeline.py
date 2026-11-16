@@ -29,6 +29,7 @@ import runtime
 import article_parser
 import audio_tools
 import speech as speech_tools
+import voice_check
 
 # ---------------------------------------------------------------- config
 
@@ -406,6 +407,8 @@ class TTSTruncatedError(RuntimeError):
 
 # Attempts per chunk are bounded by the run deadline (llm.check_deadline), not by this count.
 _tts_state = {"fallback_used": False}
+VOICE_RETRIES = 2                  # extra takes for a chunk whose two voices are not distinct
+VOICE_REPORT: list[dict] = []      # failed takes of this run, for the run report
 
 
 def tts_model() -> str:
@@ -550,7 +553,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
     if not 0.8 <= tempo <= 1.2:
         raise ValueError(f"[speech] tempo must be between 0.8 and 1.2, got {tempo}")
     slow = f"atempo={tempo:g}," if tempo != 1.0 else ""
-    spoken_turns = speech_tools.prepare_turns(script_turns, glossary)
+    spoken_turns = speech_tools.merge_same_speaker(speech_tools.prepare_turns(script_turns, glossary))
     chunks = audio_tools.chunks_for_turns(spoken_turns, TTS_CHUNK_CHAR_LIMIT)
 
     log(f"synthesizing audio via Gemini TTS in {len(chunks)} batched chunks...")
@@ -575,6 +578,30 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
             second = synthesize_with_split("\n".join(turns[mid:]), f"{label}b")
             return first + second
 
+    def voiced_and_checked(chunk_text: str, idx: int) -> bytes:
+        """Voice a chunk and measure it: both hosts' voices must be there (voice_check.py).
+        A chunk that fails is voiced again, up to VOICE_RETRIES times; the take with the
+        widest pitch spread is kept, so a retry can only improve on the first."""
+        both = all(f"{name}: " in chunk_text for name in (SPEAKER_A, SPEAKER_B))
+        best, best_spread, note = None, -1.0, ""
+        for take in range(1 + VOICE_RETRIES):
+            audio = synthesize_with_split(chunk_text, f"chunk {idx}")
+            ok, note, spread = voice_check.judge(audio, both)
+            if best is None or spread > best_spread:
+                best, best_spread = audio, spread
+            if ok:
+                if take:
+                    log(f"    chunk {idx}: take {take + 1} has both voices ({note})")
+                return audio
+            print(f"::warning::speech chunk {idx}, take {take + 1}: the two hosts' voices are not "
+                  f"distinct ({note}); " + ("voicing it again" if take < VOICE_RETRIES
+                                            else "keeping the best take"), flush=True)
+            VOICE_REPORT.append({"chunk": idx, "take": take + 1, "note": note})
+        return best
+
+    if not voice_check.available():
+        print("::warning::numpy is not installed: the voices of each speech chunk are not checked",
+              flush=True)
     pcm = bytearray()
     for idx, chunk_text in enumerate(chunks, 1):
         identity = audio_identity(chunk_text)
@@ -586,7 +613,7 @@ def synthesize_audio(script_turns: list[dict], wav_path: pathlib.Path,
             continue
 
         log(f"  processing TTS chunk {idx}/{len(chunks)} ({len(chunk_text)} chars)...")
-        audio_bytes = synthesize_with_split(chunk_text, f"chunk {idx}")
+        audio_bytes = voiced_and_checked(chunk_text, idx)
         if date:
             # Save before the inter-chunk sleep, not after the loop: the
             # whole point is that a chunk survives whatever kills the run
@@ -882,7 +909,10 @@ def publish_episode(articles: list[dict], data: dict, key: str, today: str,
                          "\n".join(f"{t['speaker']}: {t['text']}" for t in data["script"]))
 
     wav_path, mp3_path = EPISODES / f"{today}.wav", EPISODES / f"{today}.mp3"
-    synthesize_audio(data["script"], wav_path, mp3_path, date=key)
+    # The voice reads the script with vowel marks on the ambiguous words (nikud.py); the
+    # saved and published script stays unpointed.
+    import nikud
+    synthesize_audio(nikud.apply(data["script"], data.get("vocalization")), wav_path, mp3_path, date=key)
     duration = get_duration(mp3_path)
     words = script_quality.count_words(data["script"])
     wpm = round(words / max(duration - 7, 1) * 60, 1)
@@ -914,7 +944,7 @@ def publish_episode(articles: list[dict], data: dict, key: str, today: str,
         "duration_seconds": duration, "words_per_minute": wpm,
         "models": {"scoring": live_model(GEMINI_SCORING_MODEL), "creative": live_model(GEMINI_CREATIVE_MODEL),
                    "review": live_model(GEMINI_REVIEW_MODEL), "tts": live_model(TTS_MODEL)},
-        "usage": llm.USAGE_LOG, "calls": llm.usage_report(),
+        "usage": llm.USAGE_LOG, "calls": llm.usage_report(), "voice_retakes": VOICE_REPORT,
         "week": week_history or [],
         "elapsed_seconds": round(time.monotonic() - llm._run_started, 1),
         "profile_fingerprint": runtime.fingerprint(runtime.load_profile()),

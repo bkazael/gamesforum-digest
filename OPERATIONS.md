@@ -67,6 +67,7 @@ there is still no episode. To diagnose, read `work/plan.json` (`last_error`, `hi
 | `story N cut from the episode` | A factual error survived one rewrite | Read the editorial report |
 | `Only N stories survived review` | Fewer than three left | Read the editorial report; the next run retries from the saved stories |
 | `source alert: ... listed but none scored` | A source fetches but cannot feed an episode | `reports/source_yield.json`; probe the source |
+| `speech chunk N ...: the two hosts' voices are not distinct` | The speech model gave both hosts similar voices in that chunk | It is voiced again automatically (up to 3 takes); see `voice_retakes` in the run report |
 | `ffmpeg ... failed` / `assembled as:` | The mix fell back (without slow-down, or without the jingle) | The episode still published; look at the ffmpeg line |
 | Any other traceback | A bug | Fix with a test; do not re-run the same day on the free tier |
 
@@ -81,6 +82,8 @@ chunks are cached by their text, so only changed chunks cost anything.
   (8.0): six places for anything over the bar, two more only for 8+ stories, so a weak week stays at
   six; `max_age_days`, `min_words`, `require_publication_date`, `min_scoring_coverage`.
 - `[identity]`, `[interests]`: the taste the scorer and writers use.
+- `[thresholds] deep_stories` (4): how many stories get a full discussion; the rest are quick hits.
+- `[speech] vocalize`: vowel marks on ambiguous words for the voice (run **Voice sample** to hear the difference).
 - `[voice]`: speaker names, voices, delivery direction; `[speech] tempo` (0.94 = slightly slower);
   `[speech.replacements]`: pronunciation glossary, applied to speech only.
 - Sources: below.

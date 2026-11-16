@@ -101,6 +101,10 @@ def fake_model(prompt, schema=None, **kw):
     if "edits" in props:
         calls.append("proofread")
         return {"edits": []}
+    if "words" in props:
+        calls.append("nikud")
+        return {"words": [{"turn": 2, "word": "דנה", "vocalized": "דָּנָה"},
+                          {"turn": 2, "word": "לא-קיים", "vocalized": "x"}]}
     raise AssertionError("unexpected schema")
 
 
@@ -194,11 +198,14 @@ with tempfile.TemporaryDirectory() as tmp:
         day(SUN)
         check("Sunday writes the last two stories, then edits: ONE review, ONE frame, the intro, the proofread",
               calls.count("story") == 2 and calls.count("review") == 1 and calls.count("frame") == 1
-              and calls.count("intro") == 1 and calls.count("proofread") == 1 and not state["synth"], str(calls))
+              and calls.count("intro") == 1 and calls.count("proofread") == 1 and calls.count("nikud") == 1
+              and not state["synth"], str(calls))
         content = CP.load_content(TARGET)
-        check("the script is saved with the links between stories in it",
-              content[1]["script"] and content[1]["bridges_used"] == 5
-              and sum(1 for t in content[1]["script"] if "מחבר אותנו" in t["text"]) == 5)
+        texts = [t["text"] for t in content[1]["script"]]
+        check("links only between the four stories told in depth; one fixed line opens the quick hits",
+              sum(1 for t in texts if "מחבר אותנו" in t) == 3 and sum(1 for t in texts if "בקצרה" in t) == 1, str(len(texts)))
+        check("the pointed words for the voice are saved; a word not in its turn is refused",
+              content[1]["vocalization"] == [{"turn": 2, "word": "דנה", "vocalized": "דָּנָה"}], str(content[1].get("vocalization")))
 
         day(MON)
         check("Monday: no model call at all, the episode is voiced and published", calls == [] and len(state["synth"]) == 1, str(calls))
@@ -211,6 +218,9 @@ with tempfile.TemporaryDirectory() as tmp:
               plan["published"] == MON.isoformat() and len(plan["history"]) == 4, str(plan["history"]))
         check("the voiced script opens with the welcome, ends with the outro",
               state["synth"][0][0] == P.welcome_turn() and state["synth"][0][-1]["text"] == "תודה שהאזנתם.")
+        check("the voice gets the pointed word, the published script file stays unpointed",
+              "דָּנָה" in state["synth"][0][1]["text"]
+              and "דָּנָה" not in (P.DIGESTS / f"{MON.isoformat()}-script.md").read_text(encoding="utf-8"))
         check("the week's content file is gone after publishing", CP.load_content(TARGET) is None)
         report = json.loads((P.ROOT / "reports" / f"{MON.isoformat()}-run.json").read_text())
         check("the run report carries the week's history and the model call counts",

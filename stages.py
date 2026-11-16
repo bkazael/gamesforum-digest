@@ -229,6 +229,14 @@ class Run:
             data["proofread_done"] = True
             self.save(articles, data)
             self.did.append(f"proofread ({data['proofread'].get('applied', 0)} fixes)")
+        speech_cfg = runtime.load_profile().get("speech", {})
+        if "vocalization" not in data and data.get("proofread_done") and speech_cfg.get("vocalize", True) \
+                and P.LANG == "he":
+            import nikud
+            data["vocalization"] = nikud.vocalize(data["script"], call=self.call,
+                                                  model=llm.GEMINI_CREATIVE_MODEL, log=log)
+            self.save(articles, data)
+            self.did.append(f"vowel marks on {len(data['vocalization'])} words")
         return P.finalize_episode(data, self.key)
 
     def hold_back(self, articles: list[dict], data: dict) -> bool:
@@ -294,6 +302,7 @@ def run(today: dt.date) -> int:
     llm.configure(checkpoint.WORK_DIR / "usage.json")
     force = os.environ.get("PIPELINE_FORCE", "").lower() in {"1", "true", "yes"}
     r = Run(today, force)
+    segments.DEEP_STORIES = int(runtime.load_profile().get("thresholds", {}).get("deep_stories", 4))
     log(f"{today} ({WEEKDAYS[today.weekday()]}): episode for {r.key}, day {r.day:+d} of the week's plan"
         + (" [forced]" if force else ""))
 
