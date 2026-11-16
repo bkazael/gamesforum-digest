@@ -82,7 +82,7 @@ chunks are cached by their text, so only changed chunks cost anything.
   (8.0): six places for anything over the bar, two more only for 8+ stories, so a weak week stays at
   six; `max_age_days`, `min_words`, `require_publication_date`, `min_scoring_coverage`.
 - `[identity]`, `[interests]`: the taste the scorer and writers use.
-- `[thresholds] deep_stories` (4): how many stories get a full discussion; the rest are quick hits.
+- `[thresholds] deep_stories` (6): how many stories get a full discussion; the rest are quick hits.
 - `[speech] vocalize`: vowel marks on ambiguous words for the voice (run **Voice sample** to hear the difference).
 - `[voice]`: speaker names, voices, delivery direction; `[speech] tempo` (0.94 = slightly slower);
   `[speech.replacements]`: pronunciation glossary, applied to speech only.

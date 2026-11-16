@@ -82,7 +82,7 @@ the other recited figures. Now each story decides a `hook` (why this listener sh
 `debate` (what the hosts dig into or disagree on) before the script, and is built hook, what
 happened, discussion (at least a third), landing. Two free checks trigger the one rewrite:
 `delivery_problems` flags an analyst whose turns are mostly questions and turns that pile up four or
-more figures. The first `deep_stories` (4) stories are discussed in depth; the rest are quick hits
+more figures. The first `deep_stories` (6) stories are discussed in depth; the rest are quick hits
 of 4-6 turns after a fixed line, with links only between the deep ones.
 
 ## Model routing and budget

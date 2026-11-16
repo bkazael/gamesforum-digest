@@ -139,12 +139,25 @@ def setup(tmp: pathlib.Path):
     llm.DAILY_BUDGET = 100
     llm.GEMINI_CREATIVE_MODEL = "creative-m"
     llm.quota_day = lambda now=None: "same-day"
+    ST.runtime.load_profile = _profile_with_deep(4)
     calls.clear()
     state.update(weak_only=False, blocking_story=None, fail_synth=False, synth=[])
     return saved
 
 
+_real_load_profile = ST.runtime.load_profile
+
+
+def _profile_with_deep(n):
+    def load(*a, **k):
+        prof = _real_load_profile(*a, **k)
+        prof.setdefault("thresholds", {})["deep_stories"] = n
+        return prof
+    return load
+
+
 def restore(saved):
+    ST.runtime.load_profile = _real_load_profile
     CP.WORK_DIR, CP.CHECKPOINT_DIR = saved["CP"]
     P.EPISODES, P.DIGESTS, P.ROOT, P.STATE_FILE, P.ASSETS_DIR = saved["P"]
     (P.synthesize_audio, P.get_duration, P.build_feed, P.preflight, P.memory.append_entry,
@@ -161,6 +174,9 @@ def day(d):
     calls.clear()
     return ST.run(d)
 
+
+check("the profile asks for six stories in depth, the rest as quick hits",
+      _real_load_profile()["thresholds"]["deep_stories"] == 6)
 
 # ---------------------------------------------------------------- the calendar
 check("Mon-Wed belong to this week's Monday, Thu-Sun to the next one",
