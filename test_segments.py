@@ -110,13 +110,6 @@ check("a host's own illustration is marked as opinion and never carries digits",
 check("the processing step comes before the script: insights the article does not state, then the debate",
       p0.index("hook:") < p0.index("insights: THE PROCESSING") < p0.index("debate:") < p0.index("script:")
       and "A restated fact is not an insight" in p0 and "reach EVERY insight" in p0)
-thin = S.segment_problems({"script": turns(20, "41."), "key_points": ["41"], "insights": ["אחת."]}, "LEAD", SP, "he")
-check("a deep story with fewer than two insights is sent back", any("fewer than two insights" in p for p in thin))
-check("...a quick hit is not", not any("insights" in p for p in S.segment_problems(
-    {"script": turns(5, "41."), "key_points": ["41"], "insights": []}, "BRIEF", SP, "he")))
-check("the fact reviewer is told that analysis framed as the hosts' view is wanted",
-      "SUPPOSED to analyse" in S.review_prompt([{"story": 1, "article": {"title": "t", "text": "x"},
-                                                 "script": turns(2), "suspects": []}], SP))
 check("a quick hit is told it is one: a few turns, one number, one reaction",
       "THIS IS A QUICK HIT" in prompt(index=5, total=8, role="BRIEF") and "THIS IS A QUICK HIT" not in p0)
 
@@ -301,6 +294,14 @@ check("a Hebrew sentence full of English names and terms is not mistaken for Eng
 # a BRIEF has a lower floor
 r_brief = seg(stub(script=turns(5, "41.")), role="BRIEF")
 check("a short item may be short: 5 turns is fine for a BRIEF", r_brief["status"] == "ok" and len(r_brief["script"]) == 5)
+
+# insights: the processing step (2026-11-16)
+thin = S.segment_problems({"script": turns(20, "41."), "key_points": ["41"], "insights": ["אחת."]}, "LEAD", SP, "he")
+check("a deep story with fewer than two insights is sent back", any("fewer than two insights" in p for p in thin))
+check("...a quick hit is not", not any("insights" in p for p in S.segment_problems(
+    {"script": turns(5, "41."), "key_points": ["41"], "insights": []}, "BRIEF", SP, "he")))
+check("the fact reviewer is told that analysis framed as the hosts' view is wanted",
+      "SUPPOSED to analyse" in S.review_prompt([{"story": 1, "article": {"title": "t", "text": "x"}, "script": turns(2), "suspects": []}], SP))
 
 # ---------------------------------------------------------------- the frame
 
