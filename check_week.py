@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import sys
+from zoneinfo import ZoneInfo
 
 import checkpoint
 import runtime
@@ -18,8 +19,13 @@ AUDIO_WARN_MB = 600       # GitHub Pages sites should stay under about 1 GB
 
 
 def main(today: dt.date | None = None) -> int:
-    today = today or dt.datetime.now(dt.timezone.utc).date()
+    # The owner's calendar is Pacific, and GitHub may start a scheduled run hours late, so
+    # a Wednesday check can arrive after midnight UTC. Judge by the Pacific date, and from
+    # Thursday on check the week that just ended (the upcoming week is not due yet).
+    today = today or dt.datetime.now(ZoneInfo("America/Los_Angeles")).date()
     target = stages.week_target(today)
+    if today.weekday() >= 3:
+        target -= dt.timedelta(days=7)
     import gamesforum_pipeline as P
     published = P.episode_published_for(target)
     audio_mb = sum(p.stat().st_size for p in (runtime.OUTPUT_ROOT / "episodes").glob("*.mp3")) / 1e6
