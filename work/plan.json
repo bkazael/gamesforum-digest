@@ -45,6 +45,29 @@
     },
     "daily_budget": 16
    }
+  },
+  {
+   "date": "2026-11-22",
+   "did": [
+    "wrote 2 stories",
+    "assembled 8 stories, 5 bridges",
+    "intro",
+    "proofread (3 fixes)",
+    "vowel marks on 9 words"
+   ],
+   "status": "ok",
+   "calls": {
+    "quota_day": "2026-11-22",
+    "today": {
+     "gemini-3.8-flash": 4,
+     "gemini-3.5-flash": 7
+    },
+    "this_run": {
+     "gemini-3.8-flash": 4,
+     "gemini-3.5-flash": 7
+    },
+    "daily_budget": 16
+   }
   }
  ]
 }

@@ -1,7 +1,7 @@
 {
-  "quota_day": "2026-11-21",
+  "quota_day": "2026-11-22",
   "calls": {
-    "gemini-3.8-flash": 6,
-    "gemini-3.5-flash": 5
+    "gemini-3.8-flash": 4,
+    "gemini-3.5-flash": 7
   }
 }
