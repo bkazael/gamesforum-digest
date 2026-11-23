@@ -1,0 +1,246 @@
+{
+  "status": "complete",
+  "date": "2026-11-23",
+  "target": "2026-11-23",
+  "words": 2371,
+  "duration_seconds": 1241,
+  "words_per_minute": 115.3,
+  "models": {
+    "scoring": "gemini-3.5-flash-lite",
+    "creative": "gemini-3.8-flash",
+    "review": "gemini-3.5-flash",
+    "tts": "gemini-2.5-flash-preview-tts"
+  },
+  "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "thinking_tokens": 0,
+    "tts_chunks": 4
+  },
+  "calls": {
+    "quota_day": "2026-11-23",
+    "today": {
+      "gemini-2.5-flash-preview-tts": 4
+    },
+    "this_run": {
+      "gemini-2.5-flash-preview-tts": 4
+    },
+    "daily_budget": 16
+  },
+  "voice_retakes": [],
+  "week": [
+    {
+      "date": "2026-11-20",
+      "did": [
+        "selected 8 stories",
+        "wrote 3 stories"
+      ],
+      "status": "ok",
+      "calls": {
+        "quota_day": "2026-11-20",
+        "today": {
+          "gemini-3.5-flash-lite": 7,
+          "gemini-3.5-flash": 5,
+          "gemini-3.8-flash": 6
+        },
+        "this_run": {
+          "gemini-3.5-flash-lite": 7,
+          "gemini-3.5-flash": 5,
+          "gemini-3.8-flash": 6
+        },
+        "daily_budget": 16
+      }
+    },
+    {
+      "date": "2026-11-21",
+      "did": [
+        "wrote 3 stories"
+      ],
+      "status": "ok",
+      "calls": {
+        "quota_day": "2026-11-21",
+        "today": {
+          "gemini-3.8-flash": 6,
+          "gemini-3.5-flash": 5
+        },
+        "this_run": {
+          "gemini-3.8-flash": 6,
+          "gemini-3.5-flash": 5
+        },
+        "daily_budget": 16
+      }
+    },
+    {
+      "date": "2026-11-22",
+      "did": [
+        "wrote 2 stories",
+        "assembled 8 stories, 5 bridges",
+        "intro",
+        "proofread (3 fixes)",
+        "vowel marks on 9 words"
+      ],
+      "status": "ok",
+      "calls": {
+        "quota_day": "2026-11-22",
+        "today": {
+          "gemini-3.8-flash": 4,
+          "gemini-3.5-flash": 7
+        },
+        "this_run": {
+          "gemini-3.8-flash": 4,
+          "gemini-3.5-flash": 7
+        },
+        "daily_budget": 16
+      }
+    }
+  ],
+  "elapsed_seconds": 410.0,
+  "profile_fingerprint": "da72678d18fcf19479e0f146d666f714ae2e99171538713623d1285464ffde06",
+  "editorial": {
+    "passed": true,
+    "published_with_warnings": false,
+    "stories": 8,
+    "dropped": [],
+    "model": "gemini-3.5-flash",
+    "notes": [
+      {
+        "story": 6,
+        "turn": 5,
+        "kind": "TYPO",
+        "blocking": false,
+        "problem": "שגיאת דפוס במילה 'לללא-משלמים' (נכתבה עם שלוש אותיות ל').",
+        "fix": "תיקון המילה ל-'ללא-משלמים'.",
+        "replacement": "שם הוא טוען שיש מנגנון LowMatch שמוריד התאמות. בבדיקה שלו על 400 משחקים בשלב אחד, סיכויי הניצחון ירדו מ-52% ל-12%, והצעת המשך המשחק קפצה מ-0.99$ ללא-משלמים ל-6.99$ למשלמים."
+      },
+      {
+        "story": 4,
+        "turn": 5,
+        "kind": "ATTRIBUTION",
+        "blocking": false,
+        "problem": "הציטוט 'בלתי ישימה' (unworkable) מיוחס בדברי דנה ל-UKIE, בעוד שלפי הכתבה עמדה זו הובעה על ידי EGDF (לצד Video Games Europe), ואילו UKIE קראה תיגר על ההצעה בטיעון שהיא פוגעת בבחירת ההורים ובתעשייה הבריטית.",
+        "fix": "לייחס את האמירה 'בלתי ישימה' ל-EGDF ול-Video Games Europe, או להזכיר את הטיעון של UKIE לגבי בחירת ההורים."
+      }
+    ],
+    "proofread": {
+      "deterministic_fixes": 0,
+      "edits": [
+        {
+          "turn": 4,
+          "category": "SPELLING",
+          "action": "REPLACE",
+          "reason": "המילה 'שלכולנו' נכתבה בטעות כמילה אחת במקום 'של כולנו'.",
+          "applied": true,
+          "before": "תקציבי הפרסום של e-commerce עשויים להשפיע פה על מחירי רכישת המשתמשים שלכולנו.",
+          "after": "תקציבי הפרסום של e-commerce עשויים להשפיע פה על מחירי רכישת המשתמשים של כולנו."
+        },
+        {
+          "turn": 58,
+          "category": "SPELLING",
+          "action": "REPLACE",
+          "reason": "שגיאת כתיב במילה 'יפוך' במקום 'יהפוך'.",
+          "applied": true,
+          "before": "אם בית המשפט העליון יפוך את החלטת הביזיון, זה יעניק אור ירוק לכל פלטפורמה לקבוע עמלות עוקפות שישמרו על רווחיות הפלטפורמה בתוך ומחוץ לאפליקציה.",
+          "after": "אם בית המשפט העליון יהפוך את החלטת הביזיון, זה יעניק אור ירוק לכל פלטפורמה לקבוע עמלות עוקפות שישמרו על רווחיות הפלטפורמה בתוך ומחוץ לאפליקציה."
+        },
+        {
+          "turn": 78,
+          "category": "WRONG_WORD",
+          "action": "REPLACE",
+          "reason": "שימוש בשם העצם 'יישום' במקום בפועל הסביל 'ייושם'.",
+          "applied": true,
+          "before": "ה-DFA הוא עדיין הצעת חוק שלא אושרה, וגם אם תעבור זה יישום לכל המוקדם ב-2028. מה שבאמת דחוף זה מה שקורה בבריטניה החל מינואר 2027.",
+          "after": "ה-DFA הוא עדיין הצעת חוק שלא אושרה, וגם אם תעבור זה ייושם לכל המוקדם ב-2028. מה שבאמת דחוף זה מה שקורה בבריטניה החל מינואר 2027."
+        }
+      ],
+      "pronunciation_risks": [
+        "AppLovin",
+        "Criteo",
+        "Appcharge",
+        "Tripledot",
+        "Quinti Capital",
+        "Supercell",
+        "Ilkka Paananen",
+        "Ayo Omolewa",
+        "Monopoly Go",
+        "Royal Kingdom",
+        "Block Blast",
+        "Pixel Flow",
+        "Colony Flow",
+        "Auto Drill",
+        "Lava Labs"
+      ],
+      "status": "done",
+      "applied": 3,
+      "refused": 0
+    },
+    "through_line": "",
+    "bridges_used": 5,
+    "writers": [
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash"
+    ]
+  },
+  "artifacts": {
+    "episodes/2026-11-23.mp3": "27fb3614614b7408fded218ae700f19d809598fac67fef6f0e20344f7c4f5ea4",
+    "episodes/2026-11-23.json": "2a2d89f8daf628b53e98c4cfd34ebb293a3e3535c582c290827dcff63478f6d8",
+    "digests/2026-11-23.md": "fa7802ac0a8686febd03a76d2e6c8c5e6f2716127a9e1a73c94eec7496eafbbb",
+    "digests/2026-11-23-script.md": "43e9fb27e142de504a27b8d9d0705484c9b36748cf9c303d412b8956adae9881",
+    "feed.xml": "97e28337cdea238af823e45ca579089a44087e08a1e64a7da644936035e9d7d5"
+  },
+  "sources": [
+    {
+      "title": "From Games to DATA: $136B AppLovin Wants $1B Criteo?!",
+      "url": "https://www.gamigion.com/from-games-to-data-136b-applovin-wants-1b-criteo",
+      "published": "2026-11-19",
+      "score": 9.0
+    },
+    {
+      "title": "Appcharge launches Checkout Experimentation Lab for D2C sales",
+      "url": "https://www.pocketgamer.biz/appcharge-launches-checkout-experimentation-lab-for-d2c-sales",
+      "published": "2026-11-18",
+      "score": 9.0
+    },
+    {
+      "title": "Epic Games tells Supreme Court that Apple was rightly held in contempt",
+      "url": "https://www.pocketgamer.biz/epic-games-tells-supreme-court-that-apple-was-rightly-held-in-contempt",
+      "published": "2026-11-16",
+      "score": 9.0
+    },
+    {
+      "title": "Have your say: Feedback on the EU's Digital Fairness Act proposal opens",
+      "url": "https://www.pocketgamer.biz/have-your-say-feedback-on-the-eus-digital-fairness-act-proposal-is-open-until-january-14th",
+      "published": "2026-11-19",
+      "score": 9.0
+    },
+    {
+      "title": "Games Regulation 2026: Monetisation, AI, UGC & Privacy",
+      "url": "https://www.globalgamesforum.com/news-media/monetisation-masterclass-regulation-is-the-new-product-constrain",
+      "published": "2026-11-16",
+      "score": 8.0
+    },
+    {
+      "title": "New ‘decompilation’ videos allege Monopoly Go borrows from slot machines and Royal Kingdom secretly makes levels harder",
+      "url": "https://mobilegamer.biz/new-decompiling-videos-allege-monopoly-go-borrows-from-slot-machines-and-royal-kingdom-secretly-makes-levels-harder",
+      "published": "2026-11-19",
+      "score": 8.0
+    },
+    {
+      "title": "Data digest: Pixel Flow, Monster Hunter, October’s top games, Nintendo numbers, more",
+      "url": "https://mobilegamer.biz/data-digest-pixel-flow-monster-hunter-octobers-top-games-nintendo-numbers-more",
+      "published": "2026-11-18",
+      "score": 8.0
+    },
+    {
+      "title": "Drilling Its Way to $100K a Day",
+      "url": "https://www.gamigion.com/drilling-its-way-to-100k-a-day",
+      "published": "2026-11-19",
+      "score": 8.0
+    }
+  ]
+}

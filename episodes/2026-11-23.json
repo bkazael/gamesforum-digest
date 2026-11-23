@@ -1,0 +1,48 @@
+{
+  "title": "שינויי מוניטיזציה, רגולציה אירופית ומאבקים משפטיים בתעשיית המובייל | Ben's Weekly Digest",
+  "summary": "יש לבחון כיצד עליית מחירי ה-CPI שתיגרם מכניסת מפרסמי retail תשפיע על כדאיות רכישת משתמשים, ולהיערך לאופטימיזציית מונטיזציה שתנצל את ה-eCPM הגבוה יותר.",
+  "notes": "<p>יש לבחון כיצד עליית מחירי ה-CPI שתיגרם מכניסת מפרסמי retail תשפיע על כדאיות רכישת משתמשים, ולהיערך לאופטימיזציית מונטיזציה שתנצל את ה-eCPM הגבוה יותר.</p><p><strong>Sources (8):</strong></p><ol><li><strong>AppLovin במגעים לרכישת Criteo תמורת 1B דולר</strong><br/><a href=\"https://www.gamigion.com/from-games-to-data-136b-applovin-wants-1b-criteo\">From Games to DATA: $136B AppLovin Wants $1B Criteo?!</a> <em>(Gamigion)</em></li><li><strong>כלי חדש של Appcharge לבדיקות A/B בתהליך הצ'ק-אאוט בחנויות ווב</strong><br/><a href=\"https://www.pocketgamer.biz/appcharge-launches-checkout-experimentation-lab-for-d2c-sales\">Appcharge launches Checkout Experimentation Lab for D2C sales</a> <em>(PocketGamer.biz)</em></li><li><strong>מאבק Epic מול Apple בבית המשפט העליון על עמלות הקישורים</strong><br/><a href=\"https://www.pocketgamer.biz/epic-games-tells-supreme-court-that-apple-was-rightly-held-in-contempt\">Epic Games tells Supreme Court that Apple was rightly held in contempt</a> <em>(PocketGamer.biz)</em></li><li><strong>הצעת חוק הגינות הדיגיטלית באיחוד האירופי נפתחת למשוב</strong><br/><a href=\"https://www.pocketgamer.biz/have-your-say-feedback-on-the-eus-digital-fairness-act-proposal-is-open-until-january-14th\">Have your say: Feedback on the EU's Digital Fairness Act proposal opens</a> <em>(PocketGamer.biz)</em></li><li><strong>הרגולציה האירופית והבריטית החדשה מחייבת התאמה משפטית בפיתוח</strong><br/><a href=\"https://www.globalgamesforum.com/news-media/monetisation-masterclass-regulation-is-the-new-product-constrain\">Games Regulation 2026: Monetisation, AI, UGC &amp; Privacy</a> <em>(Gamesforum)</em></li><li><strong>סרטוני הנדסה לאחור חושפים מנגנוני מונטיזציה במונופול גו ורויל קינגדום</strong><br/><a href=\"https://mobilegamer.biz/new-decompiling-videos-allege-monopoly-go-borrows-from-slot-machines-and-royal-kingdom-secretly-makes-levels-harder\">New ‘decompilation’ videos allege Monopoly Go borrows from slot machines and Royal Kingdom secretly makes levels harder</a> <em>(MobileGamer.biz)</em></li><li><strong>Pixel Flow מוביל את תת-ז'אנר הפאזל בהיבריד-קז'ואל ברבעון השלישי</strong><br/><a href=\"https://mobilegamer.biz/data-digest-pixel-flow-monster-hunter-octobers-top-games-nintendo-numbers-more\">Data digest: Pixel Flow, Monster Hunter, October’s top games, Nintendo numbers, more</a> <em>(MobileGamer.biz)</em></li><li><strong>Auto Drill: משחק idle מינימליסטי שמכניס מעל 100 אלף דולר ביום</strong><br/><a href=\"https://www.gamigion.com/drilling-its-way-to-100k-a-day\">Drilling Its Way to $100K a Day</a> <em>(Gamigion)</em></li></ol>",
+  "duration": 1241,
+  "sources": [
+    {
+      "title": "From Games to DATA: $136B AppLovin Wants $1B Criteo?!",
+      "url": "https://www.gamigion.com/from-games-to-data-136b-applovin-wants-1b-criteo",
+      "source": "Gamigion"
+    },
+    {
+      "title": "Appcharge launches Checkout Experimentation Lab for D2C sales",
+      "url": "https://www.pocketgamer.biz/appcharge-launches-checkout-experimentation-lab-for-d2c-sales",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Epic Games tells Supreme Court that Apple was rightly held in contempt",
+      "url": "https://www.pocketgamer.biz/epic-games-tells-supreme-court-that-apple-was-rightly-held-in-contempt",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Have your say: Feedback on the EU's Digital Fairness Act proposal opens",
+      "url": "https://www.pocketgamer.biz/have-your-say-feedback-on-the-eus-digital-fairness-act-proposal-is-open-until-january-14th",
+      "source": "PocketGamer.biz"
+    },
+    {
+      "title": "Games Regulation 2026: Monetisation, AI, UGC & Privacy",
+      "url": "https://www.globalgamesforum.com/news-media/monetisation-masterclass-regulation-is-the-new-product-constrain",
+      "source": "Gamesforum"
+    },
+    {
+      "title": "New ‘decompilation’ videos allege Monopoly Go borrows from slot machines and Royal Kingdom secretly makes levels harder",
+      "url": "https://mobilegamer.biz/new-decompiling-videos-allege-monopoly-go-borrows-from-slot-machines-and-royal-kingdom-secretly-makes-levels-harder",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "Data digest: Pixel Flow, Monster Hunter, October’s top games, Nintendo numbers, more",
+      "url": "https://mobilegamer.biz/data-digest-pixel-flow-monster-hunter-octobers-top-games-nintendo-numbers-more",
+      "source": "MobileGamer.biz"
+    },
+    {
+      "title": "Drilling Its Way to $100K a Day",
+      "url": "https://www.gamigion.com/drilling-its-way-to-100k-a-day",
+      "source": "Gamigion"
+    }
+  ]
+}
