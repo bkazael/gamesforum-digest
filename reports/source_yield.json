@@ -104,5 +104,46 @@
     "selected": 1
    }
   }
+ },
+ {
+  "date": "2026-11-27",
+  "sources": {
+   "PocketGamer.biz": {
+    "listed": 46,
+    "blocked": 8,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 0,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 38,
+    "selected": 4
+   },
+   "MobileGamer.biz": {
+    "listed": 8,
+    "blocked": 0,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 0,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 8,
+    "selected": 2
+   },
+   "Gamesforum": {
+    "listed": 22,
+    "blocked": 0,
+    "skipped": 0,
+    "unreadable": 0,
+    "stale": 20,
+    "undated": 0,
+    "too_short": 0,
+    "unscored": 0,
+    "scored": 2,
+    "selected": 0
+   }
+  }
  }
 ]

@@ -1,87 +1,28 @@
 {
- "target": "2026-11-23",
- "published": "2026-11-23",
+ "target": "2026-11-30",
+ "published": null,
  "holds": 0,
  "held": null,
  "last_error": null,
  "history": [
   {
-   "date": "2026-11-20",
+   "date": "2026-11-27",
    "did": [
-    "selected 8 stories",
-    "wrote 3 stories"
+    "selected 6 stories",
+    "wrote 2 stories"
    ],
    "status": "ok",
    "calls": {
-    "quota_day": "2026-11-20",
+    "quota_day": "2026-11-27",
     "today": {
-     "gemini-3.5-flash-lite": 7,
-     "gemini-3.5-flash": 5,
-     "gemini-3.8-flash": 6
+     "gemini-3.5-flash-lite": 3,
+     "gemini-3.5-flash": 4,
+     "gemini-3.8-flash": 5
     },
     "this_run": {
-     "gemini-3.5-flash-lite": 7,
-     "gemini-3.5-flash": 5,
-     "gemini-3.8-flash": 6
-    },
-    "daily_budget": 16
-   }
-  },
-  {
-   "date": "2026-11-21",
-   "did": [
-    "wrote 3 stories"
-   ],
-   "status": "ok",
-   "calls": {
-    "quota_day": "2026-11-21",
-    "today": {
-     "gemini-3.8-flash": 6,
-     "gemini-3.5-flash": 5
-    },
-    "this_run": {
-     "gemini-3.8-flash": 6,
-     "gemini-3.5-flash": 5
-    },
-    "daily_budget": 16
-   }
-  },
-  {
-   "date": "2026-11-22",
-   "did": [
-    "wrote 2 stories",
-    "assembled 8 stories, 5 bridges",
-    "intro",
-    "proofread (3 fixes)",
-    "vowel marks on 9 words"
-   ],
-   "status": "ok",
-   "calls": {
-    "quota_day": "2026-11-22",
-    "today": {
-     "gemini-3.8-flash": 4,
-     "gemini-3.5-flash": 7
-    },
-    "this_run": {
-     "gemini-3.8-flash": 4,
-     "gemini-3.5-flash": 7
-    },
-    "daily_budget": 16
-   }
-  },
-  {
-   "date": "2026-11-23",
-   "did": [
-    "published"
-   ],
-   "status": "ok",
-   "calls": {
-    "quota_day": "2026-11-23",
-    "today": {
-     "gemini-2.5-flash-preview-tts": 4
-    },
-    "this_run": {
-     "gemini-2.5-flash-preview-tts": 4
+     "gemini-3.5-flash-lite": 3,
+     "gemini-3.5-flash": 4,
+     "gemini-3.8-flash": 5
     },
     "daily_budget": 16
    }
